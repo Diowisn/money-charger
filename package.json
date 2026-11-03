@@ -9,6 +9,7 @@
     "start": "next start",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
+    "check:wa": "tsx --env-file=.env.local scripts/check-wa.ts",
     "db:setup": "tsx --env-file=.env.local scripts/db-setup.ts"
   },
   "dependencies": {
