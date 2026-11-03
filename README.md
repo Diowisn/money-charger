@@ -1,7 +1,7 @@
 # Money-Charger
 
-Bot WhatsApp pribadi untuk mencatat gaji dan pengeluaran. Tidak ada website: semua lewat chat.
-Next.js (hanya API route) di Vercel + Postgres online di Neon + Groq (AI cadangan). Tidak perlu memasang DBMS di komputer.
+Bot WhatsApp pribadi untuk mencatat gaji dan pengeluaran, plus dashboard web ringkas untuk melihat ringkasan, mengatur jatah, dan mengelola transaksi/pos.
+Next.js di Vercel + Postgres online di Neon + Groq (AI cadangan). Tidak perlu memasang DBMS di komputer.
 
 Acuan: `prd-catatan-keuangan-whatsapp.md` dan `srs-catatan-keuangan-whatsapp.md`.
 
@@ -16,8 +16,14 @@ Acuan: `prd-catatan-keuangan-whatsapp.md` dan `srs-catatan-keuangan-whatsapp.md`
 | `src/lib/pg-repo.ts` | Akses Neon Postgres. `mem-repo.ts` adalah versi memori untuk tes |
 | `src/app/api/whatsapp/webhook/route.ts` | Webhook Meta (GET verifikasi, POST pesan) |
 | `src/app/api/export/route.ts` | Unduh CSV (token 15 menit, sekali pakai) |
+| `src/app/page.tsx` + `dashboard.tsx` | Dashboard web: ringkasan, slider rencana, transaksi, pos |
+| `src/app/login/` | Halaman login password |
+| `src/lib/auth.ts` | Sesi cookie HMAC (`DASHBOARD_PASSWORD` + `AUTH_SECRET`) |
+| `src/lib/dashboard.ts` | View-model dashboard dari `State` + engine |
+| `src/lib/web-actions.ts` | Aksi web: simpan rencana, transaksi, pos, setup |
+| `src/app/api/dashboard`, `plan`, `transactions`, `pos`, `setup` | API dashboard (wajib login) |
 | `db/schema.sql` | Skema tabel |
-| `tests/` | 93 tes, termasuk skenario AC-01 sampai AC-26 |
+| `tests/` | 103 tes, termasuk skenario AC-01 sampai AC-26 dan aksi web |
 
 ## Setup (urutan disarankan)
 
@@ -40,6 +46,7 @@ Acuan: `prd-catatan-keuangan-whatsapp.md` dan `srs-catatan-keuangan-whatsapp.md`
 
 ### 4. Isi environment
 Salin `.env.example` ke `.env.local` dan isi. `ALLOWED_NUMBERS` adalah nomor pribadi Anda, format `62812...` tanpa plus.
+Isi `DASHBOARD_PASSWORD` dengan password kuat untuk halaman web. `AUTH_SECRET` opsional; bila kosong, cookie ditandatangani dengan password tersebut. Tanpa `DASHBOARD_PASSWORD`, halaman web menolak login tetapi bot WhatsApp tetap berjalan.
 Untuk percobaan lokal, isi variabel WhatsApp berikut sesuai API Setup Meta: `WA_PHONE_NUMBER_ID`, `WA_ACCESS_TOKEN`, `WA_APP_SECRET`. Buat sendiri nilai acak untuk `WA_VERIFY_TOKEN`; gunakan nilai yang sama saat mendaftarkan webhook. Versi Graph API bawaan adalah `v25.0`; samakan dengan versi yang ditampilkan Meta.
 
 ```bash
@@ -74,6 +81,8 @@ Contoh berikut hanya format pengisian. Ganti semua nilai bertanda `GANTI_...` de
 | `DATABASE_URL` | Connection string pooled dari Neon |
 | `GROQ_API_KEY` | `GANTI_DENGAN_API_KEY_GROQ` |
 | `GROQ_MODEL` | `openai/gpt-oss-20b` |
+| `DASHBOARD_PASSWORD` | password kuat untuk login dashboard web |
+| `AUTH_SECRET` | opsional; string acak panjang untuk menandatangani cookie sesi |
 | `HEALTH_TOKEN` | opsional; bila diisi, `/api/health` hanya bisa dibuka dengan `?token=<nilai ini>` |
 
 Di halaman Webhooks Meta, gunakan:
@@ -137,6 +146,21 @@ Invoke-RestMethod `
 ### 6. Ganti nomor bot (FR-83)
 Ganti `WA_PHONE_NUMBER_ID` dan `WA_ACCESS_TOKEN` di Vercel, redeploy. Kode dan data tidak berubah.
 Ganti nomor pribadi: ubah `ALLOWED_NUMBERS`, jalankan `npm run db:setup` lagi.
+
+## Dashboard web
+
+Buka `https://<domain-vercel-anda>/login` lalu masukkan `DASHBOARD_PASSWORD`. Untuk lokal: `npm run dev`, buka `http://localhost:3000`, dan lihat nilai `DASHBOARD_PASSWORD` di `.env.local`.
+
+Isi dashboard:
+
+- **Ringkasan**: sisa uang, rasio terpakai, pendapatan/pengeluaran bulan ini, alokasi per grup, dan detail pos yang bisa dilipat.
+- **Rencana**: slider jatah per pos, Dana Darurat, Tabungan, dan Investasi. Simpan membuat versi rencana baru (versi lama diarsipkan). Opsi "berlaku juga di periode berjalan" menyesuaikan gaji periode aktif dan mencatat selisih ke Saldo.
+- **Transaksi**: catat pengeluaran, pemasukan, gaji, bonus, tarik, dan pindah; hapus transaksi (pembatalan, bukan hapus permanen). Menghapus gaji juga membatalkan alokasi dan selisihnya.
+- **Pos**: tambah pos (langsung masuk rencana aktif), ganti nama, tambah alias, nonaktifkan, dan setup awal sebelum gaji pertama.
+
+Perubahan dari web dan WhatsApp memakai database yang sama. Semua API dashboard wajib login; `/api/health` tetap publik untuk diagnosa.
+
+Saat deploy, tambahkan `DASHBOARD_PASSWORD` (dan `AUTH_SECRET` bila dipakai) di Vercel, lalu redeploy. Tanpa itu halaman login akan menampilkan pesan bahwa password belum diatur.
 
 ## Perintah chat
 

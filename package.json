@@ -2,7 +2,7 @@
   "name": "money-charger",
   "version": "0.1.0",
   "private": true,
-  "description": "Bot WhatsApp pribadi untuk catatan keuangan (Next.js API-only + Neon Postgres)",
+  "description": "Bot WhatsApp + dashboard web pribadi untuk catatan keuangan (Next.js + Neon Postgres)",
   "scripts": {
     "dev": "next dev",
     "build": "next build",

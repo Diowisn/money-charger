@@ -5,7 +5,16 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const WA_VARS = ["WA_PHONE_NUMBER_ID", "WA_ACCESS_TOKEN", "WA_APP_SECRET", "WA_VERIFY_TOKEN"] as const;
-const SEMUA_VARS = ["DATABASE_URL", ...WA_VARS, "WA_API_VERSION", "ALLOWED_NUMBERS", "APP_BASE_URL", "GROQ_API_KEY"] as const;
+const SEMUA_VARS = [
+  "DATABASE_URL",
+  ...WA_VARS,
+  "WA_API_VERSION",
+  "ALLOWED_NUMBERS",
+  "APP_BASE_URL",
+  "GROQ_API_KEY",
+  "DASHBOARD_PASSWORD",
+  "AUTH_SECRET",
+] as const;
 
 const TABEL = [
   "allowed_numbers",
@@ -51,6 +60,7 @@ export async function GET(req: NextRequest) {
   for (const k of WA_VARS) if (!env[k]) peringatan.push(`${k} belum diisi.`);
   if (!env.ALLOWED_NUMBERS) peringatan.push("ALLOWED_NUMBERS kosong (hanya dipakai saat db:setup).");
   if (!env.APP_BASE_URL) peringatan.push("APP_BASE_URL kosong; perintah ekspor tidak bisa membuat tautan.");
+  if (!env.DASHBOARD_PASSWORD) peringatan.push("DASHBOARD_PASSWORD kosong; dashboard web menolak login.");
 
   const db: Record<string, unknown> = {
     tersambung: false,
