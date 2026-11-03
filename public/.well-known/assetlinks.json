@@ -1,10 +1,8 @@
-[
-  {
-    "relation": ["delegate_permission/common.handle_all_urls"],
-    "target": {
-      "namespace": "android_app",
-      "package_name": "GANTI.DENGAN.PACKAGE.ID",
-      "sha256_cert_fingerprints": ["GANTI:DENGAN:SHA256:DARI:PWABUILDER"]
-    }
-  }
-]
+[{
+      "relation": ["delegate_permission/common.handle_all_urls"],
+      "target": {
+        "namespace": "android_app",
+        "package_name": "app.vercel.money_charger.twa",
+        "sha256_cert_fingerprints": ["30:2C:D8:31:1D:CB:57:79:EE:7A:57:AD:42:5F:47:05:F0:32:B7:2A:46:DA:23:39:EC:20:F6:41:31:95:BA:E2"]
+      }
+    }]
