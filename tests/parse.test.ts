@@ -1,0 +1,135 @@
+import { describe, expect, it } from "vitest";
+import { parseAmount } from "@/lib/parse/amount";
+import { parseCommand } from "@/lib/parse/command";
+import { extractDate, wibDate } from "@/lib/parse/date";
+import { rp, splitPesan } from "@/lib/format";
+import { validasiAi } from "@/lib/ai";
+
+const v = (t: string) => {
+  const r = parseAmount(t);
+  return r.ok ? r.value : r.reason;
+};
+
+describe("parser nominal (SRS 6.1)", () => {
+  it.each([
+    ["25rb", 25_000],
+    ["25k", 25_000],
+    ["25.000", 25_000],
+    ["25000", 25_000],
+    ["1.8jt", 1_800_000],
+    ["1,8jt", 1_800_000],
+    ["1,8 juta", 1_800_000],
+    ["1jt", 1_000_000],
+    ["1 juta", 1_000_000],
+    ["1.500.000", 1_500_000],
+    ["250rb", 250_000],
+    ["1,85jt", 1_850_000],
+    ["Rp25.000", 25_000],
+    ["2,5rb", 2_500],
+  ])("%s -> %i", (t, hasil) => expect(v(t)).toBe(hasil));
+
+  it("menolak nol, negatif, ambigu, terlalu besar, dan tanpa angka", () => {
+    expect(v("0")).toBe("nol");
+    expect(v("-25rb")).toBe("negatif");
+    expect(v("25,5")).toBe("ambigu");
+    expect(v("2000jt")).toBe("terlalu_besar");
+    expect(v("kopi")).toBe("tidak_ada");
+  });
+
+  it("angka kecil polos tidak mengalahkan nominal bersatuan", () => {
+    expect(v("2 gelas kopi 25rb")).toBe(25_000);
+    expect(v("parkir 500")).toBe(500);
+  });
+});
+
+describe("tanggal (SRS 6.3)", () => {
+  const today = "2026-10-17";
+  it("kata tanggal", () => {
+    expect(extractDate("bensin kemarin", today).date).toBe("2026-10-16");
+    expect(extractDate("makan lusa lalu", today).date).toBe("2026-10-15");
+    expect(extractDate("makan tgl 10", today).date).toBe("2026-10-10");
+    expect(extractDate("makan tgl 20", today).date).toBe("2026-09-20"); // n > hari ini -> bulan lalu
+    expect(extractDate("makan tgl 17/10", today).date).toBe("2026-10-17");
+    expect(extractDate("makan 25/12", today).date).toBe("2025-12-25"); // masa depan -> tahun lalu
+  });
+  it("menolak tanggal tidak valid atau masa depan", () => {
+    expect(extractDate("makan tgl 31/02", today).error).toBeTruthy();
+    expect(extractDate("makan tgl 01/01/2027", today).error).toMatch(/masa depan/);
+  });
+  it("WIB: 23.30 UTC sudah hari berikutnya di WIB", () => {
+    expect(wibDate(Date.UTC(2026, 9, 31, 23, 30))).toBe("2026-11-01");
+  });
+});
+
+describe("perintah", () => {
+  const t = "2026-10-17";
+  it("out", () => {
+    expect(parseCommand("OUT 25rb kopi", t)).toMatchObject({ k: "out", nominal: 25_000, uraian: "kopi", tanggal: null });
+    expect(parseCommand("out 20rb bensin kemarin", t)).toMatchObject({ k: "out", nominal: 20_000, uraian: "bensin", tanggal: "2026-10-16" });
+  });
+  it("gaji, bonus, in", () => {
+    expect(parseCommand("gaji masuk 1.8 juta", t)).toMatchObject({ k: "gaji", nominal: 1_800_000 });
+    expect(parseCommand("gaji 1.8jt tgl 15", t)).toMatchObject({ k: "gaji", tanggal: "2026-10-15" });
+    expect(parseCommand("gaji udah masuk 1,8 juta", t).k).toBe("error"); // sintaks gaji ketat
+    expect(parseCommand("gaji bulan lalu 1,5 juta", t).k).toBe("error");
+    expect(parseCommand("bonus 200rb ke tabungan", t)).toMatchObject({ k: "bonus", nominal: 200_000, wadah: "tabungan" });
+    expect(parseCommand("in 150rb freelance ke investasi", t)).toMatchObject({ k: "in", wadah: "investasi", label: "freelance" });
+  });
+  it("rencana dan wadah", () => {
+    expect(parseCommand("set makan 400rb sekarang", t)).toMatchObject({ k: "set", pos: "makan", nominal: 400_000, sekarang: true });
+    expect(parseCommand("geser 50rb dari jajan ke bensin", t)).toMatchObject({ k: "geser", nominal: 50_000, dari: "jajan", ke: "bensin" });
+    expect(parseCommand("tarik tabungan 200rb", t)).toMatchObject({ k: "tarik", wadah: "tabungan", nominal: 200_000 });
+    expect(parseCommand("pindah 100rb dari saldo ke tabungan", t)).toMatchObject({ k: "pindah", dari: "saldo", ke: "tabungan" });
+    expect(parseCommand("pindah 100rb dari saldo ke saldo", t).k).toBe("error");
+  });
+  it("setup", () => {
+    expect(parseCommand("setup 17/10 saldo 300rb tabungan 0 investasi 0", t)).toMatchObject({
+      k: "setup", tanggal: "2026-10-17", saldo: 300_000, tabungan: 0, investasi: 0,
+    });
+  });
+  it("kata tunggal dan bahasa bebas", () => {
+    expect(parseCommand("Saldo", t).k).toBe("saldo");
+    expect(parseCommand("laporan periode", t).k).toBe("laporan_periode");
+    expect(parseCommand("hapus terakhir", t).k).toBe("hapus_terakhir");
+    expect(parseCommand("tadi beli kopi 25rb pakai gopay", t).k).toBe("bebas");
+    expect(parseCommand("ya tadi beli kopi 25rb", t).k).toBe("bebas");
+  });
+  it("nominal tidak valid memberi pesan jelas", () => {
+    expect(parseCommand("out 0 kopi", t)).toMatchObject({ k: "error" });
+    expect(parseCommand("out kopi", t)).toMatchObject({ k: "error" });
+  });
+});
+
+describe("format", () => {
+  it("rupiah dan pemecahan pesan", () => {
+    expect(rp(1_800_000)).toBe("Rp1.800.000");
+    expect(rp(-20_000)).toBe("-Rp20.000");
+    const panjang = Array.from({ length: 600 }, (_, i) => `baris ${i}`).join("\n");
+    const bagian = splitPesan(panjang);
+    expect(bagian.length).toBeGreaterThan(1);
+    expect(bagian.every((b) => b.length <= 4096)).toBe(true);
+    expect(bagian.join("\n")).toBe(panjang);
+  });
+});
+
+describe("validasi AI (SRS 7.3, AC-13)", () => {
+  const nama = ["Jajan / Kopi / Self-Reward", "Bensin & Parkir"];
+  const today = "2026-10-17";
+  const pesan = "tadi beli kopi 25rb pakai gopay";
+  it("menerima hasil yang konsisten dengan pesan", () => {
+    const r = validasiAi({ intent: "out", amount_text: "25rb", sub_pos: "Jajan / Kopi / Self-Reward", tanggal_text: null, label: "kopi" }, pesan, nama, today);
+    expect(r).toMatchObject({ ok: true, hasil: { nominal: 25_000, subPos: "Jajan / Kopi / Self-Reward" } });
+  });
+  it("menolak nominal yang tidak ada di pesan", () => {
+    expect(validasiAi({ intent: "out", amount_text: "35rb" }, pesan, nama, today).ok).toBe(false);
+  });
+  it("sub_pos di luar daftar dianggap belum dipetakan", () => {
+    const r = validasiAi({ intent: "out", amount_text: "25rb", sub_pos: "Kopi" }, pesan, nama, today);
+    expect(r).toMatchObject({ ok: true, hasil: { subPos: null } });
+  });
+  it("gaji tidak dieksekusi, tidak_jelas dan JSON rusak gagal", () => {
+    expect(validasiAi({ intent: "gaji", amount_text: "25rb" }, pesan, nama, today)).toMatchObject({ ok: false, alasan: "gaji" });
+    expect(validasiAi({ intent: "tidak_jelas" }, pesan, nama, today).ok).toBe(false);
+    expect(validasiAi(null, pesan, nama, today).ok).toBe(false);
+  });
+});
