@@ -280,6 +280,9 @@ function Ringkasan({
           <span>Terpakai {rp(r.terpakai)}</span>
           <span>Total {rp(r.totalRencana)}</span>
         </div>
+        {r.belumDipetakan > 0 ? (
+          <p className="muted kecil">Termasuk {rp(r.belumDipetakan)} pengeluaran tanpa pos.</p>
+        ) : null}
       </section>
 
       <section className="grid-2">
@@ -318,6 +321,10 @@ function Ringkasan({
             </li>
           ))}
         </ul>
+        <p className="muted kecil">
+          Terpakai {rp(data.grup.reduce((s, g) => s + g.terpakai, 0))}
+          {r.belumDipetakan > 0 ? ` · tanpa pos ${rp(r.belumDipetakan)}` : ""}
+        </p>
       </section>
 
       <section className="tumpuk">
@@ -372,6 +379,7 @@ function Ringkasan({
           <p className="label">Dana Darurat</p>
           <p className="angka">{rp(data.posLain.ddSisa)}</p>
           <p className="muted">dari {rp(data.posLain.dd)}</p>
+          {r.kekuranganDD > 0 ? <p className="merah kecil">Kurang {rp(r.kekuranganDD)}</p> : null}
         </div>
         <div className="kartu mini">
           <p className="label">Tabungan</p>

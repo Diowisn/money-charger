@@ -68,6 +68,8 @@ describe("dashboard", () => {
     expect(d.ringkasan.terpakai).toBe(75_000);
     expect(d.ringkasan.sisaUang).toBe(d.ringkasan.totalRencana - 75_000);
     expect(d.ringkasan.ddSisa).toBe(d.ringkasan.dd - 25_000);
+    expect(d.ringkasan.belumDipetakan).toBe(25_000);
+    expect(d.ringkasan.kekuranganDD).toBe(0);
     expect(d.grup[0].terpakai).toBe(50_000);
     expect(d.posSemua.find((p) => p.id === pos.id)!.terpakai).toBe(50_000);
     expect(d.transaksi).toHaveLength(2);

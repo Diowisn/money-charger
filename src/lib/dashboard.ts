@@ -68,6 +68,8 @@ export interface DashboardData {
     investasi: number;
     dd: number;
     ddSisa: number;
+    belumDipetakan: number;
+    kekuranganDD: number;
   };
   grup: GrupView[];
   posLain: { dd: number; tabungan: number; investasi: number; ddSisa: number };
@@ -200,6 +202,8 @@ export function bangunDashboard(state: State, hariIni: string): DashboardData {
       investasi: wadah.investasi,
       dd,
       ddSisa,
+      belumDipetakan: statistik.belumDipetakan,
+      kekuranganDD: statistik.kekuranganDD,
     },
     grup,
     posLain: {
