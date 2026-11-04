@@ -9,7 +9,7 @@ import {
   SEED_TABUNGAN,
 } from "./seed";
 import { parseConfig } from "./engine";
-import type { NewTx, Pending, PlanItem, State, Tx } from "./types";
+import type { Debt, NewDebt, NewTx, Pending, PlanItem, State, Tx } from "./types";
 
 interface Data {
   allowed: string[];
@@ -19,9 +19,10 @@ interface Data {
   aliases: State["aliases"];
   plans: State["plans"];
   txs: Tx[];
+  debts: Debt[];
   pendings: (Pending & { status: string })[];
   inbound: Map<string, string>;
-  seq: { tx: number; plan: number; sub: number; pending: number };
+  seq: { tx: number; plan: number; sub: number; pending: number; debt: number };
 }
 
 /** Implementasi dalam memori, dipakai pengujian. Perilakunya mengikuti PgRepo. */
@@ -38,9 +39,10 @@ export class MemRepo implements Repo {
       aliases: [],
       plans: [],
       txs: [],
+      debts: [],
       pendings: [],
       inbound: new Map(),
-      seq: { tx: 0, plan: 0, sub: 0, pending: 0 },
+      seq: { tx: 0, plan: 0, sub: 0, pending: 0, debt: 0 },
     };
     this.seed();
   }
@@ -72,6 +74,7 @@ export class MemRepo implements Repo {
       aliases: d.aliases,
       plans: d.plans,
       txs: d.txs,
+      debts: d.debts,
     });
   }
 
@@ -148,6 +151,19 @@ export class MemRepo implements Repo {
   }
   async addAlias(subPostId: number, alias: string) {
     if (!this.d.aliases.some((a) => a.alias === alias)) this.d.aliases.push({ alias, subPostId });
+  }
+
+  async addDebt(d: NewDebt) {
+    const id = ++this.d.seq.debt;
+    this.d.debts.push({ ...d, id, status: d.status ?? "aktif" });
+    return id;
+  }
+
+  async updateDebt(id: number, patch: { dibayar?: number; status?: Debt["status"] }) {
+    const d = this.d.debts.find((x) => x.id === id);
+    if (!d) return;
+    if (patch.dibayar !== undefined) d.dibayar = patch.dibayar;
+    if (patch.status !== undefined) d.status = patch.status;
   }
 
   async addPending(jenis: string, payload: Record<string, unknown>, kedaluwarsaPada: number) {

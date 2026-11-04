@@ -126,7 +126,13 @@ class Sesi {
       case "error": return cmd.pesan;
       case "setup": return this.setup(cmd);
       case "out":
-        return this.catatOut({ nominal: cmd.nominal, uraian: cmd.uraian, tanggal: cmd.tanggal ?? this.today, sumber: "kaku" });
+        return this.catatOut({
+          nominal: cmd.nominal,
+          biayaAdmin: cmd.biayaAdmin,
+          uraian: cmd.uraian,
+          tanggal: cmd.tanggal ?? this.today,
+          sumber: "kaku",
+        });
       case "in":
         return this.catatIn(cmd.nominal, cmd.label, cmd.wadah, cmd.tanggal ?? this.today, "kaku");
       case "gaji": return this.gaji(cmd.nominal, cmd.tanggal ?? this.today, false);
@@ -142,6 +148,9 @@ class Sesi {
       case "pindah": return this.pindah(cmd.nominal, cmd.dari, cmd.ke, "pindah");
       case "saldo": return teksWadah(hitungWadah(this.state));
       case "sisa": return this.sisa(cmd.pos);
+      case "debt_add": return this.debtTambah(cmd.jenis, cmd.nominal, cmd.nama, cmd.jatuhTempo);
+      case "debt_list": return this.debtDaftar(cmd.jenis);
+      case "debt_pay": return this.debtBayar(cmd.jenis, cmd.nama, cmd.nominal);
       case "laporan": return teksLaporan(this.state, this.today);
       case "laporan_periode": return teksLaporanPeriode(this.state);
       case "evaluasi": return this.evaluasiManual();
@@ -168,6 +177,7 @@ class Sesi {
 
   private async catatOut(p: {
     nominal: number;
+    biayaAdmin?: number;
     uraian: string;
     tanggal: string;
     sumber: "kaku" | "ai";
@@ -184,7 +194,16 @@ class Sesi {
       if (kec.kind === "satu") sub = kec.id;
     }
     const id = await this.r.insertTx(
-      buatTx({ tipe: "out", nominal: p.nominal, subPostId: sub, tanggal: p.tanggal, label: p.uraian || null, sumber: p.sumber, waMessageId: this.msg.id }),
+      buatTx({
+        tipe: "out",
+        nominal: p.nominal,
+        biayaAdmin: p.biayaAdmin ?? 0,
+        subPostId: sub,
+        tanggal: p.tanggal,
+        label: p.uraian || null,
+        sumber: p.sumber,
+        waMessageId: this.msg.id,
+      }),
     );
     if (sub === null) await this.r.addPending("petakan", { txId: id }, this.nowMs + PETAKAN_MS);
     await this.muat();
@@ -201,7 +220,9 @@ class Sesi {
     const w = hitungWadah(state);
     const ai = t.sumber === "ai";
 
-    let kepala = `Tercatat${ai ? " (dibaca AI)" : ""}: ${rp(t.nominal)}, ${sub ? sub.nama : "belum dipetakan"}`;
+    const total = t.nominal + (t.biayaAdmin ?? 0);
+    const admin = t.biayaAdmin > 0 ? ` + admin ${rp(t.biayaAdmin)} (total ${rp(total)})` : "";
+    let kepala = `Tercatat${ai ? " (dibaca AI)" : ""}: ${rp(t.nominal)}${admin}, ${sub ? sub.nama : "belum dipetakan"}`;
     if (t.tanggal !== this.today) kepala += ` (tgl ${tglPendek(t.tanggal)})`;
     kepala += ".";
 
@@ -242,10 +263,11 @@ class Sesi {
       const pilihan = daftarPilihan(state);
       if (kec.kind === "banyak") {
         const nama = kec.ids.map((id) => state.subPosts.find((s) => s.id === id)!.nama).join(", ");
-        baris.push(`Pesan cocok dengan lebih dari satu pos (${nama}). ${rp(t.nominal)} untuk apa? Balas nama pos: ${pilihan}.`);
+        baris.push(`Pesan cocok dengan lebih dari satu pos (${nama}). ${rp(total)} untuk apa? Balas nama pos: ${pilihan}.`);
       } else {
-        baris.push(`${rp(t.nominal)} untuk apa? Balas nama pos: ${pilihan}.`);
+        baris.push(`${rp(total)} untuk apa? Balas nama pos: ${pilihan}.`);
       }
+      baris.push('Atau balas "tanpa pos" untuk membiarkannya. Untuk pos baru: pos tambah operasional <nama> 0.');
     }
     return baris.join("\n");
   }
@@ -432,7 +454,8 @@ class Sesi {
   private deskripsi(t: Tx): string {
     const sub = t.subPostId ? this.state.subPosts.find((s) => s.id === t.subPostId)?.nama : null;
     const jenis: Record<string, string> = { out: "pengeluaran", in: "pemasukan", gaji: "gaji", bonus: "bonus", tarik: "penarikan", pindah: "pemindahan", geser: "geser jatah" };
-    return `${jenis[t.tipe] ?? t.tipe} ${rp(t.nominal)}${sub ? ` (${sub})` : ""} tgl ${tglPendek(t.tanggal)}`;
+    const admin = t.biayaAdmin > 0 ? ` + admin ${rp(t.biayaAdmin)}` : "";
+    return `${jenis[t.tipe] ?? t.tipe} ${rp(t.nominal)}${admin}${sub ? ` (${sub})` : ""} tgl ${tglPendek(t.tanggal)}`;
   }
 
   private async batalkan(id: number) {
@@ -697,6 +720,59 @@ class Sesi {
     return `${st.nama}: jatah efektif ${rp(st.efektif)}, terpakai ${rp(st.terpakai)}, sisa ${rp(st.sisa)}${st.lewat ? `, lewat ${rp(st.lewat)} (ditutup Dana Darurat)` : ""}.`;
   }
 
+  // ---------- piutang / utang ----------
+
+  private async debtTambah(jenis: "piutang" | "utang", nominal: number, nama: string, jatuhTempo: string | null): Promise<string> {
+    const id = await this.r.addDebt({
+      jenis,
+      nama: judul(nama.trim()),
+      nominal,
+      dibayar: 0,
+      tanggal: this.today,
+      jatuhTempo,
+      catatan: null,
+    });
+    await this.muat();
+    const d = this.state.debts.find((x) => x.id === id)!;
+    const label = jenis === "piutang" ? "Piutang (orang berutang ke kita)" : "Utang (kita berutang)";
+    const jt = jatuhTempo ? ` Jatuh tempo ${tglPendek(jatuhTempo)}.` : "";
+    return `${label} dicatat: ${rp(nominal)} atas nama ${d.nama}.${jt} Ketik "${jenis}" untuk lihat daftar, atau "lunasi ${jenis} ${d.nama}" bila sudah lunas.`;
+  }
+
+  private debtDaftar(jenis: "piutang" | "utang"): string {
+    const aktif = this.state.debts.filter((d) => d.status === "aktif" && d.jenis === jenis);
+    const label = jenis === "piutang" ? "Piutang aktif (orang berutang ke kita)" : "Utang aktif (kita berutang)";
+    if (!aktif.length) return `${label}: tidak ada.`;
+    const total = aktif.reduce((s, d) => s + (d.nominal - d.dibayar), 0);
+    const baris = aktif.map((d) => {
+      const sisa = d.nominal - d.dibayar;
+      const lewat = d.jatuhTempo && d.jatuhTempo < this.today;
+      return `- ${d.nama}: sisa ${rp(sisa)} dari ${rp(d.nominal)}${d.jatuhTempo ? `, jatuh tempo ${tglPendek(d.jatuhTempo)}${lewat ? " (lewat tempo)" : ""}` : ""}`;
+    });
+    return [`${label} (total ${rp(total)}):`, ...baris].join("\n");
+  }
+
+  private async debtBayar(jenis: "piutang" | "utang", nama: string, nominal: number | null): Promise<string> {
+    const n = norm(nama);
+    const cocok = this.state.debts.filter((d) => d.status === "aktif" && d.jenis === jenis && norm(d.nama).includes(n));
+    if (!cocok.length) return `Tidak ada ${jenis} aktif atas nama "${nama}".`;
+    if (cocok.length > 1) {
+      return `Ada lebih dari satu ${jenis} cocok: ${cocok.map((d) => d.nama).join(", ")}. Sebutkan nama lebih lengkap.`;
+    }
+    const d = cocok[0];
+    const sisa = d.nominal - d.dibayar;
+    const bayar = nominal ?? sisa;
+    if (bayar > sisa) return `Nominal ${rp(bayar)} melebihi sisa ${jenis} ${rp(sisa)}.`;
+    const dibayar = d.dibayar + bayar;
+    const lunas = dibayar >= d.nominal;
+    await this.r.updateDebt(d.id, { dibayar, status: lunas ? "lunas" : "aktif" });
+    await this.muat();
+    const kataArah = jenis === "piutang" ? `diterima dari ${d.nama}` : `dibayar ke ${d.nama}`;
+    return lunas
+      ? `${rp(bayar)} ${kataArah}. ${judul(jenis)} ini lunas.`
+      : `${rp(bayar)} ${kataArah}. Sisa ${jenis}: ${rp(d.nominal - dibayar)}.`;
+  }
+
   private async ekspor(): Promise<string> {
     if (!this.deps.baseUrl) return "APP_BASE_URL belum diatur, tautan ekspor belum bisa dibuat.";
     const token = randomBytes(24).toString("hex");
@@ -717,15 +793,20 @@ class Sesi {
         else {
           const id = this.resolveSub(teks);
           const t = this.state.txs.find((x) => x.id === Number(p.payload.txId));
+          const n = norm(teks);
+          const lewati = ["tanpa pos", "lewati", "skip", "biarkan", "belum dipetakan", "0"].includes(n);
           if (!t || t.status !== "berlaku") await this.r.resolvePending(p.id, "batal");
-          else if (id) {
+          else if (lewati && !id) {
+            await this.r.resolvePending(p.id, "selesai");
+            return `Baik, ${rp(t.nominal + (t.biayaAdmin ?? 0))} tetap tanpa pos. Kamu bisa memetakannya nanti lewat "koreksi pos <nama pos>".`;
+          } else if (id) {
             const sebelum = this.state;
             await this.r.updateTx(t.id, { subPostId: id });
             await this.r.resolvePending(p.id, "selesai");
             await this.muat();
             return `Dipetakan ke ${this.state.subPosts.find((s) => s.id === id)!.nama}.\n${this.balasOut(sebelum, t.id, { kind: "satu", id })}`;
-          } else if (teks.trim().split(/\s+/).length <= 3) {
-            return `Pos "${teks.trim()}" tidak dikenali. Balas salah satu: ${daftarPilihan(this.state)}. Atau "hapus terakhir" untuk membatalkan catatan itu.`;
+          } else if (teks.trim().split(/\s+/).length <= 5) {
+            return `Pos "${teks.trim()}" tidak dikenali. Balas salah satu: ${daftarPilihan(this.state)}.\nAtau "tanpa pos" untuk membiarkannya. Untuk pos baru: pos tambah operasional <nama> 0.`;
           }
         }
       }

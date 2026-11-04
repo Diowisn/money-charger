@@ -19,6 +19,8 @@ Acuan: [PRD Money-Charger SaaS](./prd-catatan-keuangan-whatsapp.md) dan [SRS](./
 | `src/modules/auth/` | Modul HMVC autentikasi dashboard |
 | `src/modules/export/` | Modul HMVC unduh CSV |
 | `src/modules/health/` | Modul HMVC diagnosa kesiapan |
+| `src/modules/email/` | Modul HMVC penerima email payroll generik (`/api/email/inbound`) |
+| `src/lib/email.ts` | Heuristik ekstraksi nominal & deteksi "gaji/payroll" dari teks email |
 | `src/app/api/` | Adapter Next.js tipis yang meneruskan request ke controller modul |
 | `src/app/page.tsx` | Adapter halaman dashboard Next.js |
 | `src/app/login/` | Halaman login password |
@@ -26,7 +28,7 @@ Acuan: [PRD Money-Charger SaaS](./prd-catatan-keuangan-whatsapp.md) dan [SRS](./
 | `src/lib/dashboard.ts` | View-model dashboard dari `State` + engine |
 | `src/lib/web-actions.ts` | Aksi web: simpan rencana, transaksi, pos, setup |
 | `db/schema.sql` | Skema tabel |
-| `tests/` | 106 tes, termasuk skenario AC-01 sampai AC-26, aksi web, dan controller HMVC |
+| `tests/` | 119 tes, termasuk skenario AC-01 sampai AC-26, aksi web, piutang/utang, biaya admin, dan controller HMVC |
 
 ## Arsitektur aplikasi (HMVC internal)
 
@@ -162,6 +164,42 @@ Invoke-RestMethod `
 ### 6. Ganti nomor bot (FR-83)
 Ganti `WA_PHONE_NUMBER_ID` dan `WA_ACCESS_TOKEN` di Vercel, redeploy. Kode dan data tidak berubah.
 Ganti nomor pribadi: ubah `ALLOWED_NUMBERS`, jalankan `npm run db:setup` lagi.
+
+### 7. Email payroll otomatis (opsional, generik)
+
+`POST /api/email/inbound` mencatat email masuk sebagai **gaji** (bila subjek/isi menyebut "gaji"/"payroll"/"salary"/"upah"/"THR")
+atau **pemasukan biasa** ke Saldo. Endpoint ini **tidak terikat ke satu bank atau penyedia email tertentu**: kirim
+request JSON dari layanan forwarding email pilihan Anda (mis. Resend Inbound, Cloudflare Email Workers, Mailgun Routes,
+atau Zapier/Make yang membaca email lalu memanggil webhook ini).
+
+1. Isi `EMAIL_INBOUND_SECRET` dengan string acak panjang di `.env.local` dan di Vercel, lalu redeploy.
+2. Konfigurasikan penyedia forwarding email Anda untuk meneruskan email BSI Syariah payroll ke endpoint ini sebagai
+   `POST https://<domain-vercel-anda>/api/email/inbound`, dengan header `X-Email-Secret: <EMAIL_INBOUND_SECRET>`
+   (atau query `?secret=<EMAIL_INBOUND_SECRET>` bila penyedia tidak bisa mengatur header kustom).
+3. Body JSON yang dikenali:
+
+   ```json
+   {
+     "id": "id-unik-email-ini",
+     "from": "noreply@bsimobile.example",
+     "subject": "Notifikasi Gaji Diterima",
+     "text": "Dana masuk Rp1.800.000 ke rekening Anda...",
+     "nominal": 1800000
+   }
+   ```
+
+   - `id` wajib dan harus unik per email (dipakai untuk mencegah pencatatan ganda bila penyedia mengirim ulang).
+   - `nominal` opsional tapi **sangat disarankan** diisi langsung oleh penyedia (lebih akurat). Bila kosong, server
+     mencoba mengambil angka rupiah pertama dari `text`/`html` dengan heuristik sederhana (`Rp1.800.000`, `2.500.000`, dst).
+   - Tanggal yang dipakai selalu tanggal hari ini (WIB) saat email diproses, bukan tanggal di isi email.
+
+4. Uji dengan `curl`/Postman sebelum menyambungkan penyedia sungguhan, supaya format JSON dan heuristik nominal sudah
+   sesuai dengan contoh email BSI Syariah Anda yang sebenarnya.
+
+Catatan penting: parser nominal ini adalah heuristik umum, **belum disesuaikan dengan format email BSI Syariah yang
+sebenarnya** karena belum ada contoh email asli. Setelah menerima contoh (boleh dengan nominal/identitas disamarkan),
+sesuaikan `ekstrakNominalEmail` di `src/lib/email.ts` agar presisi, dan pertimbangkan mengirim `nominal` langsung dari
+penyedia forwarding bila formatnya mendukung ekstraksi di sisi mereka.
 
 ## Dashboard web
 

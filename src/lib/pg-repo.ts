@@ -10,7 +10,7 @@ import {
   SEED_SUBPOS,
   SEED_TABUNGAN,
 } from "./seed";
-import type { NewTx, Pending, PlanItem, State, Tx, Wadah } from "./types";
+import type { Debt, NewDebt, NewTx, Pending, PlanItem, State, Tx, Wadah } from "./types";
 
 // bigint (int8) -> number, date -> string 'YYYY-MM-DD' (hindari konversi zona waktu)
 types.setTypeParser(20, (v) => Number(v));
@@ -37,7 +37,7 @@ export class PgRepo implements Repo {
 
   async load(): Promise<State> {
     const q = (t: string) => this.db.query(t).then((r) => r.rows);
-    const [cfg, groups, subs, aliases, plans, items, txs] = await Promise.all([
+    const [cfg, groups, subs, aliases, plans, items, txs, debts] = await Promise.all([
       q("SELECT kunci, nilai FROM config"),
       q("SELECT id, nama, urutan FROM groups ORDER BY urutan, id"),
       q("SELECT id, group_id, nama, kategori, aktif, urutan FROM sub_posts ORDER BY urutan, id"),
@@ -45,6 +45,7 @@ export class PgRepo implements Repo {
       q("SELECT id, nama, status FROM plan_versions ORDER BY id"),
       q("SELECT plan_version_id, tipe, sub_post_id, nominal FROM plan_items ORDER BY id"),
       q("SELECT * FROM transactions ORDER BY id"),
+      q("SELECT * FROM debts ORDER BY id"),
     ]);
     const config = parseConfig(Object.fromEntries(cfg.map((r) => [r.kunci, r.nilai])));
     return {
@@ -72,6 +73,7 @@ export class PgRepo implements Repo {
           id: t.id,
           tipe: t.tipe,
           nominal: t.nominal,
+          biayaAdmin: t.biaya_admin ?? 0,
           subPostId: t.sub_post_id,
           subPostIdTujuan: t.sub_post_id_tujuan,
           wadahAsal: t.wadah_asal as Wadah | null,
@@ -84,6 +86,19 @@ export class PgRepo implements Repo {
           indukId: t.induk_id,
           planVersionId: t.plan_version_id,
           waMessageId: t.wa_message_id,
+        }),
+      ),
+      debts: debts.map(
+        (d): Debt => ({
+          id: d.id,
+          jenis: d.jenis,
+          nama: d.nama,
+          nominal: d.nominal,
+          dibayar: d.dibayar,
+          tanggal: d.tanggal,
+          jatuhTempo: d.jatuh_tempo,
+          catatan: d.catatan,
+          status: d.status,
         }),
       ),
     };
@@ -125,11 +140,11 @@ export class PgRepo implements Repo {
   async insertTx(t: NewTx) {
     const r = await this.db.query(
       `INSERT INTO transactions
-        (tipe, nominal, sub_post_id, sub_post_id_tujuan, wadah_asal, wadah_tujuan, tanggal, label,
+        (tipe, nominal, biaya_admin, sub_post_id, sub_post_id_tujuan, wadah_asal, wadah_tujuan, tanggal, label,
          sumber, status, pengganti_dari, induk_id, plan_version_id, wa_message_id)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) RETURNING id`,
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15) RETURNING id`,
       [
-        t.tipe, t.nominal, t.subPostId, t.subPostIdTujuan, t.wadahAsal, t.wadahTujuan, t.tanggal,
+        t.tipe, t.nominal, t.biayaAdmin ?? 0, t.subPostId, t.subPostIdTujuan, t.wadahAsal, t.wadahTujuan, t.tanggal,
         t.label, t.sumber, t.status ?? "berlaku", t.penggantiDari, t.indukId, t.planVersionId, t.waMessageId,
       ],
     );
@@ -184,6 +199,19 @@ export class PgRepo implements Repo {
       subPostId,
       alias,
     ]);
+  }
+
+  async addDebt(d: NewDebt) {
+    const r = await this.db.query(
+      `INSERT INTO debts (jenis, nama, nominal, dibayar, tanggal, jatuh_tempo, catatan, status)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING id`,
+      [d.jenis, d.nama, d.nominal, d.dibayar, d.tanggal, d.jatuhTempo, d.catatan, d.status ?? "aktif"],
+    );
+    return r.rows[0].id as number;
+  }
+  async updateDebt(id: number, patch: { dibayar?: number; status?: Debt["status"] }) {
+    if (patch.dibayar !== undefined) await this.db.query("UPDATE debts SET dibayar = $2 WHERE id = $1", [id, patch.dibayar]);
+    if (patch.status !== undefined) await this.db.query("UPDATE debts SET status = $2 WHERE id = $1", [id, patch.status]);
   }
 
   async addPending(jenis: string, payload: Record<string, unknown>, kedaluwarsaPada: number) {

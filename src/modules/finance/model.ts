@@ -2,14 +2,18 @@ import { bangunDashboard } from "@/lib/dashboard";
 import { wibDate } from "@/lib/parse/date";
 import { PgRepo } from "@/lib/pg-repo";
 import {
+  batalkanDebt,
   batalkanTransaksi,
+  bayarDebt,
   gantiNamaPos,
   nonaktifkanPos,
   simpanRencana,
   simpanSetup,
   tambahAliasPos,
+  tambahDebt,
   tambahPos,
   tambahTransaksi,
+  type InputDebt,
   type InputTransaksi,
   type ItemRencana,
 } from "@/lib/web-actions";
@@ -64,4 +68,16 @@ export async function simpanSetupFinance(body: {
   investasiAwal: number;
 }) {
   return simpanSetup(new PgRepo(), wibDate(Date.now()), body);
+}
+
+export async function tambahDebtFinance(input: InputDebt) {
+  return tambahDebt(new PgRepo(), wibDate(Date.now()), input);
+}
+
+export async function bayarDebtFinance(id: number, nominal?: number | null) {
+  return bayarDebt(new PgRepo(), id, nominal);
+}
+
+export async function batalkanDebtFinance(id: number) {
+  return batalkanDebt(new PgRepo(), id);
 }

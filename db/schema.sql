@@ -48,6 +48,7 @@ CREATE TABLE IF NOT EXISTS transactions (
   tipe                TEXT NOT NULL CHECK (tipe IN
     ('out','in','gaji','bonus','tarik','pindah','alokasi_gaji','selisih_gaji','tambahan_jatah','geser')),
   nominal             BIGINT NOT NULL CHECK (nominal > 0),
+  biaya_admin         BIGINT NOT NULL DEFAULT 0 CHECK (biaya_admin >= 0),
   sub_post_id         INT REFERENCES sub_posts(id),
   sub_post_id_tujuan  INT REFERENCES sub_posts(id),         -- hanya untuk geser
   wadah_asal          TEXT CHECK (wadah_asal IN ('saldo','tabungan','investasi')),
@@ -64,6 +65,22 @@ CREATE TABLE IF NOT EXISTS transactions (
 );
 CREATE INDEX IF NOT EXISTS idx_tx_tanggal ON transactions (tanggal);
 CREATE INDEX IF NOT EXISTS idx_tx_induk ON transactions (induk_id);
+ALTER TABLE transactions ADD COLUMN IF NOT EXISTS biaya_admin BIGINT NOT NULL DEFAULT 0 CHECK (biaya_admin >= 0);
+
+CREATE TABLE IF NOT EXISTS debts (
+  id            BIGSERIAL PRIMARY KEY,
+  jenis         TEXT NOT NULL CHECK (jenis IN ('piutang','utang')),
+  nama          TEXT NOT NULL,
+  nominal       BIGINT NOT NULL CHECK (nominal > 0),
+  dibayar       BIGINT NOT NULL DEFAULT 0 CHECK (dibayar >= 0),
+  tanggal       DATE NOT NULL,
+  jatuh_tempo   DATE,
+  catatan       TEXT,
+  status        TEXT NOT NULL DEFAULT 'aktif' CHECK (status IN ('aktif','lunas','batal')),
+  dibuat_pada   TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_debts_status ON debts (status);
+CREATE INDEX IF NOT EXISTS idx_debts_jenis ON debts (jenis);
 
 CREATE TABLE IF NOT EXISTS pending_actions (
   id                BIGSERIAL PRIMARY KEY,

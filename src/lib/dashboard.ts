@@ -4,6 +4,7 @@ import {
   hitungPeriode,
   hitungWadah,
   nominalItem,
+  nominalKeluar,
   periodes,
   planById,
   totalJatahSubPos,
@@ -37,6 +38,7 @@ export interface TxView {
   id: number;
   tipe: TxTipe;
   nominal: number;
+  biayaAdmin: number;
   tanggal: string;
   label: string | null;
   subPost: string | null;
@@ -44,6 +46,20 @@ export interface TxView {
   wadahTujuan: Wadah | null;
   status: "berlaku" | "batal";
   bisaDihapus: boolean;
+}
+
+export interface DebtView {
+  id: number;
+  jenis: "piutang" | "utang";
+  nama: string;
+  nominal: number;
+  dibayar: number;
+  sisa: number;
+  tanggal: string;
+  jatuhTempo: string | null;
+  catatan: string | null;
+  status: "aktif" | "lunas" | "batal";
+  lewatTempo: boolean;
 }
 
 export interface DashboardData {
@@ -70,8 +86,11 @@ export interface DashboardData {
     ddSisa: number;
     belumDipetakan: number;
     kekuranganDD: number;
+    piutangAktif: number;
+    utangAktif: number;
   };
   grup: GrupView[];
+  piutang: DebtView[];
   posLain: { dd: number; tabungan: number; investasi: number; ddSisa: number };
   transaksi: TxView[];
   posSemua: PosView[];
@@ -100,6 +119,7 @@ function ringkasTx(state: State, t: Tx): TxView {
     id: t.id,
     tipe: t.tipe,
     nominal: t.nominal,
+    biayaAdmin: t.biayaAdmin ?? 0,
     tanggal: t.tanggal,
     label: t.label,
     subPost: namaSubPost(state, t.subPostId),
@@ -165,7 +185,7 @@ export function bangunDashboard(state: State, hariIni: string): DashboardData {
     .reduce((s, t) => s + t.nominal, 0);
   const pengeluaranBulanIni = berlaku
     .filter((t) => t.tanggal.startsWith(bulan) && t.tipe === "out")
-    .reduce((s, t) => s + t.nominal, 0);
+    .reduce((s, t) => s + nominalKeluar(t), 0);
 
   const totalRencana = totalPlan(planPeriode);
   const jatahSubPos = totalJatahSubPos(planPeriode);
@@ -179,6 +199,32 @@ export function bangunDashboard(state: State, hariIni: string): DashboardData {
     .sort((a, b) => (a.tanggal < b.tanggal ? 1 : a.tanggal > b.tanggal ? -1 : b.id - a.id))
     .slice(0, 120)
     .map((t) => ringkasTx(state, t));
+
+  const piutang: DebtView[] = state.debts
+    .filter((d) => d.status !== "batal")
+    .map((d) => ({
+      id: d.id,
+      jenis: d.jenis,
+      nama: d.nama,
+      nominal: d.nominal,
+      dibayar: d.dibayar,
+      sisa: Math.max(0, d.nominal - d.dibayar),
+      tanggal: d.tanggal,
+      jatuhTempo: d.jatuhTempo,
+      catatan: d.catatan,
+      status: d.status,
+      lewatTempo: d.status === "aktif" && Boolean(d.jatuhTempo && d.jatuhTempo < hariIni),
+    }))
+    .sort((a, b) => {
+      if (a.status !== b.status) return a.status === "aktif" ? -1 : 1;
+      return a.tanggal < b.tanggal ? 1 : a.tanggal > b.tanggal ? -1 : b.id - a.id;
+    });
+  const piutangAktif = piutang
+    .filter((d) => d.status === "aktif" && d.jenis === "piutang")
+    .reduce((s, d) => s + d.sisa, 0);
+  const utangAktif = piutang
+    .filter((d) => d.status === "aktif" && d.jenis === "utang")
+    .reduce((s, d) => s + d.sisa, 0);
 
   return {
     hariIni,
@@ -204,8 +250,11 @@ export function bangunDashboard(state: State, hariIni: string): DashboardData {
       ddSisa,
       belumDipetakan: statistik.belumDipetakan,
       kekuranganDD: statistik.kekuranganDD,
+      piutangAktif,
+      utangAktif,
     },
     grup,
+    piutang,
     posLain: {
       dd,
       tabungan: nominalItem(planPeriode, "tabungan"),

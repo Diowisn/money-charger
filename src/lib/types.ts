@@ -24,6 +24,7 @@ export interface Tx {
   id: number;
   tipe: TxTipe;
   nominal: number;
+  biayaAdmin: number;
   subPostId: number | null;
   subPostIdTujuan: number | null;
   wadahAsal: Wadah | null;
@@ -44,6 +45,7 @@ export function buatTx(
   p: Partial<NewTx> & Pick<NewTx, "tipe" | "nominal" | "tanggal">,
 ): NewTx {
   return {
+    biayaAdmin: 0,
     subPostId: null,
     subPostIdTujuan: null,
     wadahAsal: null,
@@ -102,6 +104,23 @@ export interface Config {
   bonusSubPostId: number | null;
 }
 
+export type DebtJenis = "piutang" | "utang";
+export type DebtStatus = "aktif" | "lunas" | "batal";
+
+export interface Debt {
+  id: number;
+  jenis: DebtJenis;
+  nama: string;
+  nominal: number;
+  dibayar: number;
+  tanggal: string;
+  jatuhTempo: string | null;
+  catatan: string | null;
+  status: DebtStatus;
+}
+
+export type NewDebt = Omit<Debt, "id" | "status"> & { status?: DebtStatus };
+
 export interface State {
   config: Config;
   groups: Group[];
@@ -109,6 +128,7 @@ export interface State {
   aliases: AliasRow[];
   plans: PlanVersion[];
   txs: Tx[];
+  debts: Debt[];
 }
 
 export interface Pending {

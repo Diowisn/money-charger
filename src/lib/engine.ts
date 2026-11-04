@@ -54,6 +54,9 @@ export interface Periode {
 
 export const berlaku = (state: State): Tx[] => state.txs.filter((t) => t.status === "berlaku");
 
+/** Nominal keluar efektif: pengeluaran ditambah biaya admin (bila ada). */
+export const nominalKeluar = (t: Tx): number => (t.tipe === "out" ? t.nominal + (t.biayaAdmin ?? 0) : t.nominal);
+
 const urut = (a: Tx, b: Tx) => (a.tanggal < b.tanggal ? -1 : a.tanggal > b.tanggal ? 1 : a.id - b.id);
 
 export function periodes(state: State): Periode[] {
@@ -114,7 +117,7 @@ function ringkasPeriode(state: State, plan: PlanVersion, txs: Tx[]): RingkasanPe
     let geserNet = 0;
     let terpakai = 0;
     for (const t of txs) {
-      if (t.tipe === "out" && t.subPostId === s.id) terpakai += t.nominal;
+      if (t.tipe === "out" && t.subPostId === s.id) terpakai += nominalKeluar(t);
       else if (t.tipe === "tambahan_jatah" && t.subPostId === s.id) tambahan += t.nominal;
       else if (t.tipe === "geser") {
         if (t.subPostId === s.id) geserNet -= t.nominal;
@@ -137,7 +140,9 @@ function ringkasPeriode(state: State, plan: PlanVersion, txs: Tx[]): RingkasanPe
     });
   }
 
-  const belumDipetakan = txs.filter((t) => t.tipe === "out" && t.subPostId === null).reduce((s, t) => s + t.nominal, 0);
+  const belumDipetakan = txs
+    .filter((t) => t.tipe === "out" && t.subPostId === null)
+    .reduce((s, t) => s + nominalKeluar(t), 0);
   const dd = nominalItem(plan, "dd");
   const bebanDD = pos.reduce((s, x) => s + x.lewat, 0) + belumDipetakan;
   const ddSisa = Math.max(0, dd - bebanDD);
@@ -188,7 +193,7 @@ export function hitungWadah(state: State): SaldoWadah {
   const ps = periodes(state);
   for (const t of berlaku(state)) {
     if (t.tipe === "out") {
-      if (indeksPeriode(ps, t.tanggal) === 0) w.saldo -= t.nominal; // periode awal: langsung kurangi Saldo
+      if (indeksPeriode(ps, t.tanggal) === 0) w.saldo -= nominalKeluar(t); // periode awal: langsung kurangi Saldo
     } else if (TIPE_WADAH.has(t.tipe)) {
       if (t.wadahAsal) w[t.wadahAsal] -= t.nominal;
       if (t.wadahTujuan) w[t.wadahTujuan] += t.nominal;

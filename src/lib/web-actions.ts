@@ -10,7 +10,7 @@ import {
 import { diffDays } from "./parse/date";
 import { norm } from "./parse/pos";
 import type { Repo } from "./repo";
-import { TURUNAN, WADAH, buatTx, type PlanItem, type State, type TxTipe, type Wadah } from "./types";
+import { TURUNAN, WADAH, buatTx, type DebtJenis, type PlanItem, type State, type TxTipe, type Wadah } from "./types";
 
 export class AksiError extends Error {}
 
@@ -37,6 +37,21 @@ function tanggalSah(s: unknown, hariIni: string): string {
   }
   if (s > hariIni) throw new AksiError("Tanggal di masa depan ditolak.");
   return s;
+}
+
+function tanggalKalender(s: unknown): string {
+  if (typeof s !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(s)) throw new AksiError("Tanggal tidak valid.");
+  const [y, m, d] = s.split("-").map(Number);
+  const t = new Date(Date.UTC(y, m - 1, d));
+  if (t.getUTCFullYear() !== y || t.getUTCMonth() !== m - 1 || t.getUTCDate() !== d) {
+    throw new AksiError("Tanggal tidak valid.");
+  }
+  return s;
+}
+
+function jenisDebtSah(v: unknown): DebtJenis {
+  if (v !== "piutang" && v !== "utang") throw new AksiError("Jenis harus piutang atau utang.");
+  return v;
 }
 
 function wadahSah(v: unknown, fallback: Wadah | null = null): Wadah {
@@ -129,6 +144,7 @@ export async function simpanRencana(
 export interface InputTransaksi {
   tipe: TxTipe;
   nominal: number;
+  biayaAdmin?: number;
   tanggal: string;
   label?: string | null;
   subPostId?: number | null;
@@ -145,6 +161,8 @@ export async function tambahTransaksi(
 ): Promise<{ id: number }> {
   if (!TIPE_TRANSAKSI.has(input.tipe)) throw new AksiError("Jenis transaksi tidak didukung dari web.");
   const nominal = bulat(input.nominal, false);
+  const biayaAdmin = bulat(input.biayaAdmin ?? 0, true);
+  if (biayaAdmin > 0 && input.tipe !== "out") throw new AksiError("Biaya admin hanya untuk pengeluaran.");
   const tanggal = tanggalSah(input.tanggal, hariIni);
   const label = typeof input.label === "string" ? input.label.trim().slice(0, 120) || null : null;
 
@@ -159,7 +177,7 @@ export async function tambahTransaksi(
         subPostId = sub.id;
       }
       const id = await tx.insertTx(
-        buatTx({ tipe: "out", nominal, subPostId, tanggal, label, sumber: "kaku" }),
+        buatTx({ tipe: "out", nominal, biayaAdmin, subPostId, tanggal, label, sumber: "kaku" }),
       );
       return { id };
     }
@@ -379,5 +397,65 @@ export async function simpanSetup(r: Repo, hariIni: string, input: InputSetup): 
     await tx.setConfig("saldo_awal", String(saldo));
     await tx.setConfig("tabungan_awal", String(tabungan));
     await tx.setConfig("investasi_awal", String(investasi));
+  });
+}
+
+export interface InputDebt {
+  jenis: DebtJenis | string;
+  nama: string;
+  nominal: number;
+  tanggal: string;
+  jatuhTempo?: string | null;
+  catatan?: string | null;
+}
+
+export async function tambahDebt(r: Repo, hariIni: string, input: InputDebt): Promise<{ id: number }> {
+  return r.transaction(async (tx) => {
+    const jenis = jenisDebtSah(input.jenis);
+    const nama = String(input.nama ?? "").trim().slice(0, 80);
+    if (!nama) throw new AksiError("Nama wajib diisi.");
+    const nominal = bulat(input.nominal, false);
+    const tanggal = tanggalSah(input.tanggal, hariIni);
+    const jatuhTempo = input.jatuhTempo ? tanggalKalender(input.jatuhTempo) : null;
+    const catatan = typeof input.catatan === "string" ? input.catatan.trim().slice(0, 200) || null : null;
+    const id = await tx.addDebt({
+      jenis,
+      nama,
+      nominal,
+      dibayar: 0,
+      tanggal,
+      jatuhTempo,
+      catatan,
+    });
+    return { id };
+  });
+}
+
+export async function bayarDebt(
+  r: Repo,
+  id: number,
+  nominal?: number | null,
+): Promise<{ sisa: number; lunas: boolean }> {
+  return r.transaction(async (tx) => {
+    const state = await tx.load();
+    const d = state.debts.find((x) => x.id === Number(id));
+    if (!d) throw new AksiError("Catatan piutang/utang tidak ditemukan.");
+    if (d.status !== "aktif") throw new AksiError("Catatan ini sudah tidak aktif.");
+    const sisa = d.nominal - d.dibayar;
+    const bayar = nominal === undefined || nominal === null ? sisa : bulat(nominal, false);
+    if (bayar > sisa) throw new AksiError(`Nominal melebihi sisa ${sisa.toLocaleString("id-ID")}.`);
+    const dibayar = d.dibayar + bayar;
+    const lunas = dibayar >= d.nominal;
+    await tx.updateDebt(d.id, { dibayar, status: lunas ? "lunas" : "aktif" });
+    return { sisa: d.nominal - dibayar, lunas };
+  });
+}
+
+export async function batalkanDebt(r: Repo, id: number): Promise<void> {
+  await r.transaction(async (tx) => {
+    const state = await tx.load();
+    const d = state.debts.find((x) => x.id === Number(id));
+    if (!d) throw new AksiError("Catatan piutang/utang tidak ditemukan.");
+    await tx.updateDebt(d.id, { status: "batal" });
   });
 }

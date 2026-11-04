@@ -11,12 +11,23 @@ export const metadata = {
 export const viewport = {
   width: "device-width",
   initialScale: 1,
-  themeColor: "#0098d1",
+  themeColor: "#f2a900",
 };
+
+const SKRIP_TEMA = `
+try {
+  var t = localStorage.getItem("mc_tema");
+  if (!t) t = matchMedia("(prefers-color-scheme: dark)").matches ? "gelap" : "terang";
+  document.documentElement.dataset.theme = t === "gelap" ? "dark" : "light";
+} catch (e) {}
+`;
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="id">
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: SKRIP_TEMA }} />
+      </head>
       <body>
         <SwRegister />
         {children}

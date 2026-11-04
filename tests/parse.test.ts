@@ -4,6 +4,7 @@ import { parseCommand } from "@/lib/parse/command";
 import { extractDate, wibDate } from "@/lib/parse/date";
 import { rp, splitPesan } from "@/lib/format";
 import { validasiAi } from "@/lib/ai";
+import { ekstrakNominalEmail, kemungkinanGaji } from "@/lib/email";
 
 const v = (t: string) => {
   const r = parseAmount(t);
@@ -64,8 +65,25 @@ describe("tanggal (SRS 6.3)", () => {
 describe("perintah", () => {
   const t = "2026-10-17";
   it("out", () => {
-    expect(parseCommand("OUT 25rb kopi", t)).toMatchObject({ k: "out", nominal: 25_000, uraian: "kopi", tanggal: null });
+    expect(parseCommand("OUT 25rb kopi", t)).toMatchObject({ k: "out", nominal: 25_000, biayaAdmin: 0, uraian: "kopi", tanggal: null });
     expect(parseCommand("out 20rb bensin kemarin", t)).toMatchObject({ k: "out", nominal: 20_000, uraian: "bensin", tanggal: "2026-10-16" });
+  });
+
+  it("out dengan biaya admin", () => {
+    expect(parseCommand("out 12.500 admin 2.500 kopi", t)).toMatchObject({
+      k: "out", nominal: 12_500, biayaAdmin: 2_500, uraian: "kopi",
+    });
+    expect(parseCommand("out 10rb biaya admin 1rb entah", t)).toMatchObject({
+      k: "out", nominal: 10_000, biayaAdmin: 1_000,
+    });
+  });
+
+  it("piutang, utang, lunasi, bayar", () => {
+    expect(parseCommand("piutang 100rb Andi", t)).toMatchObject({ k: "debt_add", jenis: "piutang", nominal: 100_000, nama: "Andi" });
+    expect(parseCommand("utang 50rb Budi", t)).toMatchObject({ k: "debt_add", jenis: "utang", nominal: 50_000, nama: "Budi" });
+    expect(parseCommand("piutang", t)).toMatchObject({ k: "debt_list", jenis: "piutang" });
+    expect(parseCommand("lunasi piutang Andi", t)).toMatchObject({ k: "debt_pay", jenis: "piutang", nama: "Andi", nominal: null });
+    expect(parseCommand("bayar piutang Andi 40rb", t)).toMatchObject({ k: "debt_pay", jenis: "piutang", nama: "Andi", nominal: 40_000 });
   });
   it("gaji, bonus, in", () => {
     expect(parseCommand("gaji masuk 1.8 juta", t)).toMatchObject({ k: "gaji", nominal: 1_800_000 });
@@ -131,5 +149,19 @@ describe("validasi AI (SRS 7.3, AC-13)", () => {
     expect(validasiAi({ intent: "gaji", amount_text: "25rb" }, pesan, nama, today)).toMatchObject({ ok: false, alasan: "gaji" });
     expect(validasiAi({ intent: "tidak_jelas" }, pesan, nama, today).ok).toBe(false);
     expect(validasiAi(null, pesan, nama, today).ok).toBe(false);
+  });
+});
+
+describe("parser email masuk (payroll)", () => {
+  it("mengambil nominal rupiah dari teks notifikasi", () => {
+    expect(ekstrakNominalEmail("Dana masuk Rp1.800.000 ke rekening Anda.")).toBe(1_800_000);
+    expect(ekstrakNominalEmail("Saldo bertambah sebesar 2.500.000 pada akun Anda.")).toBe(2_500_000);
+    expect(ekstrakNominalEmail("Tidak ada angka di sini.")).toBeNull();
+  });
+
+  it("mendeteksi email gaji/payroll dari subjek atau isi", () => {
+    expect(kemungkinanGaji("Notifikasi Gaji Bulan Ini", "")).toBe(true);
+    expect(kemungkinanGaji("", "Payroll telah dikirim ke rekening Anda")).toBe(true);
+    expect(kemungkinanGaji("Transfer Masuk", "Dana masuk Rp500.000")).toBe(false);
   });
 });

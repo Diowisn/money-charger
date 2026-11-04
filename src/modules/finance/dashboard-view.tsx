@@ -1,15 +1,15 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactElement } from "react";
 import type { DashboardData } from "@/lib/dashboard";
 
 type Pesan = { jenis: "ok" | "error"; teks: string };
-type Tab = "ringkasan" | "rencana" | "transaksi" | "pos";
+type Tab = "ringkasan" | "rencana" | "transaksi" | "pos" | "piutang";
 type StatusLive = "hidup" | "terputus";
 
 const INTERVAL_LIVE_MS = 5000;
 
-const WARNA = ["#2f9e6b", "#4f8ef7", "#f2a33c", "#c26bd8", "#e05d5d", "#3aa6b9", "#8a7d3d"];
+const WARNA = ["#f2a900", "#c56a00", "#8a6a3a", "#b3261e", "#6f4518", "#d98b24", "#3e7d44"];
 const NAMA_WADAH: Record<string, string> = { saldo: "Saldo", tabungan: "Tabungan", investasi: "Investasi" };
 const NAMA_TIPE: Record<string, string> = {
   out: "Pengeluaran",
@@ -29,6 +29,50 @@ const persen = (n: number) => `${Math.round(n * 100)}%`;
 const persenDari = (n: number, total: number) =>
   total > 0 ? `${Math.min(100, Math.round((n / total) * 100))}%` : "0%";
 
+function IkonRingkasan({ aktif }: { aktif: boolean }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={aktif ? 2.4 : 1.8}>
+      <rect x="3" y="12" width="4" height="8" />
+      <rect x="10" y="7" width="4" height="13" />
+      <rect x="17" y="3" width="4" height="17" />
+    </svg>
+  );
+}
+
+function IkonRencana({ aktif }: { aktif: boolean }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={aktif ? 2.4 : 1.8}>
+      <path d="M4 6h16M4 12h10M4 18h7" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function IkonTransaksi({ aktif }: { aktif: boolean }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={aktif ? 2.4 : 1.8}>
+      <path d="M12 3v18M7 7l5-4 5 4M7 17l5 4 5-4" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function IkonPos({ aktif }: { aktif: boolean }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={aktif ? 2.4 : 1.8}>
+      <rect x="4" y="7" width="16" height="13" rx="2" />
+      <path d="M8 7V5a4 4 0 0 1 8 0v2" />
+    </svg>
+  );
+}
+
+function IkonPiutang({ aktif }: { aktif: boolean }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={aktif ? 2.4 : 1.8}>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M9.5 9.5a2.5 2.5 0 0 1 5 0c0 2-2.5 2.5-2.5 4.5M12 17v.5" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 function drafRencana(data: DashboardData): Record<string, number> {
   const d: Record<string, number> = {
     dd: data.rencanaLain.dd,
@@ -39,6 +83,15 @@ function drafRencana(data: DashboardData): Record<string, number> {
   return d;
 }
 
+type Tema = "terang" | "gelap";
+
+function temaAwal(): Tema {
+  if (typeof window === "undefined") return "terang";
+  const simpanan = window.localStorage.getItem("mc_tema");
+  if (simpanan === "terang" || simpanan === "gelap") return simpanan;
+  return window.matchMedia?.("(prefers-color-scheme: dark)").matches ? "gelap" : "terang";
+}
+
 export default function Dashboard({ awal }: { awal: DashboardData }) {
   const [data, setData] = useState(awal);
   const [tab, setTab] = useState<Tab>("ringkasan");
@@ -47,6 +100,7 @@ export default function Dashboard({ awal }: { awal: DashboardData }) {
   const [buka, setBuka] = useState<Record<number, boolean>>(() => ({ [awal.grup[0]?.id ?? 0]: true }));
   const [statusLive, setStatusLive] = useState<StatusLive>("hidup");
   const [terakhir, setTerakhir] = useState<number | null>(null);
+  const [tema, setTema] = useState<Tema>("terang");
   const dataRef = useRef(awal);
   const sibukRef = useRef(false);
   const urutanRef = useRef(0);
@@ -145,6 +199,15 @@ export default function Dashboard({ awal }: { awal: DashboardData }) {
     }
   }
 
+  useEffect(() => {
+    setTema(temaAwal());
+  }, []);
+
+  useEffect(() => {
+    document.documentElement.dataset.theme = tema === "gelap" ? "dark" : "light";
+    window.localStorage.setItem("mc_tema", tema);
+  }, [tema]);
+
   async function keluar() {
     await fetch("/api/auth/logout", { method: "POST" });
     window.location.href = "/login";
@@ -182,6 +245,15 @@ export default function Dashboard({ awal }: { awal: DashboardData }) {
             <i />
             {statusLive === "hidup" ? "Live" : "Terputus"}
           </span>
+          <button
+            className="ghost"
+            type="button"
+            onClick={() => setTema((t) => (t === "gelap" ? "terang" : "gelap"))}
+            aria-label={tema === "gelap" ? "Pakai mode terang" : "Pakai mode gelap"}
+            title={tema === "gelap" ? "Mode terang" : "Mode gelap"}
+          >
+            {tema === "gelap" ? "Terang" : "Gelap"}
+          </button>
           <button className="ghost" onClick={keluar} type="button">
             Keluar
           </button>
@@ -204,6 +276,7 @@ export default function Dashboard({ awal }: { awal: DashboardData }) {
             ["rencana", "Rencana"],
             ["transaksi", "Transaksi"],
             ["pos", "Pos"],
+            ["piutang", "Piutang"],
           ] as [Tab, string][]
         ).map(([id, label]) => (
           <button
@@ -228,7 +301,30 @@ export default function Dashboard({ awal }: { awal: DashboardData }) {
           <Transaksi data={data} kirim={kirim} sibuk={sibuk} />
         ) : null}
         {tab === "pos" ? <Pos data={data} kirim={kirim} sibuk={sibuk} /> : null}
+        {tab === "piutang" ? <Piutang data={data} kirim={kirim} sibuk={sibuk} /> : null}
       </main>
+
+      <nav className="bottom-nav" aria-label="Menu dashboard (mobile)">
+        {(
+          [
+            ["ringkasan", "Ringkasan", IkonRingkasan],
+            ["rencana", "Rencana", IkonRencana],
+            ["transaksi", "Transaksi", IkonTransaksi],
+            ["pos", "Pos", IkonPos],
+            ["piutang", "Piutang", IkonPiutang],
+          ] as [Tab, string, (p: { aktif: boolean }) => ReactElement][]
+        ).map(([id, label, Ikon]) => (
+          <button
+            key={id}
+            type="button"
+            className={tab === id ? "nav-item aktif" : "nav-item"}
+            onClick={() => setTab(id)}
+          >
+            <Ikon aktif={tab === id} />
+            <span>{label}</span>
+          </button>
+        ))}
+      </nav>
 
       <footer className="kaki">
         <span>
@@ -266,10 +362,7 @@ function Ringkasan({
             <p className="angka-besar">{rp(r.sisaUang)}</p>
             <p className="muted">Potensi Dana Darurat &amp; Investasi Diri</p>
           </div>
-          <div
-            className="cincin"
-            style={{ background: `conic-gradient(var(--hijau) ${r.rasio * 100}%, var(--garis) 0)` }}
-          >
+          <div className="cincin">
             <span>{persen(r.rasio)}</span>
           </div>
         </div>
@@ -412,6 +505,21 @@ function Ringkasan({
           </div>
         </div>
       </section>
+
+      {r.piutangAktif > 0 || r.utangAktif > 0 ? (
+        <section className="grid-2">
+          <div className="kartu">
+            <p className="label">Piutang Aktif</p>
+            <p className="angka">{rp(r.piutangAktif)}</p>
+            <p className="muted">Orang berutang ke kita</p>
+          </div>
+          <div className="kartu">
+            <p className="label">Utang Aktif</p>
+            <p className="angka">{rp(r.utangAktif)}</p>
+            <p className="muted">Kita berutang</p>
+          </div>
+        </section>
+      ) : null}
     </div>
   );
 }
@@ -565,6 +673,8 @@ function Transaksi({
 }) {
   const [tipe, setTipe] = useState("out");
   const [nominal, setNominal] = useState("");
+  const [biayaAdminAktif, setBiayaAdminAktif] = useState(false);
+  const [biayaAdmin, setBiayaAdmin] = useState("");
   const [tanggal, setTanggal] = useState(data.hariIni);
   const [label, setLabel] = useState("");
   const [subPostId, setSubPostId] = useState("");
@@ -577,7 +687,10 @@ function Transaksi({
 
   async function simpan() {
     const body: Record<string, unknown> = { tipe, nominal: Number(nominal), tanggal, label: label || null };
-    if (tipe === "out") body.subPostId = subPostId ? Number(subPostId) : null;
+    if (tipe === "out") {
+      body.subPostId = subPostId ? Number(subPostId) : null;
+      body.biayaAdmin = biayaAdminAktif ? Number(biayaAdmin || 0) : 0;
+    }
     if (tipe === "in") body.wadah = wadah;
     if (tipe === "bonus") body.wadah = wadah || null;
     if (tipe === "tarik") {
@@ -593,6 +706,8 @@ function Transaksi({
     if (ok) {
       setNominal("");
       setLabel("");
+      setBiayaAdmin("");
+      setBiayaAdminAktif(false);
     }
   }
 
@@ -642,17 +757,41 @@ function Transaksi({
           </label>
 
           {tipe === "out" ? (
-            <label>
-              Pos (opsional)
-              <select value={subPostId} onChange={(e) => setSubPostId(e.target.value)}>
-                <option value="">Belum dipetakan</option>
-                {posAktif.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.grup} · {p.nama}
-                  </option>
-                ))}
-              </select>
-            </label>
+            <>
+              <label>
+                Pos (opsional)
+                <select value={subPostId} onChange={(e) => setSubPostId(e.target.value)}>
+                  <option value="">Belum dipetakan</option>
+                  {posAktif.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.grup} A� {p.nama}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="cek">
+                <input
+                  type="checkbox"
+                  checked={biayaAdminAktif}
+                  onChange={(e) => setBiayaAdminAktif(e.target.checked)}
+                />
+                <span>Ada biaya admin</span>
+              </label>
+              {biayaAdminAktif ? (
+                <label>
+                  Nominal biaya admin (Rp)
+                  <input
+                    type="number"
+                    min={0}
+                    step={500}
+                    inputMode="numeric"
+                    value={biayaAdmin}
+                    onChange={(e) => setBiayaAdmin(e.target.value)}
+                    placeholder="contoh 2500"
+                  />
+                </label>
+              ) : null}
+            </>
           ) : null}
 
           {tipe === "in" || tipe === "bonus" ? (
@@ -719,13 +858,14 @@ function Transaksi({
                   </p>
                   <p className="muted kecil">
                     {t.tanggal}
-                    {t.wadahAsal ? ` · dari ${NAMA_WADAH[t.wadahAsal]}` : ""}
-                    {t.status === "batal" ? " · dibatalkan" : ""}
+                    {t.wadahAsal ? ` A� dari ${NAMA_WADAH[t.wadahAsal]}` : ""}
+                    {t.biayaAdmin > 0 ? ` A� admin ${rp(t.biayaAdmin)}` : ""}
+                    {t.status === "batal" ? " A� dibatalkan" : ""}
                   </p>
                 </div>
               </div>
               <div className="transaksi-kanan">
-                <b>{rp(t.nominal)}</b>
+                <b>{rp(t.nominal + t.biayaAdmin)}</b>
                 {t.bisaDihapus ? (
                   <button
                     type="button"
@@ -993,6 +1133,187 @@ function Pos({
           </div>
         </section>
       )}
+    </div>
+  );
+}
+
+function Piutang({
+  data,
+  kirim,
+  sibuk,
+}: {
+  data: DashboardData;
+  kirim: (url: string, method: string, body?: unknown) => Promise<boolean>;
+  sibuk: boolean;
+}) {
+  const [jenis, setJenis] = useState<"piutang" | "utang">("piutang");
+  const [nama, setNama] = useState("");
+  const [nominal, setNominal] = useState("");
+  const [jatuhTempo, setJatuhTempo] = useState("");
+  const [catatan, setCatatan] = useState("");
+  const [bayarInput, setBayarInput] = useState<Record<number, string>>({});
+
+  async function tambah() {
+    const ok = await kirim("/api/debts", "POST", {
+      aksi: "tambah",
+      jenis,
+      nama,
+      nominal: Number(nominal),
+      tanggal: data.hariIni,
+      jatuhTempo: jatuhTempo || null,
+      catatan: catatan || null,
+    });
+    if (ok) {
+      setNama("");
+      setNominal("");
+      setJatuhTempo("");
+      setCatatan("");
+    }
+  }
+
+  async function bayar(id: number, penuh: boolean) {
+    const nominalBayar = penuh ? null : Number(bayarInput[id] || 0);
+    if (!penuh && (!nominalBayar || nominalBayar <= 0)) return;
+    const ok = await kirim("/api/debts", "POST", { aksi: "bayar", id, nominal: nominalBayar });
+    if (ok) setBayarInput((b) => ({ ...b, [id]: "" }));
+  }
+
+  async function batal(id: number, nama: string) {
+    if (!window.confirm(`Batalkan catatan "${nama}"?`)) return;
+    await kirim("/api/debts", "POST", { aksi: "batal", id });
+  }
+
+  const aktif = data.piutang.filter((d) => d.status === "aktif");
+  const selesai = data.piutang.filter((d) => d.status !== "aktif");
+  const totalPiutang = aktif.filter((d) => d.jenis === "piutang").reduce((s, d) => s + d.sisa, 0);
+  const totalUtang = aktif.filter((d) => d.jenis === "utang").reduce((s, d) => s + d.sisa, 0);
+
+  return (
+    <div className="tumpuk">
+      <section className="grid-2">
+        <div className="kartu">
+          <p className="label">Piutang Aktif</p>
+          <p className="angka">{rp(totalPiutang)}</p>
+          <p className="muted">Orang berutang ke kita</p>
+        </div>
+        <div className="kartu">
+          <p className="label">Utang Aktif</p>
+          <p className="angka">{rp(totalUtang)}</p>
+          <p className="muted">Kita berutang</p>
+        </div>
+      </section>
+
+      <section className="kartu">
+        <h2>Catat Piutang/Utang</h2>
+        <div className="form">
+          <label>
+            Jenis
+            <select value={jenis} onChange={(e) => setJenis(e.target.value as "piutang" | "utang")}>
+              <option value="piutang">Piutang (orang berutang ke kita)</option>
+              <option value="utang">Utang (kita berutang)</option>
+            </select>
+          </label>
+          <label>
+            Nama
+            <input value={nama} onChange={(e) => setNama(e.target.value)} placeholder="contoh: Andi" />
+          </label>
+          <label>
+            Nominal (Rp)
+            <input
+              type="number"
+              min={1}
+              step={1000}
+              inputMode="numeric"
+              value={nominal}
+              onChange={(e) => setNominal(e.target.value)}
+              placeholder="contoh 100000"
+            />
+          </label>
+          <label>
+            Jatuh tempo (opsional)
+            <input type="date" value={jatuhTempo} onChange={(e) => setJatuhTempo(e.target.value)} />
+          </label>
+          <label>
+            Catatan (opsional)
+            <input value={catatan} onChange={(e) => setCatatan(e.target.value)} placeholder="contoh pinjam untuk..." />
+          </label>
+          <button
+            type="button"
+            className="utama lebar"
+            onClick={() => void tambah()}
+            disabled={sibuk || !nama || !nominal}
+          >
+            Simpan
+          </button>
+        </div>
+      </section>
+
+      <section className="kartu">
+        <h2>Aktif</h2>
+        <ul className="daftar-transaksi">
+          {aktif.map((d) => (
+            <li key={d.id}>
+              <div className="transaksi-kiri">
+                <span className={`badge ${d.jenis === "piutang" ? "tipe-in" : "tipe-out"}`}>
+                  {d.jenis === "piutang" ? "Piutang" : "Utang"}
+                </span>
+                <div>
+                  <p className="nama-transaksi">{d.nama}</p>
+                  <p className="muted kecil">
+                    Sisa {rp(d.sisa)} dari {rp(d.nominal)}
+                    {d.jatuhTempo ? ` A� tempo ${d.jatuhTempo}${d.lewatTempo ? " (lewat)" : ""}` : ""}
+                  </p>
+                  <div className="baris-tombol" style={{ marginTop: 6 }}>
+                    <input
+                      type="number"
+                      min={1}
+                      step={1000}
+                      placeholder="Bayar sebagian"
+                      value={bayarInput[d.id] ?? ""}
+                      onChange={(e) => setBayarInput((b) => ({ ...b, [d.id]: e.target.value }))}
+                    />
+                    <button type="button" className="sekunder" onClick={() => void bayar(d.id, false)} disabled={sibuk}>
+                      Bayar
+                    </button>
+                    <button type="button" className="utama" onClick={() => void bayar(d.id, true)} disabled={sibuk}>
+                      Lunas
+                    </button>
+                  </div>
+                </div>
+              </div>
+              <div className="transaksi-kanan">
+                <button type="button" className="hapus" onClick={() => void batal(d.id, d.nama)} disabled={sibuk}>
+                  Batal
+                </button>
+              </div>
+            </li>
+          ))}
+          {!aktif.length ? <li className="kosong">Belum ada piutang/utang aktif.</li> : null}
+        </ul>
+      </section>
+
+      {selesai.length ? (
+        <section className="kartu">
+          <h2>Riwayat</h2>
+          <ul className="daftar-transaksi">
+            {selesai.map((d) => (
+              <li key={d.id} className={d.status === "batal" ? "batal" : undefined}>
+                <div className="transaksi-kiri">
+                  <span className={`badge ${d.jenis === "piutang" ? "tipe-in" : "tipe-out"}`}>
+                    {d.jenis === "piutang" ? "Piutang" : "Utang"}
+                  </span>
+                  <div>
+                    <p className="nama-transaksi">{d.nama}</p>
+                    <p className="muted kecil">
+                      {rp(d.nominal)} A� {d.status === "lunas" ? "lunas" : "dibatalkan"}
+                    </p>
+                  </div>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
     </div>
   );
 }

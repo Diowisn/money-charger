@@ -4,12 +4,15 @@ import { aktifPlan, periodes, totalPlan } from "../src/lib/engine";
 import { MemRepo } from "../src/lib/mem-repo";
 import {
   AksiError,
+  batalkanDebt,
   batalkanTransaksi,
+  bayarDebt,
   gantiNamaPos,
   nonaktifkanPos,
   simpanRencana,
   simpanSetup,
   tambahAliasPos,
+  tambahDebt,
   tambahPos,
   tambahTransaksi,
 } from "../src/lib/web-actions";
@@ -195,5 +198,27 @@ describe("rencana dan pos web", () => {
         investasiAwal: 0,
       }),
     ).rejects.toBeInstanceOf(AksiError);
+  });
+});
+
+describe("piutang/utang web", () => {
+  it("menambah, membayar sebagian, lalu melunasi piutang", async () => {
+    const repo = new MemRepo();
+    const { id } = await tambahDebt(repo, HARI, { jenis: "piutang", nama: "Andi", nominal: 100_000, tanggal: HARI });
+    let hasil = await bayarDebt(repo, id, 40_000);
+    expect(hasil).toEqual({ sisa: 60_000, lunas: false });
+    hasil = await bayarDebt(repo, id, null);
+    expect(hasil).toEqual({ sisa: 0, lunas: true });
+    const state = await repo.load();
+    expect(state.debts.find((d) => d.id === id)!.status).toBe("lunas");
+  });
+
+  it("menolak pembayaran melebihi sisa dan membatalkan catatan", async () => {
+    const repo = new MemRepo();
+    const { id } = await tambahDebt(repo, HARI, { jenis: "utang", nama: "Budi", nominal: 50_000, tanggal: HARI });
+    await expect(bayarDebt(repo, id, 80_000)).rejects.toBeInstanceOf(AksiError);
+    await batalkanDebt(repo, id);
+    const state = await repo.load();
+    expect(state.debts.find((d) => d.id === id)!.status).toBe("batal");
   });
 });

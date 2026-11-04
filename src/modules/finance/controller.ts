@@ -2,11 +2,14 @@ import type { NextRequest } from "next/server";
 import { tolakJikaBelumLogin } from "@/lib/auth";
 import { AksiError } from "@/lib/web-actions";
 import {
+  batalkanDebtFinance,
   batalkanTransaksiFinance,
+  bayarDebtFinance,
   kelolaPos,
   muatDashboard,
   simpanRencanaFinance,
   simpanSetupFinance,
+  tambahDebtFinance,
   tambahTransaksiFinance,
 } from "./model";
 import { bacaBody, dashboard, galat, ok } from "./view";
@@ -65,6 +68,30 @@ export async function postPosition(req: NextRequest) {
     const body = await bacaBody(req);
     const hasil = await kelolaPos(body);
     return hasil ? ok(hasil) : ok();
+  } catch (e) {
+    return galat(e);
+  }
+}
+
+export async function postDebt(req: NextRequest) {
+  const tolak = tolakJikaBelumLogin(req);
+  if (tolak) return tolak;
+  try {
+    const body = await bacaBody(req);
+    const aksi = String(body.aksi ?? "");
+    if (aksi === "tambah") {
+      const hasil = await tambahDebtFinance(body as unknown as Parameters<typeof tambahDebtFinance>[0]);
+      return ok(hasil);
+    }
+    if (aksi === "bayar") {
+      const nominal = body.nominal === undefined || body.nominal === null || body.nominal === "" ? null : Number(body.nominal);
+      return ok(await bayarDebtFinance(Number(body.id), nominal));
+    }
+    if (aksi === "batal") {
+      await batalkanDebtFinance(Number(body.id));
+      return ok();
+    }
+    throw new AksiError("Aksi piutang/utang tidak dikenal.");
   } catch (e) {
     return galat(e);
   }

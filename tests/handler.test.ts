@@ -286,6 +286,30 @@ describe("pemetaan pos (FR-15, 6.2)", () => {
     await kirim("out 40rb entah", "2026-11-02");
     expect(await kirim("hmm", "2026-11-02")).toContain("tidak dikenali");
   });
+
+  it('balas "tanpa pos" membiarkan transaksi tidak dipetakan', async () => {
+    await kirim("out 40rb entah apa", "2026-11-02");
+    const r = await kirim("tanpa pos", "2026-11-02");
+    expect(r).toContain("tetap tanpa pos");
+    const t = (await repo.load()).txs.find((x) => x.tipe === "out")!;
+    expect(t.subPostId).toBeNull();
+  });
+});
+
+describe("biaya admin pada pengeluaran", () => {
+  beforeEach(mulaiPeriode1);
+
+  it("out dengan admin fee dicatat dan masuk hitungan sisa jatah", async () => {
+    const r = await kirim("out 12.500 admin 2.500 kopi", "2026-11-02");
+    expect(r).toContain("Rp12.500 + admin Rp2.500 (total Rp15.000)");
+    expect(await kirim("sisa jajan", "2026-11-02")).toContain("terpakai Rp15.000, sisa Rp135.000");
+  });
+
+  it("biaya admin ikut terhitung belum dipetakan bila tanpa pos", async () => {
+    const r = await kirim("out 10rb biaya admin 1rb entah", "2026-11-02");
+    expect(r).toContain("Rp10.000 + admin Rp1.000 (total Rp11.000)");
+    expect(r).toContain("Sisa Dana Darurat: Rp89.000");
+  });
 });
 
 describe("transaksi mundur (AC-15) dan koreksi", () => {
@@ -421,6 +445,34 @@ describe("evaluasi dan usulan (FR-60, FR-61)", () => {
   it("evaluasi di periode pertama belum menghasilkan usulan", async () => {
     const r = await kirim("evaluasi", "2026-11-10");
     expect(r).toContain("Belum ada periode yang tertutup");
+  });
+});
+
+describe("piutang dan utang", () => {
+  beforeEach(mulaiPeriode1);
+
+  it("mencatat piutang, menampilkan daftar, dan melunasi sebagian lalu penuh", async () => {
+    const tambah = await kirim("piutang 100rb Andi", "2026-11-02");
+    expect(tambah).toContain("Piutang");
+    expect(tambah).toContain("Rp100.000 atas nama Andi");
+
+    const daftar = await kirim("piutang", "2026-11-02");
+    expect(daftar).toContain("Andi: sisa Rp100.000 dari Rp100.000");
+
+    const bayar1 = await kirim("bayar piutang Andi 40rb", "2026-11-03");
+    expect(bayar1).toContain("Rp40.000 diterima dari Andi");
+    expect(bayar1).toContain("Sisa piutang: Rp60.000");
+
+    const lunas = await kirim("lunasi piutang Andi", "2026-11-04");
+    expect(lunas).toContain("lunas");
+
+    expect(await kirim("piutang", "2026-11-04")).toContain("tidak ada");
+  });
+
+  it("mencatat utang dan menolak pembayaran melebihi sisa", async () => {
+    await kirim("utang 50rb Budi", "2026-11-02");
+    const r = await kirim("bayar utang Budi 80rb", "2026-11-03");
+    expect(r).toContain("melebihi sisa");
   });
 });
 

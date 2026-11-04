@@ -1,12 +1,12 @@
 import { buangSpan, parseAmount } from "./amount";
 import { extractDate } from "./date";
-import { WADAH, type Wadah } from "../types";
+import { WADAH, type DebtJenis, type Wadah } from "../types";
 
 export type Cmd =
   | { k: "bantuan" | "saldo" | "laporan" | "laporan_periode" | "evaluasi" | "ekspor" }
   | { k: "ya" | "batal" | "setuju" | "tolak" | "hapus_terakhir" }
   | { k: "setup"; tanggal: string | null; saldo: number; tabungan: number; investasi: number }
-  | { k: "out"; nominal: number; uraian: string; tanggal: string | null }
+  | { k: "out"; nominal: number; biayaAdmin: number; uraian: string; tanggal: string | null }
   | { k: "in"; nominal: number; label: string; wadah: Wadah; tanggal: string | null }
   | { k: "gaji"; nominal: number; tanggal: string | null }
   | { k: "bonus"; nominal: number; wadah: Wadah | null }
@@ -19,6 +19,9 @@ export type Cmd =
   | { k: "tarik"; wadah: Wadah; nominal: number }
   | { k: "pindah"; nominal: number; dari: Wadah; ke: Wadah }
   | { k: "sisa"; pos: string }
+  | { k: "debt_add"; jenis: DebtJenis; nominal: number; nama: string; jatuhTempo: string | null }
+  | { k: "debt_list"; jenis: DebtJenis }
+  | { k: "debt_pay"; jenis: DebtJenis; nama: string; nominal: number | null }
   | { k: "error"; pesan: string }
   | { k: "bebas" };
 
@@ -32,10 +35,13 @@ const SATU_KATA: Record<string, Cmd> = {
   batal: { k: "batal" },
   setuju: { k: "setuju" },
   tolak: { k: "tolak" },
+  piutang: { k: "debt_list", jenis: "piutang" },
+  utang: { k: "debt_list", jenis: "utang" },
 };
 
 const AWAL_PERINTAH = new Set([
   "out", "in", "gaji", "bonus", "koreksi", "set", "geser", "pos", "tarik", "pindah", "sisa", "setup",
+  "piutang", "utang", "lunasi", "bayar",
 ]);
 
 const CONTOH: Record<string, string> = {
@@ -51,6 +57,10 @@ const CONTOH: Record<string, string> = {
   pindah: "pindah 100rb dari saldo ke tabungan",
   sisa: "sisa jajan",
   setup: "setup 17/10 saldo 300rb tabungan 0 investasi 0",
+  piutang: "piutang 100rb Andi",
+  utang: "utang 50rb Budi",
+  lunasi: "lunasi piutang Andi",
+  bayar: "bayar piutang Andi 50rb",
 };
 
 function isWadah(s: string): s is Wadah {
@@ -59,6 +69,16 @@ function isWadah(s: string): s is Wadah {
 
 const salah = (pesan: string): Cmd => ({ k: "error", pesan });
 const format = (cmd: string): Cmd => salah(`Format kurang tepat. Contoh: ${CONTOH[cmd]}`);
+
+/** Memisahkan "admin 2.500" / "biaya admin 2.500" dari teks pengeluaran. */
+function pisahBiayaAdmin(teks: string): { rest: string; biayaAdmin: number; error?: string } {
+  const m = /\b(?:(?:biaya)\s+)?admin\b\s*[:=]?\s*(\d[0-9.,]*(?:\s?(?:juta|jt|ribu|rb|k))?)(?![a-z0-9])/i.exec(teks);
+  if (!m) return { rest: teks, biayaAdmin: 0 };
+  const a = parseAmount(m[1], { izinkanNol: true });
+  if (!a.ok) return { rest: teks, biayaAdmin: 0, error: `Biaya admin: ${a.pesan}` };
+  const rest = `${teks.slice(0, m.index)} ${teks.slice(m.index + m[0].length)}`.replace(/\s+/g, " ").trim();
+  return { rest, biayaAdmin: a.value };
+}
 
 export function parseCommand(raw: string, today: string): Cmd {
   const teks = raw.trim().replace(/\s+/g, " ");
@@ -81,11 +101,19 @@ export function parseCommand(raw: string, today: string): Cmd {
 
   switch (kata) {
     case "out": {
-      const d = extractDate(sisa, today);
+      const admin = pisahBiayaAdmin(sisa);
+      if (admin.error) return salah(admin.error);
+      const d = extractDate(admin.rest, today);
       if (d.error) return salah(d.error);
       const a = parseAmount(d.rest);
       if (!a.ok) return salah(a.pesan);
-      return { k: "out", nominal: a.value, uraian: buangSpan(d.rest, a.start, a.end), tanggal: d.date };
+      return {
+        k: "out",
+        nominal: a.value,
+        biayaAdmin: admin.biayaAdmin,
+        uraian: buangSpan(d.rest, a.start, a.end),
+        tanggal: d.date,
+      };
     }
 
     case "in": {
@@ -196,6 +224,33 @@ export function parseCommand(raw: string, today: string): Cmd {
 
     case "sisa":
       return { k: "sisa", pos: sisa };
+
+    case "piutang":
+    case "utang": {
+      const jenis = kata as DebtJenis;
+      if (!sisa) return { k: "debt_list", jenis };
+      const d = extractDate(sisa, today);
+      if (d.error) return salah(d.error);
+      const a = parseAmount(d.rest);
+      if (!a.ok) return salah(a.pesan);
+      const nama = buangSpan(d.rest, a.start, a.end);
+      if (!nama) return format(kata);
+      return { k: "debt_add", jenis, nominal: a.value, nama, jatuhTempo: d.date };
+    }
+
+    case "lunasi": {
+      const m = /^(piutang|utang)\s+(.+)$/i.exec(sisa);
+      if (!m) return format("lunasi");
+      return { k: "debt_pay", jenis: m[1].toLowerCase() as DebtJenis, nama: m[2].trim(), nominal: null };
+    }
+
+    case "bayar": {
+      const m = /^(piutang|utang)\s+(.+?)\s+(\S+(?:\s*(?:juta|jt|ribu|rb|k))?)$/i.exec(sisa);
+      if (!m) return format("bayar");
+      const a = parseAmount(m[3]);
+      if (!a.ok) return salah(a.pesan);
+      return { k: "debt_pay", jenis: m[1].toLowerCase() as DebtJenis, nama: m[2].trim(), nominal: a.value };
+    }
 
     case "setup": {
       const d = extractDate(sisa, today);

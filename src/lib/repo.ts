@@ -1,4 +1,4 @@
-import type { NewTx, Pending, PlanItem, State } from "./types";
+import type { Debt, NewDebt, NewTx, Pending, PlanItem, State } from "./types";
 
 /**
  * Akses data. Semua aturan uang ada di engine.ts (fungsi murni); Repo hanya menyimpan
@@ -18,6 +18,9 @@ export interface Repo {
   insertTx(tx: NewTx): Promise<number>;
   updateTx(id: number, patch: { status?: "berlaku" | "batal"; subPostId?: number | null }): Promise<void>;
   setGajiPlan(txId: number, planVersionId: number): Promise<void>;
+
+  addDebt(d: NewDebt): Promise<number>;
+  updateDebt(id: number, patch: { dibayar?: number; status?: Debt["status"] }): Promise<void>;
 
   setConfig(kunci: string, nilai: string): Promise<void>;
 

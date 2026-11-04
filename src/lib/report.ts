@@ -1,6 +1,6 @@
 /** Penyusun teks laporan (teks polos tanpa emoji, SRS 8). */
 import { diffDays } from "./parse/date";
-import { hitungPeriode, hitungWadah, indeksPeriode, periodes, berlaku, type Evaluasi, type PeriodeHasil, type SaldoWadah } from "./engine";
+import { hitungPeriode, hitungWadah, indeksPeriode, nominalKeluar, periodes, berlaku, type Evaluasi, type PeriodeHasil, type SaldoWadah } from "./engine";
 import { rp, tglPendek } from "./format";
 import type { State } from "./types";
 
@@ -40,7 +40,7 @@ export function teksLaporan(state: State, today: string): string {
     const mulai = state.config.tanggalMulai ?? today;
     const total = berlaku(state)
       .filter((t) => t.tipe === "out")
-      .reduce((s, t) => s + t.nominal, 0);
+      .reduce((s, t) => s + nominalKeluar(t), 0);
     return [
       `Periode awal (mulai ${tglPendek(mulai)}, hari ke-${diffDays(today, mulai) + 1}). Belum ada jatah.`,
       `Pengeluaran tercatat: ${rp(total)}`,
@@ -93,7 +93,7 @@ export function nomorPeriodeSaatIni(state: State): number {
 
 export const TEKS_BANTUAN = [
   "Perintah (huruf besar-kecil bebas):",
-  "- out 25rb kopi  (pengeluaran; tambah: kemarin / tgl 20)",
+  "- out 25rb kopi  (pengeluaran; tambah: kemarin / tgl 20, admin 2rb)",
   "- in 150rb freelance  (pemasukan lain; tambah: ke tabungan)",
   "- gaji masuk 1.8 juta  (opsional: tgl 30)",
   "- bonus 200rb  (opsional: ke tabungan)",
@@ -106,6 +106,9 @@ export const TEKS_BANTUAN = [
   "- tarik tabungan 200rb",
   "- pindah 100rb dari saldo ke tabungan",
   "- setup 17/10 saldo 300rb tabungan 0 investasi 0  (hanya sebelum gaji pertama)",
+  "- piutang 100rb Andi  (orang berutang ke kita) | utang 50rb Budi  (kita berutang)",
+  "- piutang | utang  (lihat daftar aktif)",
+  "- lunasi piutang Andi | bayar piutang Andi 50rb",
   "- ekspor  (tautan CSV)",
   "- ya | batal | setuju | tolak  (jawaban konfirmasi)",
   "Kalimat bebas seperti \"tadi beli kopi 25rb\" juga dicoba dibaca AI.",
