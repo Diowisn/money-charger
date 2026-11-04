@@ -11,19 +11,35 @@ Acuan: `prd-catatan-keuangan-whatsapp.md` dan `srs-catatan-keuangan-whatsapp.md`
 |---|---|
 | `src/lib/engine.ts` | Mesin uang (fungsi murni): periode, jatah, Dana Darurat, Saldo, bonus, evaluasi |
 | `src/lib/parse/` | Parser nominal, tanggal, alias pos, perintah |
-| `src/lib/handler.ts` | Satu pesan masuk -> satu balasan (dalam satu transaksi database) |
-| `src/lib/ai.ts` | Groq sebagai cadangan, beserta validasi hasil AI |
+| `src/lib/handler.ts` | Aturan domain pemrosesan pesan dan transaksi |
+| `src/lib/ai.ts` | Groq sebagai cadangan bahasa bebas, beserta validasi hasil AI |
 | `src/lib/pg-repo.ts` | Akses Neon Postgres. `mem-repo.ts` adalah versi memori untuk tes |
-| `src/app/api/whatsapp/webhook/route.ts` | Webhook Meta (GET verifikasi, POST pesan) |
-| `src/app/api/export/route.ts` | Unduh CSV (token 15 menit, sekali pakai) |
-| `src/app/page.tsx` + `dashboard.tsx` | Dashboard web: ringkasan, slider rencana, transaksi, pos |
+| `src/modules/whatsapp/` | Modul HMVC webhook: controller, model, dan respons |
+| `src/modules/finance/` | Modul HMVC keuangan/dashboard: controller, model, view, dan halaman dashboard |
+| `src/modules/auth/` | Modul HMVC autentikasi dashboard |
+| `src/modules/export/` | Modul HMVC unduh CSV |
+| `src/modules/health/` | Modul HMVC diagnosa kesiapan |
+| `src/app/api/` | Adapter Next.js tipis yang meneruskan request ke controller modul |
+| `src/app/page.tsx` | Adapter halaman dashboard Next.js |
 | `src/app/login/` | Halaman login password |
 | `src/lib/auth.ts` | Sesi cookie HMAC (`DASHBOARD_PASSWORD` + `AUTH_SECRET`) |
 | `src/lib/dashboard.ts` | View-model dashboard dari `State` + engine |
 | `src/lib/web-actions.ts` | Aksi web: simpan rencana, transaksi, pos, setup |
-| `src/app/api/dashboard`, `plan`, `transactions`, `pos`, `setup` | API dashboard (wajib login) |
 | `db/schema.sql` | Skema tabel |
-| `tests/` | 103 tes, termasuk skenario AC-01 sampai AC-26 dan aksi web |
+| `tests/` | 106 tes, termasuk skenario AC-01 sampai AC-26, aksi web, dan controller HMVC |
+
+## Arsitektur aplikasi (HMVC internal)
+
+Proyek memakai pola HMVC yang dibangun di atas Next.js—**tidak memasang framework baru**. Next.js tetap menangani URL, HTTP, dan deployment; setiap fitur aplikasi dikelompokkan sebagai modul di `src/modules/<nama-modul>/`.
+
+- `controller.ts`: menerima request dari adapter Next.js, memeriksa autentikasi, memanggil model, lalu memilih respons.
+- `model.ts`: menjalankan use case dan berinteraksi dengan aturan domain serta penyimpanan atau layanan eksternal.
+- `view.ts` / `dashboard-view.tsx`: membentuk respons HTTP atau tampilan modul.
+- `src/app/api/**/route.ts`: hanya menghubungkan metode HTTP Next.js ke controller terkait.
+
+Aturan keuangan tetap berada di `src/lib/engine.ts` dan `src/lib/handler.ts`; modul mengatur alur fitur tanpa menggandakan aturan tersebut. `Repo` dan `AiClient` sudah menjadi titik substitusi untuk penyimpanan dan AI. Bila vendor WhatsApp atau layanan lain perlu diganti, tambahkan adapter pada batas modul tanpa menanam logika vendor di aturan keuangan.
+
+Struktur ini **belum** menjadikan aplikasi multi-pelanggan: autentikasi, whitelist, transaksi, dan konfigurasi masih untuk satu pemilik. Jangan mengaktifkan beberapa pelanggan pada deployment/database yang sama sebelum isolasi data dan akun per tenant dirancang serta diuji.
 
 ## Setup (urutan disarankan)
 
