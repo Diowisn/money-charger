@@ -1,5 +1,6 @@
 import {
   aktifPlan,
+  hitungAwal,
   hitungPeriode,
   hitungWadah,
   nominalItem,
@@ -110,12 +111,13 @@ function ringkasTx(state: State, t: Tx): TxView {
 export function bangunDashboard(state: State, hariIni: string): DashboardData {
   const ps = periodes(state);
   const planAktif = aktifPlan(state);
-  const per = ps.length ? ps[ps.length - 1] : null;
-  const perBerjalan = per && per.start <= hariIni ? hitungPeriode(state, ps, per) : null;
-  const planPeriode = per ? planById(state, per.planId) : planAktif;
+  const perAktif = [...ps].reverse().find((p) => p.start <= hariIni) ?? null;
+  const perBerjalan = perAktif ? hitungPeriode(state, ps, perAktif) : null;
+  const statistik = perBerjalan ?? hitungAwal(state, hariIni);
+  const planPeriode = perAktif ? planById(state, perAktif.planId) : planAktif;
   const wadah = hitungWadah(state);
 
-  const statMap = new Map((perBerjalan?.pos ?? []).map((p) => [p.subPostId, p]));
+  const statMap = new Map(statistik.pos.map((p) => [p.subPostId, p]));
   const grupMap = new Map(state.groups.map((g) => [g.id, g.nama]));
 
   const posSemua: PosView[] = state.subPosts
@@ -165,9 +167,9 @@ export function bangunDashboard(state: State, hariIni: string): DashboardData {
 
   const totalRencana = totalPlan(planPeriode);
   const jatahSubPos = totalJatahSubPos(planPeriode);
-  const terpakai = perBerjalan?.terpakaiTotal ?? 0;
+  const terpakai = statistik.terpakaiTotal;
   const dd = nominalItem(planPeriode, "dd");
-  const ddSisa = perBerjalan?.ddSisa ?? dd;
+  const ddSisa = statistik.ddSisa;
 
   const transaksi = state.txs
     .slice()
@@ -180,10 +182,10 @@ export function bangunDashboard(state: State, hariIni: string): DashboardData {
     hariIni,
     periode: {
       aktif: Boolean(perBerjalan),
-      mulai: per?.start ?? null,
-      akhir: per?.end ?? null,
-      hariKe: perBerjalan ? Math.max(1, diffDays(hariIni, per!.start) + 1) : 0,
-      gaji: per?.gaji.nominal ?? 0,
+      mulai: perAktif?.start ?? null,
+      akhir: perAktif?.end ?? null,
+      hariKe: perBerjalan ? Math.max(1, diffDays(hariIni, perAktif!.start) + 1) : 0,
+      gaji: perAktif?.gaji.nominal ?? 0,
     },
     ringkasan: {
       pendapatanBulanIni,

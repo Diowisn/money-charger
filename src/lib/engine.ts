@@ -89,9 +89,7 @@ export interface PosStat {
   sisa: number;
 }
 
-export interface PeriodeHasil {
-  periode: Periode;
-  tertutup: boolean;
+export interface RingkasanPeriode {
   pos: PosStat[];
   belumDipetakan: number;
   dd: number;
@@ -103,10 +101,12 @@ export interface PeriodeHasil {
   terpakaiTotal: number;
 }
 
-export function hitungPeriode(state: State, ps: Periode[], p: Periode): PeriodeHasil {
-  const plan = planById(state, p.planId);
-  const txs = berlaku(state).filter((t) => dalam(p, t));
+export interface PeriodeHasil extends RingkasanPeriode {
+  periode: Periode;
+  tertutup: boolean;
+}
 
+function ringkasPeriode(state: State, plan: PlanVersion, txs: Tx[]): RingkasanPeriode {
   const pos: PosStat[] = [];
   for (const s of state.subPosts) {
     const jatah = nominalItem(plan, "sub_pos", s.id);
@@ -145,8 +145,6 @@ export function hitungPeriode(state: State, ps: Periode[], p: Periode): PeriodeH
   const sisaSub = pos.reduce((s, x) => s + x.sisa, 0);
 
   return {
-    periode: p,
-    tertutup: p.index < ps.length,
     pos,
     belumDipetakan,
     dd,
@@ -156,6 +154,26 @@ export function hitungPeriode(state: State, ps: Periode[], p: Periode): PeriodeH
     sisaTotal: sisaSub + ddSisa,
     terpakaiTotal: pos.reduce((s, x) => s + x.terpakai, 0) + belumDipetakan,
   };
+}
+
+export function hitungPeriode(state: State, ps: Periode[], p: Periode): PeriodeHasil {
+  const plan = planById(state, p.planId);
+  const txs = berlaku(state).filter((t) => dalam(p, t));
+  return {
+    periode: p,
+    tertutup: p.index < ps.length,
+    ...ringkasPeriode(state, plan, txs),
+  };
+}
+
+export function hitungAwal(state: State, hariIni: string): RingkasanPeriode {
+  const ps = periodes(state);
+  const plan = aktifPlan(state);
+  const batas = ps[0]?.start ?? null;
+  const txs = berlaku(state).filter(
+    (t) => t.tanggal <= hariIni && (batas === null || t.tanggal < batas),
+  );
+  return ringkasPeriode(state, plan, txs);
 }
 
 // ---------- wadah ----------

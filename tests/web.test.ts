@@ -50,6 +50,28 @@ describe("dashboard", () => {
     expect(d.ringkasan.pengeluaranBulanIni).toBe(50_000);
     expect(d.grup[0].terpakai).toBe(50_000);
   });
+
+  it("menghitung pengeluaran periode awal terhadap rencana aktif", async () => {
+    const repo = new MemRepo();
+    const state = await repo.load();
+    const pos = state.subPosts[0];
+    await tambahTransaksi(repo, HARI, {
+      tipe: "out",
+      nominal: 50_000,
+      tanggal: HARI,
+      subPostId: pos.id,
+    });
+    await tambahTransaksi(repo, HARI, { tipe: "out", nominal: 25_000, tanggal: HARI });
+
+    const d = bangunDashboard(await repo.load(), HARI);
+    expect(d.periode.aktif).toBe(false);
+    expect(d.ringkasan.terpakai).toBe(75_000);
+    expect(d.ringkasan.sisaUang).toBe(d.ringkasan.totalRencana - 75_000);
+    expect(d.ringkasan.ddSisa).toBe(d.ringkasan.dd - 25_000);
+    expect(d.grup[0].terpakai).toBe(50_000);
+    expect(d.posSemua.find((p) => p.id === pos.id)!.terpakai).toBe(50_000);
+    expect(d.transaksi).toHaveLength(2);
+  });
 });
 
 describe("transaksi web", () => {
