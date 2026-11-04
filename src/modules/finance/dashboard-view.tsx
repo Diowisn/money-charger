@@ -1,10 +1,13 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { DashboardData } from "@/lib/dashboard";
 
 type Pesan = { jenis: "ok" | "error"; teks: string };
 type Tab = "ringkasan" | "rencana" | "transaksi" | "pos";
+type StatusLive = "hidup" | "terputus";
+
+const INTERVAL_LIVE_MS = 5000;
 
 const WARNA = ["#2f9e6b", "#4f8ef7", "#f2a33c", "#c26bd8", "#e05d5d", "#3aa6b9", "#8a7d3d"];
 const NAMA_WADAH: Record<string, string> = { saldo: "Saldo", tabungan: "Tabungan", investasi: "Investasi" };
@@ -42,20 +45,77 @@ export default function Dashboard({ awal }: { awal: DashboardData }) {
   const [sibuk, setSibuk] = useState(false);
   const [pesan, setPesan] = useState<Pesan | null>(null);
   const [buka, setBuka] = useState<Record<number, boolean>>(() => ({ [awal.grup[0]?.id ?? 0]: true }));
+  const [statusLive, setStatusLive] = useState<StatusLive>("hidup");
+  const [terakhir, setTerakhir] = useState<number | null>(null);
+  const dataRef = useRef(awal);
+  const sibukRef = useRef(false);
+  const urutanRef = useRef(0);
 
-  useEffect(() => setData(awal), [awal]);
+  useEffect(() => {
+    dataRef.current = awal;
+    setData(awal);
+  }, [awal]);
 
-  async function muatUlang() {
-    const res = await fetch("/api/dashboard", { cache: "no-store" });
-    if (res.status === 401) {
-      window.location.href = "/login";
-      return;
+  const muatUlang = useCallback(async (senyap = true, paksa = false) => {
+    if (!paksa && sibukRef.current) return;
+    const urutan = ++urutanRef.current;
+    try {
+      const res = await fetch(`/api/dashboard?_=${Date.now()}`, {
+        cache: "no-store",
+        credentials: "same-origin",
+        headers: { "Cache-Control": "no-cache", Pragma: "no-cache" },
+      });
+      if (res.status === 401) {
+        window.location.href = "/login";
+        return;
+      }
+      const j = (await res.json().catch(() => ({}))) as {
+        ok?: boolean;
+        data?: DashboardData;
+        error?: string;
+      };
+      if (urutan !== urutanRef.current) return;
+      if (!res.ok || !j.ok || !j.data) {
+        setStatusLive("terputus");
+        if (!senyap) setPesan({ jenis: "error", teks: j.error ?? "Gagal memuat data." });
+        return;
+      }
+      if (JSON.stringify(j.data) !== JSON.stringify(dataRef.current)) {
+        dataRef.current = j.data;
+        setData(j.data);
+      }
+      setTerakhir(Date.now());
+      setStatusLive("hidup");
+    } catch {
+      if (urutan !== urutanRef.current) return;
+      setStatusLive("terputus");
+      if (!senyap) setPesan({ jenis: "error", teks: "Tidak bisa menghubungi server." });
     }
-    const j = (await res.json().catch(() => ({}))) as { ok?: boolean; data?: DashboardData };
-    if (j.ok && j.data) setData(j.data);
-  }
+  }, []);
+
+  useEffect(() => {
+    void muatUlang(true);
+    const timer = window.setInterval(() => {
+      if (document.visibilityState === "visible") void muatUlang(true);
+    }, INTERVAL_LIVE_MS);
+    const saatTerlihat = () => {
+      if (document.visibilityState === "visible") void muatUlang(true);
+    };
+    const saatFokus = () => void muatUlang(true);
+    const saatOnline = () => void muatUlang(true);
+    document.addEventListener("visibilitychange", saatTerlihat);
+    window.addEventListener("focus", saatFokus);
+    window.addEventListener("online", saatOnline);
+    return () => {
+      window.clearInterval(timer);
+      document.removeEventListener("visibilitychange", saatTerlihat);
+      window.removeEventListener("focus", saatFokus);
+      window.removeEventListener("online", saatOnline);
+    };
+  }, [muatUlang]);
 
   async function kirim(url: string, method: string, body?: unknown): Promise<boolean> {
+    sibukRef.current = true;
     setSibuk(true);
     setPesan(null);
     try {
@@ -73,13 +133,14 @@ export default function Dashboard({ awal }: { awal: DashboardData }) {
         setPesan({ jenis: "error", teks: j.error ?? "Gagal menyimpan." });
         return false;
       }
-      await muatUlang();
+      await muatUlang(true, true);
       setPesan({ jenis: "ok", teks: j.pesan ?? "Tersimpan." });
       return true;
     } catch {
       setPesan({ jenis: "error", teks: "Tidak bisa menghubungi server." });
       return false;
     } finally {
+      sibukRef.current = false;
       setSibuk(false);
     }
   }
@@ -88,6 +149,14 @@ export default function Dashboard({ awal }: { awal: DashboardData }) {
     await fetch("/api/auth/logout", { method: "POST" });
     window.location.href = "/login";
   }
+
+  const jamTerakhir = terakhir
+    ? new Date(terakhir).toLocaleTimeString("id-ID", {
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+      })
+    : null;
 
   return (
     <div className="app">
@@ -103,9 +172,20 @@ export default function Dashboard({ awal }: { awal: DashboardData }) {
               : `Hari ini ${data.hariIni}`}
           </p>
         </div>
-        <button className="ghost" onClick={keluar} type="button">
-          Keluar
-        </button>
+        <div className="topbar-aksi">
+          <span
+            className={`status-live ${statusLive}`}
+            role="status"
+            aria-live="polite"
+            title={statusLive === "hidup" ? "Data tersinkron otomatis" : "Koneksi terputus"}
+          >
+            <i />
+            {statusLive === "hidup" ? "Live" : "Terputus"}
+          </span>
+          <button className="ghost" onClick={keluar} type="button">
+            Keluar
+          </button>
+        </div>
       </header>
 
       {pesan ? (
@@ -151,8 +231,12 @@ export default function Dashboard({ awal }: { awal: DashboardData }) {
       </main>
 
       <footer className="kaki">
-        <span>Sisa uang dihitung langsung untuk Dana Darurat &amp; Investasi Diri.</span>
-        <button type="button" className="tautan" onClick={() => void muatUlang()} disabled={sibuk}>
+        <span>
+          {statusLive === "hidup"
+            ? `Tersinkron otomatis${jamTerakhir ? ` · ${jamTerakhir}` : ""}`
+            : "Koneksi terputus · mencoba lagi..."}
+        </span>
+        <button type="button" className="tautan" onClick={() => void muatUlang(false)} disabled={sibuk}>
           Muat ulang
         </button>
       </footer>
@@ -338,7 +422,7 @@ function Rencana({
 
   useEffect(() => {
     setDraf(drafRencana(data));
-  }, [data]);
+  }, [data.versiRencana]);
 
   const ubah = (key: string, v: number) => setDraf((d) => ({ ...d, [key]: Math.max(0, Math.round(v)) }));
   const total = useMemo(() => Object.values(draf).reduce((s, v) => s + v, 0), [draf]);

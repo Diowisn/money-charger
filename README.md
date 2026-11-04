@@ -3,7 +3,7 @@
 Bot WhatsApp pribadi untuk mencatat gaji dan pengeluaran, plus dashboard web ringkas untuk melihat ringkasan, mengatur jatah, dan mengelola transaksi/pos.
 Next.js di Vercel + Postgres online di Neon + Groq (AI cadangan). Tidak perlu memasang DBMS di komputer.
 
-Acuan: `prd-catatan-keuangan-whatsapp.md` dan `srs-catatan-keuangan-whatsapp.md`.
+Acuan: [PRD Money-Charger SaaS](./prd-catatan-keuangan-whatsapp.md) dan [SRS](./srs-catatan-keuangan-whatsapp.md).
 
 ## Struktur
 
@@ -39,7 +39,7 @@ Proyek memakai pola HMVC yang dibangun di atas Next.js—**tidak memasang framew
 
 Aturan keuangan tetap berada di `src/lib/engine.ts` dan `src/lib/handler.ts`; modul mengatur alur fitur tanpa menggandakan aturan tersebut. `Repo` dan `AiClient` sudah menjadi titik substitusi untuk penyimpanan dan AI. Bila vendor WhatsApp atau layanan lain perlu diganti, tambahkan adapter pada batas modul tanpa menanam logika vendor di aturan keuangan.
 
-Struktur ini **belum** menjadikan aplikasi multi-pelanggan: autentikasi, whitelist, transaksi, dan konfigurasi masih untuk satu pemilik. Jangan mengaktifkan beberapa pelanggan pada deployment/database yang sama sebelum isolasi data dan akun per tenant dirancang serta diuji.
+Struktur ini **belum** menjadikan aplikasi multi-pelanggan: autentikasi, whitelist, transaksi, dan konfigurasi masih untuk satu pemilik. Jangan mengaktifkan beberapa pelanggan pada deployment/database yang sama sebelum isolasi data dan akun per tenant dirancang serta diuji. Sasaran produk dan persyaratan migrasinya dijelaskan di [PRD](./prd-catatan-keuangan-whatsapp.md) dan [SRS](./srs-catatan-keuangan-whatsapp.md).
 
 ## Setup (urutan disarankan)
 
@@ -174,7 +174,7 @@ Isi dashboard:
 - **Transaksi**: catat pengeluaran, pemasukan, gaji, bonus, tarik, dan pindah; hapus transaksi (pembatalan, bukan hapus permanen). Menghapus gaji juga membatalkan alokasi dan selisihnya.
 - **Pos**: tambah pos (langsung masuk rencana aktif), ganti nama, tambah alias, nonaktifkan, dan setup awal sebelum gaji pertama.
 
-Perubahan dari web dan WhatsApp memakai database yang sama. Semua API dashboard wajib login; `/api/health` tetap publik untuk diagnosa.
+Perubahan dari web dan WhatsApp memakai database yang sama. Dashboard menyegarkan data otomatis setiap 5 detik dan saat tab kembali aktif/fokus, jadi transaksi dari WhatsApp muncul tanpa hard reload. Respons dashboard memakai `no-store` agar tidak tertahan cache browser/CDN. Semua API dashboard wajib login; `/api/health` tetap publik untuk diagnosa.
 
 Saat deploy, tambahkan `DASHBOARD_PASSWORD` (dan `AUTH_SECRET` bila dipakai) di Vercel, lalu redeploy. Tanpa itu halaman login akan menampilkan pesan bahwa password belum diatur.
 
