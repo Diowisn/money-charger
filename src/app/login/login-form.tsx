@@ -15,6 +15,14 @@ export default function LoginForm({ registerFirst, googleEnabled, facebookEnable
       setError("Masukkan email dan password.");
       return;
     }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+      setError("Masukkan alamat email yang valid.");
+      return;
+    }
+    if (register && password.length < 12) {
+      setError("Password akun baru minimal 12 karakter.");
+      return;
+    }
     setSibuk(true);
     setError(null);
     try {
@@ -37,10 +45,10 @@ export default function LoginForm({ registerFirst, googleEnabled, facebookEnable
   }
 
   return (
-    <form className="form" onSubmit={(e) => void masuk(e)}>
+    <form className="form" noValidate onSubmit={(e) => void masuk(e)}>
       <label>
         Email
-        <input type="email" autoComplete="email" value={email} onChange={(e) => { setEmail(e.target.value); if (error) setError(null); }} required autoFocus />
+        <input type="email" autoComplete="email" value={email} onChange={(e) => { setEmail(e.target.value); if (error) setError(null); }} aria-invalid={Boolean(error)} aria-describedby={error ? "login-error" : undefined} autoFocus />
       </label>
       <label>
         Password

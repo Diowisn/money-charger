@@ -618,7 +618,6 @@ export default function Dashboard({ awal }: { awal: DashboardData }) {
               navigasi={navigasiKe}
               keluar={keluar}
               keluarSemua={keluarSemua}
-              mintaKonfirmasi={mintaKonfirmasi}
             />
           ) : null}
           {tab === "pos" ? <Pos data={data} kirim={kirim} sibuk={sibuk} mintaKonfirmasi={mintaKonfirmasi} /> : null}
@@ -743,7 +742,6 @@ function Ringkasan({
 }) {
   const r = data.ringkasan;
   const terbaru = data.transaksi.filter((t) => t.status === "berlaku").slice(0, 6);
-  const inisial = (nama.trim().charAt(0) || "M").toUpperCase();
 
   return (
     <div className="beranda">
@@ -957,7 +955,6 @@ function Profil({
   navigasi,
   keluar,
   keluarSemua,
-  mintaKonfirmasi,
 }: {
   data: DashboardData;
   nama: string;
@@ -968,7 +965,6 @@ function Profil({
   navigasi: (tab: Tab) => void;
   keluar: () => Promise<void>;
   keluarSemua: () => Promise<void>;
-  mintaKonfirmasi: (judul: string, teks: string) => Promise<boolean>;
 }) {
   const [draf, setDraf] = useState(nama);
   const inisial = (nama.trim().charAt(0) || "M").toUpperCase();
@@ -1081,8 +1077,12 @@ function JawabanRapi({ teks }: { teks: string }) {
   const isi = teks.replace(/\r\n?/g, "\n").trim();
   const blok = isi.split(/\n\s*\n/).filter(Boolean);
   const renderBaris = (baris: string, i: number) => {
-    const item = baris.trim().match(/^(?:[-*]\s+|\d+[.)]\s+)(.+)$/);
-    if (!item) return <p key={i}>{formatMarkdown(baris.trim())}</p>;
+    const teksBaris = baris.trim();
+    if (/^\*\*[^*]+\*\*$/.test(teksBaris)) {
+      return <h3 key={i}>{teksBaris.slice(2, -2)}</h3>;
+    }
+    const item = teksBaris.match(/^(?:[-*]\s+|\d+[.)]\s+)(.+)$/);
+    if (!item) return <p key={i}>{formatMarkdown(teksBaris)}</p>;
     const nomor = baris.trim().match(/^(\d+)[.)]/)?.[1];
     return (
       <div className="jawaban-item" key={i}>
