@@ -4,6 +4,7 @@ import { useCallback, useEffect, useId, useMemo, useRef, useState, type ReactEle
 import type { DashboardData, TxView } from "@/lib/dashboard";
 
 type Pesan = { jenis: "ok" | "error"; teks: string };
+type Konfirmasi = { teks: string; judul: string; selesai: (nilai: boolean) => void };
 type HasilScan = { nominal: number; subPos: string | null; tanggal: string | null; label: string | null };
 type Tab =
   | "ringkasan"
@@ -147,6 +148,12 @@ function tanggalPendek(iso: string) {
   return `${hari} ${BULAN_PENDEK[bulan - 1] ?? ""} ${tahun}`;
 }
 
+function formatMarkdown(teks: string) {
+  return teks.split(/(\*\*[^*]+\*\*)/g).map((bagian, i) =>
+    bagian.startsWith("**") && bagian.endsWith("**") ? <strong key={i}>{bagian.slice(2, -2)}</strong> : bagian,
+  );
+}
+
 function labelBulan(kunci: string) {
   const [tahun, bulan] = kunci.split("-").map(Number);
   if (!tahun || !bulan) return kunci;
@@ -281,6 +288,7 @@ export default function Dashboard({ awal }: { awal: DashboardData }) {
   const [menuTambah, setMenuTambah] = useState(false);
   const [hasilScan, setHasilScan] = useState<HasilScan | null>(null);
   const [scanSibuk, setScanSibuk] = useState(false);
+  const [konfirmasi, setKonfirmasi] = useState<Konfirmasi | null>(null);
   const inputScanRef = useRef<HTMLInputElement>(null);
   const dataRef = useRef(awal);
   const sibukRef = useRef(false);
@@ -395,8 +403,12 @@ export default function Dashboard({ awal }: { awal: DashboardData }) {
     window.location.href = "/login";
   }
 
+  function mintaKonfirmasi(judul: string, teks: string): Promise<boolean> {
+    return new Promise((selesai) => setKonfirmasi({ judul, teks, selesai }));
+  }
+
   async function keluarSemua() {
-    if (!window.confirm("Cabut semua sesi dashboard? Perangkat ini juga akan keluar.")) return;
+    if (!(await mintaKonfirmasi("Keluar semua perangkat", "Semua sesi dashboard akan dicabut, termasuk sesi perangkat ini."))) return;
     const res = await fetch("/api/auth/logout-all", { method: "POST" });
     if (res.ok) window.location.href = "/login";
     else setPesan({ jenis: "error", teks: "Gagal mencabut semua sesi." });
@@ -472,7 +484,7 @@ export default function Dashboard({ awal }: { awal: DashboardData }) {
           </div>
         </div>
         <button className="sidebar-cat-button" type="button" onClick={() => catat("out")}>
-          <span aria-hidden="true">ï¼‹</span> Catat transaksi
+           <span aria-hidden="true">＋</span> Catat transaksi
         </button>
         <nav className="sidebar-nav" aria-label="Navigasi utama">
           <p className="sidebar-label">MENU</p>
@@ -506,7 +518,7 @@ export default function Dashboard({ awal }: { awal: DashboardData }) {
               onClick={() => navigasiKe("ringkasan")}
               aria-label="Kembali ke beranda"
             >
-              â†
+              ←
             </button>
             <h1>{JUDUL_TAB[tab]}</h1>
             <button
@@ -524,7 +536,7 @@ export default function Dashboard({ awal }: { awal: DashboardData }) {
           <div className={`toast ${pesan.jenis}`} role="status">
             <span>{pesan.teks}</span>
             <button type="button" onClick={() => setPesan(null)} aria-label="Tutup">
-              Ã—
+              ×
             </button>
           </div>
         ) : null}
@@ -556,6 +568,28 @@ export default function Dashboard({ awal }: { awal: DashboardData }) {
           </div>
         ) : null}
         {scanSibuk ? <div className="toast" role="status">Membaca struk…</div> : null}
+        {konfirmasi ? (
+          <div className="dialog-overlay" onMouseDown={(event) => {
+            if (event.target === event.currentTarget) {
+              konfirmasi.selesai(false);
+              setKonfirmasi(null);
+            }
+          }}>
+            <section className="dialog-kartu" role="alertdialog" aria-modal="true" aria-labelledby="konfirmasi-judul">
+              <h2 id="konfirmasi-judul">{konfirmasi.judul}</h2>
+              <p>{konfirmasi.teks}</p>
+              <div className="dialog-aksi">
+                <button type="button" className="sekunder" onClick={() => { konfirmasi.selesai(false); setKonfirmasi(null); }}>
+                  Batal
+                </button>
+                <button type="button" className="hapus" onClick={() => { konfirmasi.selesai(true); setKonfirmasi(null); }}>
+                  Ya, lanjutkan
+                </button>
+              </div>
+            </section>
+          </div>
+        ) : null}
+
         <main className="konten">
           {tab === "ringkasan" ? (
             <Ringkasan data={data} nama={nama} navigasi={navigasiKe} catat={catat} />
@@ -569,6 +603,7 @@ export default function Dashboard({ awal }: { awal: DashboardData }) {
               mode={tab}
               tipeAwal={tipeCatat}
               navigasi={navigasiKe}
+              mintaKonfirmasi={mintaKonfirmasi}
             />
           ) : null}
           {tab === "rekap" ? <Rekap data={data} navigasi={navigasiKe} /> : null}
@@ -583,11 +618,12 @@ export default function Dashboard({ awal }: { awal: DashboardData }) {
               navigasi={navigasiKe}
               keluar={keluar}
               keluarSemua={keluarSemua}
+              mintaKonfirmasi={mintaKonfirmasi}
             />
           ) : null}
-          {tab === "pos" ? <Pos data={data} kirim={kirim} sibuk={sibuk} /> : null}
-          {tab === "piutang" ? <Piutang data={data} kirim={kirim} sibuk={sibuk} /> : null}
-          {tab === "target" ? <Target data={data} kirim={kirim} sibuk={sibuk} /> : null}
+          {tab === "pos" ? <Pos data={data} kirim={kirim} sibuk={sibuk} mintaKonfirmasi={mintaKonfirmasi} /> : null}
+          {tab === "piutang" ? <Piutang data={data} kirim={kirim} sibuk={sibuk} mintaKonfirmasi={mintaKonfirmasi} /> : null}
+          {tab === "target" ? <Target data={data} kirim={kirim} sibuk={sibuk} mintaKonfirmasi={mintaKonfirmasi} /> : null}
           {tab === "asisten" ? <Asisten /> : null}
         </main>
 
@@ -645,8 +681,8 @@ export default function Dashboard({ awal }: { awal: DashboardData }) {
         <footer className="kaki">
         <span>
           {statusLive === "hidup"
-            ? `Tersinkron otomatis${jamTerakhir ? ` Â· ${jamTerakhir}` : ""}`
-            : "Koneksi terputus Â· mencoba lagi..."}
+            ? `Tersinkron otomatis${jamTerakhir ? ` · ${jamTerakhir}` : ""}`
+            : "Koneksi terputus · mencoba lagi..."}
         </span>
         <button type="button" className="tautan" onClick={() => void muatUlang(false)} disabled={sibuk}>
           Muat ulang
@@ -684,7 +720,7 @@ function BarisTransaksi({ tx }: { tx: TxView }) {
       <div className="ringkas-info">
         <p className="ringkas-nama">{judul}</p>
         <p className="muted kecil">
-          {tanggalPendek(tx.tanggal)} Â· {NAMA_TIPE[tx.tipe] ?? tx.tipe}
+          {tanggalPendek(tx.tanggal)} · {NAMA_TIPE[tx.tipe] ?? tx.tipe}
         </p>
       </div>
       <b className={keluar ? "ringkas-jumlah" : "ringkas-jumlah masuk"}>
@@ -731,7 +767,7 @@ function Ringkasan({
           <p className="saldo-label">Total Saldo</p>
           <p className="saldo-angka">{rp(r.saldo)}</p>
           <p className="saldo-sub">
-            {data.periode.aktif ? `Periode aktif Â· hari ke-${data.periode.hariKe}` : "Periode awal"}
+            {data.periode.aktif ? `Periode aktif · hari ke-${data.periode.hariKe}` : "Periode awal"}
           </p>
         </div>
         <SaldoIlustrasi />
@@ -921,6 +957,7 @@ function Profil({
   navigasi,
   keluar,
   keluarSemua,
+  mintaKonfirmasi,
 }: {
   data: DashboardData;
   nama: string;
@@ -931,6 +968,7 @@ function Profil({
   navigasi: (tab: Tab) => void;
   keluar: () => Promise<void>;
   keluarSemua: () => Promise<void>;
+  mintaKonfirmasi: (judul: string, teks: string) => Promise<boolean>;
 }) {
   const [draf, setDraf] = useState(nama);
   const inisial = (nama.trim().charAt(0) || "M").toUpperCase();
@@ -1039,6 +1077,36 @@ function Profil({
   );
 }
 
+function JawabanRapi({ teks }: { teks: string }) {
+  const isi = teks.replace(/\r\n?/g, "\n").trim();
+  const blok = isi.split(/\n\s*\n/).filter(Boolean);
+  const renderBaris = (baris: string, i: number) => {
+    const item = baris.trim().match(/^(?:[-*]\s+|\d+[.)]\s+)(.+)$/);
+    if (!item) return <p key={i}>{formatMarkdown(baris.trim())}</p>;
+    const nomor = baris.trim().match(/^(\d+)[.)]/)?.[1];
+    return (
+      <div className="jawaban-item" key={i}>
+        <span>{nomor ?? "•"}</span>
+        <p>{formatMarkdown(item[1])}</p>
+      </div>
+    );
+  };
+
+  return (
+    <div className="jawaban-rapi">
+      {blok.map((bagian, i) => {
+        const baris = bagian.split("\n").filter((b) => b.trim());
+        const daftar = baris.every((b) => /^(?:[-*]\s+|\d+[.)]\s+)/.test(b.trim()));
+        return daftar ? (
+          <div className="jawaban-daftar" key={i}>{baris.map(renderBaris)}</div>
+        ) : (
+          <div className="jawaban-blok" key={i}>{baris.map(renderBaris)}</div>
+        );
+      })}
+    </div>
+  );
+}
+
 type ChatPesan = { peran: "user" | "ai"; teks: string };
 
 const SARAN_TANYA = [
@@ -1110,7 +1178,7 @@ function Asisten() {
         <div className="chat" aria-live="polite">
           {riwayat.map((m, i) => (
             <div key={i} className={`chat-pesan ${m.peran}`}>
-              {m.teks}
+              {m.peran === "ai" ? <JawabanRapi teks={m.teks} /> : m.teks}
             </div>
           ))}
           {sibuk ? <div className="chat-pesan ai muted">Sedang membaca data...</div> : null}
@@ -1297,6 +1365,7 @@ function Transaksi({
   mode,
   tipeAwal,
   navigasi,
+  mintaKonfirmasi,
 }: {
   data: DashboardData;
   kirim: (url: string, method: string, body?: unknown) => Promise<boolean>;
@@ -1304,6 +1373,7 @@ function Transaksi({
   mode: "catat" | "riwayat";
   tipeAwal: "in" | "out";
   navigasi: (tab: Tab) => void;
+  mintaKonfirmasi: (judul: string, teks: string) => Promise<boolean>;
 }) {
   const [tipe, setTipe] = useState<string>(tipeAwal);
   const [nominal, setNominal] = useState("");
@@ -1374,7 +1444,7 @@ function Transaksi({
   }
 
   async function hapus(id: number, teks: string) {
-    if (!window.confirm(`Batalkan ${teks}?`)) return;
+    if (!(await mintaKonfirmasi("Batalkan transaksi?", `Batalkan ${teks}?`))) return;
     await kirim("/api/transactions", "DELETE", { id });
   }
 
@@ -1443,7 +1513,7 @@ function Transaksi({
                   <option value="">Belum dipetakan</option>
                   {posAktif.map((p) => (
                     <option key={p.id} value={p.id}>
-                      {p.grup} Aï¿½ {p.nama}
+                      {p.grup} · {p.nama}
                     </option>
                   ))}
                 </select>
@@ -1532,6 +1602,24 @@ function Transaksi({
         </div>
 
         <div className="filter-riwayat">
+          <button type="button" className="utama" onClick={() => {
+            const kolom = ["ID", "Tanggal", "Jenis", "Kategori", "Catatan", "Nominal", "Biaya admin", "Wadah asal", "Wadah tujuan", "Status"];
+            const sel = (nilai: string | number | null) => {
+              let teks = String(nilai ?? "");
+              if (/^[=+@\-\t\r]/.test(teks)) teks = `'${teks}`;
+              return /[",\n]/.test(teks) ? `"${teks.replace(/"/g, '""')}"` : teks;
+            };
+            const baris = data.transaksi.map((t) => [t.id, t.tanggal, NAMA_TIPE[t.tipe] ?? t.tipe, t.subPost, t.label, t.nominal, t.biayaAdmin, t.wadahAsal, t.wadahTujuan, t.status].map(sel).join(","));
+            const url = URL.createObjectURL(new Blob(["\uFEFF", [kolom.map(sel).join(","), ...baris].join("\r\n")], { type: "text/csv;charset=utf-8" }));
+            const tautan = document.createElement("a");
+            tautan.href = url;
+            tautan.download = "money-charger-transaksi.csv";
+            tautan.click();
+            URL.revokeObjectURL(url);
+          }}>Ekspor semua transaksi (CSV)</button>
+          <span className="muted kecil">Bisa dibuka di Excel atau Google Sheets; mencakup semua bulan dan transaksi batal.</span>
+        </div>
+        <div className="filter-riwayat">
           <label className="filter-jenis">
             Bulan
             <select
@@ -1603,21 +1691,29 @@ function Transaksi({
           Lihat Grafik
         </button>
         {totalHalaman > 1 ? (
-          <div className="baris-antara" style={{ marginTop: 12 }}>
-            <button type="button" onClick={() => setHalaman((h) => Math.max(1, h - 1))} disabled={halamanAman <= 1}>
-              Sebelumnya
-            </button>
-            <span className="muted kecil">
-              Halaman {halamanAman} dari {totalHalaman}
-            </span>
+          <nav className="paginasi" aria-label="Halaman transaksi">
             <button
               type="button"
+              className="panah-halaman"
+              onClick={() => setHalaman((h) => Math.max(1, h - 1))}
+              disabled={halamanAman <= 1}
+              aria-label="Halaman sebelumnya"
+              title="Halaman sebelumnya"
+            >
+              ←
+            </button>
+            <span aria-live="polite">{halamanAman} / {totalHalaman}</span>
+            <button
+              type="button"
+              className="panah-halaman"
               onClick={() => setHalaman((h) => Math.min(totalHalaman, h + 1))}
               disabled={halamanAman >= totalHalaman}
+              aria-label="Halaman berikutnya"
+              title="Halaman berikutnya"
             >
-              Berikutnya
+              →
             </button>
-          </div>
+          </nav>
         ) : null}
       </section>
       ) : null}
@@ -1629,10 +1725,12 @@ function Pos({
   data,
   kirim,
   sibuk,
+  mintaKonfirmasi,
 }: {
   data: DashboardData;
   kirim: (url: string, method: string, body?: unknown) => Promise<boolean>;
   sibuk: boolean;
+  mintaKonfirmasi: (judul: string, teks: string) => Promise<boolean>;
 }) {
   const [grupId, setGrupId] = useState(String(data.grup[0]?.id ?? ""));
   const [nama, setNama] = useState("");
@@ -1693,7 +1791,7 @@ function Pos({
     if (!pilih) return;
     const p = data.posSemua.find((x) => String(x.id) === pilih);
     if (!p) return;
-    if (!window.confirm(`Nonaktifkan pos ${p.nama}?`)) return;
+    if (!(await mintaKonfirmasi("Nonaktifkan pos?", `Pos ${p.nama} akan dinonaktifkan.`))) return;
     const ok = await kirim("/api/pos", "POST", { aksi: "nonaktif", id: Number(pilih) });
     if (ok) setPilih("");
   }
@@ -1754,7 +1852,7 @@ function Pos({
               <option value="">Pilih pos</option>
               {posAktif.map((p) => (
                 <option key={p.id} value={p.id}>
-                  {p.grup} Â· {p.nama} ({rp(p.jatahRencana)})
+                  {p.grup} · {p.nama} ({rp(p.jatahRencana)})
                 </option>
               ))}
             </select>
@@ -1789,7 +1887,7 @@ function Pos({
                   <li key={p.id}>
                     <span>{p.nama}</span>
                     <span className="muted">
-                      {rp(p.jatahRencana)} Â· terpakai {rp(p.terpakai)}
+                      {rp(p.jatahRencana)} · terpakai {rp(p.terpakai)}
                     </span>
                   </li>
                 ))}
@@ -1882,10 +1980,12 @@ function Target({
   data,
   kirim,
   sibuk,
+  mintaKonfirmasi,
 }: {
   data: DashboardData;
   kirim: (url: string, method: string, body?: unknown) => Promise<boolean>;
   sibuk: boolean;
+  mintaKonfirmasi: (judul: string, teks: string) => Promise<boolean>;
 }) {
   const [nama, setNama] = useState("");
   const [targetNominal, setTargetNominal] = useState("");
@@ -1918,7 +2018,7 @@ function Target({
   }
 
   async function batal(id: number, nama: string) {
-    if (!window.confirm(`Batalkan target "${nama}"?`)) return;
+    if (!(await mintaKonfirmasi("Batalkan target?", `Target ${nama} akan dibatalkan.`))) return;
     await kirim("/api/goals", "POST", { aksi: "batal", id });
   }
 
@@ -1981,7 +2081,7 @@ function Target({
                   </div>
                   <p className="muted kecil">
                     Terkumpul {rp(g.terkumpul)} dari {rp(g.targetNominal)} (sisa {rp(g.sisa)})
-                    {g.targetTanggal ? ` Â· target ${g.targetTanggal}${g.lewatTempo ? " (lewat)" : ""}` : ""}
+                    {g.targetTanggal ? ` · target ${g.targetTanggal}${g.lewatTempo ? " (lewat)" : ""}` : ""}
                   </p>
                   <div className="baris-tombol" style={{ marginTop: 6 }}>
                     <input
@@ -2040,10 +2140,12 @@ function Piutang({
   data,
   kirim,
   sibuk,
+  mintaKonfirmasi,
 }: {
   data: DashboardData;
   kirim: (url: string, method: string, body?: unknown) => Promise<boolean>;
   sibuk: boolean;
+  mintaKonfirmasi: (judul: string, teks: string) => Promise<boolean>;
 }) {
   const [jenis, setJenis] = useState<"piutang" | "utang">("piutang");
   const [nama, setNama] = useState("");
@@ -2078,7 +2180,7 @@ function Piutang({
   }
 
   async function batal(id: number, nama: string) {
-    if (!window.confirm(`Batalkan catatan "${nama}"?`)) return;
+    if (!(await mintaKonfirmasi("Batalkan catatan?", `Catatan ${nama} akan dibatalkan.`))) return;
     await kirim("/api/debts", "POST", { aksi: "batal", id });
   }
 
@@ -2160,7 +2262,7 @@ function Piutang({
                   <p className="nama-transaksi">{d.nama}</p>
                   <p className="muted kecil">
                     Sisa {rp(d.sisa)} dari {rp(d.nominal)}
-                    {d.jatuhTempo ? ` Aï¿½ tempo ${d.jatuhTempo}${d.lewatTempo ? " (lewat)" : ""}` : ""}
+                    {d.jatuhTempo ? ` · tempo ${d.jatuhTempo}${d.lewatTempo ? " (lewat)" : ""}` : ""}
                   </p>
                   <div className="baris-tombol" style={{ marginTop: 6 }}>
                     <input
@@ -2204,7 +2306,7 @@ function Piutang({
                   <div>
                     <p className="nama-transaksi">{d.nama}</p>
                     <p className="muted kecil">
-                      {rp(d.nominal)} Aï¿½ {d.status === "lunas" ? "lunas" : "dibatalkan"}
+                      {rp(d.nominal)} · {d.status === "lunas" ? "lunas" : "dibatalkan"}
                     </p>
                   </div>
                 </div>
