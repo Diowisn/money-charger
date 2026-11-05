@@ -4,6 +4,7 @@ import { parseCommand } from "@/lib/parse/command";
 import { extractDate, wibDate } from "@/lib/parse/date";
 import { rp, splitPesan } from "@/lib/format";
 import { validasiAi } from "@/lib/ai";
+import { validasiStruk } from "@/lib/ai-vision";
 import { ekstrakNominalEmail, kemungkinanGaji } from "@/lib/email";
 
 const v = (t: string) => {
@@ -85,6 +86,14 @@ describe("perintah", () => {
     expect(parseCommand("lunasi piutang Andi", t)).toMatchObject({ k: "debt_pay", jenis: "piutang", nama: "Andi", nominal: null });
     expect(parseCommand("bayar piutang Andi 40rb", t)).toMatchObject({ k: "debt_pay", jenis: "piutang", nama: "Andi", nominal: 40_000 });
   });
+
+  it("target dan nabung (goal tabungan)", () => {
+    expect(parseCommand("target 5 juta Laptop Baru", t)).toMatchObject({
+      k: "goal_add", nominal: 5_000_000, nama: "Laptop Baru", targetTanggal: null,
+    });
+    expect(parseCommand("target", t)).toMatchObject({ k: "goal_list" });
+    expect(parseCommand("nabung 100rb Laptop Baru", t)).toMatchObject({ k: "goal_save", nama: "Laptop Baru", nominal: 100_000 });
+  });
   it("gaji, bonus, in", () => {
     expect(parseCommand("gaji masuk 1.8 juta", t)).toMatchObject({ k: "gaji", nominal: 1_800_000 });
     expect(parseCommand("gaji 1.8jt tgl 15", t)).toMatchObject({ k: "gaji", tanggal: "2026-10-15" });
@@ -149,6 +158,32 @@ describe("validasi AI (SRS 7.3, AC-13)", () => {
     expect(validasiAi({ intent: "gaji", amount_text: "25rb" }, pesan, nama, today)).toMatchObject({ ok: false, alasan: "gaji" });
     expect(validasiAi({ intent: "tidak_jelas" }, pesan, nama, today).ok).toBe(false);
     expect(validasiAi(null, pesan, nama, today).ok).toBe(false);
+  });
+});
+
+describe("validasi struk/foto (vision AI)", () => {
+  const nama = ["Jajan / Kopi / Self-Reward", "Bensin & Parkir"];
+  const today = "2026-10-17";
+  it("menerima hasil struk yang jelas", () => {
+    const r = validasiStruk(
+      { intent: "out", amount_text: "Rp45.000", sub_pos: "Bensin & Parkir", label: "SPBU Pertamina" },
+      nama,
+      today,
+    );
+    expect(r).toMatchObject({ ok: true, hasil: { nominal: 45_000, subPos: "Bensin & Parkir", label: "SPBU Pertamina" } });
+  });
+  it("sub_pos di luar daftar dianggap belum dipetakan", () => {
+    const r = validasiStruk({ intent: "out", amount_text: "20rb", sub_pos: "Tidak Ada" }, nama, today);
+    expect(r).toMatchObject({ ok: true, hasil: { subPos: null } });
+  });
+  it("intent tidak_jelas, amount_text kosong, dan JSON rusak ditolak", () => {
+    expect(validasiStruk({ intent: "tidak_jelas" }, nama, today)).toMatchObject({ ok: false, alasan: "tidak_jelas" });
+    expect(validasiStruk({ intent: "out", amount_text: "" }, nama, today)).toMatchObject({ ok: false, alasan: "tidak_jelas" });
+    expect(validasiStruk(null, nama, today).ok).toBe(false);
+  });
+  it("tanggal di luar format diabaikan, bukan menggagalkan seluruh hasil", () => {
+    const r = validasiStruk({ intent: "out", amount_text: "10rb", tanggal_text: "entah kapan" }, nama, today);
+    expect(r).toMatchObject({ ok: true, hasil: { tanggal: null } });
   });
 });
 

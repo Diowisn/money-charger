@@ -9,7 +9,7 @@ import {
   SEED_TABUNGAN,
 } from "./seed";
 import { parseConfig } from "./engine";
-import type { Debt, NewDebt, NewTx, Pending, PlanItem, State, Tx } from "./types";
+import type { Debt, NewDebt, NewSavingGoal, NewTx, Pending, PlanItem, SavingGoal, State, Tx } from "./types";
 
 interface Data {
   allowed: string[];
@@ -20,9 +20,10 @@ interface Data {
   plans: State["plans"];
   txs: Tx[];
   debts: Debt[];
+  goals: SavingGoal[];
   pendings: (Pending & { status: string })[];
   inbound: Map<string, string>;
-  seq: { tx: number; plan: number; sub: number; pending: number; debt: number };
+  seq: { tx: number; plan: number; sub: number; pending: number; debt: number; goal: number };
 }
 
 /** Implementasi dalam memori, dipakai pengujian. Perilakunya mengikuti PgRepo. */
@@ -40,9 +41,10 @@ export class MemRepo implements Repo {
       plans: [],
       txs: [],
       debts: [],
+      goals: [],
       pendings: [],
       inbound: new Map(),
-      seq: { tx: 0, plan: 0, sub: 0, pending: 0, debt: 0 },
+      seq: { tx: 0, plan: 0, sub: 0, pending: 0, debt: 0, goal: 0 },
     };
     this.seed();
   }
@@ -75,6 +77,7 @@ export class MemRepo implements Repo {
       plans: d.plans,
       txs: d.txs,
       debts: d.debts,
+      goals: d.goals,
     });
   }
 
@@ -164,6 +167,19 @@ export class MemRepo implements Repo {
     if (!d) return;
     if (patch.dibayar !== undefined) d.dibayar = patch.dibayar;
     if (patch.status !== undefined) d.status = patch.status;
+  }
+
+  async addGoal(g: NewSavingGoal) {
+    const id = ++this.d.seq.goal;
+    this.d.goals.push({ ...g, id, terkumpul: g.terkumpul ?? 0, status: g.status ?? "aktif" });
+    return id;
+  }
+
+  async updateGoal(id: number, patch: { terkumpul?: number; status?: SavingGoal["status"] }) {
+    const g = this.d.goals.find((x) => x.id === id);
+    if (!g) return;
+    if (patch.terkumpul !== undefined) g.terkumpul = patch.terkumpul;
+    if (patch.status !== undefined) g.status = patch.status;
   }
 
   async addPending(jenis: string, payload: Record<string, unknown>, kedaluwarsaPada: number) {

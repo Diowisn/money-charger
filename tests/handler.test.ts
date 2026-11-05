@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import type { AiClient, AiRaw } from "@/lib/ai";
+import type { StrukRaw, VisionClient } from "@/lib/ai-vision";
 import { buatCsv } from "@/lib/csv";
 import { hitungWadah } from "@/lib/engine";
 import { tanganiPesan, type Deps } from "@/lib/handler";
@@ -27,6 +28,36 @@ async function kirim(teks: string, tgl: string, opsi: { id?: string; from?: stri
     timestampMs: at(tgl),
   });
 }
+
+/** Kirim pesan bertipe gambar (foto struk), dengan vision client mock. */
+async function kirimFoto(
+  tgl: string,
+  opsi: {
+    id?: string;
+    vision?: VisionClient | null;
+    unduhGagal?: boolean;
+    caption?: string;
+    now?: number;
+  } = {},
+) {
+  const deps: Deps = {
+    ai: null,
+    vision: opsi.vision ?? null,
+    unduhMedia: opsi.unduhGagal ? async () => null : async () => ({ base64: "ZmFrZQ==", mimeType: "image/jpeg" }),
+    baseUrl: "https://uji.example",
+    now: () => opsi.now ?? at(tgl),
+  };
+  return tanganiPesan(repo, deps, {
+    id: opsi.id ?? `wamid.${++seq}`,
+    from: OWNER,
+    type: "image",
+    mediaId: "media-123",
+    caption: opsi.caption,
+    timestampMs: at(tgl),
+  });
+}
+
+const visionClient = (raw: StrukRaw | null): VisionClient => ({ parseReceipt: async () => raw });
 
 const wadah = async () => hitungWadah(await repo.load());
 
@@ -476,6 +507,33 @@ describe("piutang dan utang", () => {
   });
 });
 
+describe("target tabungan (goal)", () => {
+  beforeEach(mulaiPeriode1);
+
+  it("membuat target, menabung sebagian, lalu mencapai target", async () => {
+    const tambah = await kirim("target 100rb Laptop Baru", "2026-11-02");
+    expect(tambah).toContain("Target tabungan dicatat: Laptop Baru, Rp100.000");
+
+    const daftar = await kirim("target", "2026-11-02");
+    expect(daftar).toContain("Laptop Baru: Rp0 dari Rp100.000 (0%)");
+
+    const nabung1 = await kirim("nabung 40rb Laptop Baru", "2026-11-03");
+    expect(nabung1).toContain("Rp40.000 ditabung ke Laptop Baru");
+    expect(nabung1).toContain("Terkumpul Rp40.000 dari Rp100.000 (sisa Rp60.000)");
+
+    const nabung2 = await kirim("nabung 60rb Laptop Baru", "2026-11-04");
+    expect(nabung2).toContain("Target tercapai!");
+
+    const setelah = await kirim("target", "2026-11-04");
+    expect(setelah).toContain("tidak ada"); // sudah selesai, tidak lagi aktif
+  });
+
+  it("menabung ke nama yang tidak ada memberi pesan jelas", async () => {
+    const r = await kirim("nabung 10rb Entah Apa", "2026-11-02");
+    expect(r).toContain("Tidak ada target tabungan aktif");
+  });
+});
+
 describe("laporan, ekspor, bantuan (AC-23)", () => {
   beforeEach(mulaiPeriode1);
 
@@ -569,6 +627,43 @@ describe("AI cadangan (AC-12 sebagian, AC-13, AC-14)", () => {
   it("AI tanpa sub_pos valid -> belum dipetakan dan ditanya", async () => {
     ai = ok({ intent: "out", amount_text: "25rb", sub_pos: null });
     expect(await kirim("tadi beli sesuatu 25rb", "2026-11-02")).toContain("untuk apa?");
+  });
+});
+
+describe("foto struk (vision AI)", () => {
+  beforeEach(mulaiPeriode1);
+
+  it("foto struk jelas dicatat otomatis sebagai pengeluaran (dibaca AI)", async () => {
+    const vision = visionClient({
+      intent: "out",
+      amount_text: "45rb",
+      sub_pos: "Bensin & Parkir",
+      label: "SPBU Pertamina",
+    });
+    const r = await kirimFoto("2026-11-02", { vision });
+    expect(r).toContain("Tercatat (dibaca AI): Rp45.000, Bensin & Parkir.");
+    expect(r).toContain('Salah? Ketik "hapus terakhir".');
+    const t = (await repo.load()).txs.find((x) => x.tipe === "out")!;
+    expect(t.nominal).toBe(45_000);
+    expect(t.sumber).toBe("ai");
+  });
+
+  it("foto yang bukan struk/nominal tidak jelas ditolak sopan", async () => {
+    const vision = visionClient({ intent: "tidak_jelas" });
+    const r = await kirimFoto("2026-11-02", { vision });
+    expect(r).toContain("bukan struk/transaksi");
+    expect((await repo.load()).txs.filter((t) => t.tipe === "out")).toHaveLength(0);
+  });
+
+  it("tanpa GROQ_API_KEY (vision null) dibalas penolakan foto yang sopan", async () => {
+    const r = await kirimFoto("2026-11-02", { vision: null });
+    expect(r).toContain("hanya bisa membaca pesan teks dan foto struk");
+  });
+
+  it("gagal unduh media dibalas pesan yang jelas, bukan diam", async () => {
+    const vision = visionClient({ intent: "out", amount_text: "10rb" });
+    const r = await kirimFoto("2026-11-02", { vision, unduhGagal: true });
+    expect(r).toContain("Foto belum bisa dibaca otomatis");
   });
 });
 

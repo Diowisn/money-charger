@@ -5,6 +5,7 @@
  */
 import { createHash, randomBytes } from "node:crypto";
 import { validasiAi, type AiClient } from "./ai";
+import { validasiStruk, type VisionClient } from "./ai-vision";
 import {
   aktifPlan,
   bagiBonus,
@@ -38,6 +39,10 @@ import { TURUNAN, buatTx, type PlanItem, type State, type Tx, type Wadah } from 
 
 export interface Deps {
   ai: AiClient | null;
+  /** Pembaca foto struk/transaksi (Groq vision); null bila GROQ_API_KEY kosong. */
+  vision?: VisionClient | null;
+  /** Mengunduh media WhatsApp (gambar) jadi base64 + mime type; null bila kredensial belum lengkap. */
+  unduhMedia?: (mediaId: string) => Promise<{ base64: string; mimeType: string } | null>;
   /** jam sistem (epoch ms); dapat disuntik saat pengujian */
   now?: () => number;
   /** URL publik untuk tautan ekspor */
@@ -51,11 +56,19 @@ export interface Masuk {
   from: string;
   type: string;
   text?: string;
+  /** ID media WhatsApp untuk pesan bertipe "image" */
+  mediaId?: string;
+  /** teks pendamping (caption) pada pesan gambar, bila ada */
+  caption?: string;
   timestampMs: number;
 }
 
 export const TEKS_NON_TEKS =
-  'Maaf, saya hanya bisa membaca pesan teks, bukan foto, suara, atau stiker. Contoh: "out 25rb kopi", "gaji masuk 1.8 juta", "saldo". Ketik "bantuan" untuk daftar lengkap.';
+  'Maaf, saya hanya bisa membaca pesan teks dan foto struk/transaksi, bukan suara atau stiker. Contoh: "out 25rb kopi", "gaji masuk 1.8 juta", "saldo". Ketik "bantuan" untuk daftar lengkap.';
+const TEKS_FOTO_GAGAL =
+  'Foto belum bisa dibaca otomatis. Pastikan nominal total terlihat jelas, atau catat manual: "out 25rb kopi". Ketik "bantuan" untuk daftar perintah.';
+const TEKS_FOTO_TIDAK_JELAS =
+  'Foto ini sepertinya bukan struk/transaksi, atau nominalnya tidak terlihat jelas. Coba foto ulang dengan nominal total terlihat, atau catat manual: "out 25rb kopi".';
 const TEKS_TIDAK_DIKENAL = 'Perintah tidak dikenali. Ketik "bantuan" untuk daftar perintah.';
 const TEKS_FALLBACK_KAKU =
   'Pesan itu belum bisa dibaca otomatis. Pakai format: "out 25rb kopi" atau "in 150rb freelance". Ketik "bantuan" untuk daftar perintah.';
@@ -73,7 +86,11 @@ export async function tanganiPesan(repo: Repo, deps: Deps, msg: Masuk): Promise<
   }
   return repo.transaction(async (r) => {
     if (!(await r.tryRecordInbound(msg.id))) return null; // FR-80
-    const balasan = msg.type === "text" ? await new Sesi(r, deps, msg).jalankan() : TEKS_NON_TEKS;
+    const sesi = new Sesi(r, deps, msg);
+    let balasan: string;
+    if (msg.type === "text") balasan = await sesi.jalankan();
+    else if (msg.type === "image" && msg.mediaId) balasan = await sesi.jalankanFoto();
+    else balasan = TEKS_NON_TEKS;
     await r.setInboundResult(msg.id, balasan.slice(0, 120));
     return balasan;
   });
@@ -120,6 +137,36 @@ class Sesi {
     return [balasan, ...this.catatan].join("\n\n");
   }
 
+  /** Jalur foto struk/transaksi (Groq vision). Mirip bebas(), tetapi sumbernya gambar. */
+  async jalankanFoto(): Promise<string> {
+    await this.muat();
+    if (!this.state.config.tanggalMulai) {
+      await this.r.setConfig("tanggal_mulai", this.today);
+      await this.muat();
+      this.catatan.push(
+        `Setup otomatis: mulai ${tglPendek(this.today)}, Saldo, Tabungan, dan Investasi awal Rp0. Ubah dengan "setup 17/10 saldo 300rb tabungan 0 investasi 0" selama gaji pertama belum dicatat.`,
+      );
+    }
+    const balasan = await this.bacaFotoStruk();
+    return [balasan, ...this.catatan].join("\n\n");
+  }
+
+  private async bacaFotoStruk(): Promise<string> {
+    if (!this.deps.vision || !this.deps.unduhMedia || !this.msg.mediaId) return TEKS_NON_TEKS;
+    const media = await this.deps.unduhMedia(this.msg.mediaId);
+    if (!media) return TEKS_FOTO_GAGAL;
+
+    const nama = this.state.subPosts.filter((s) => s.aktif).map((s) => s.nama);
+    const raw = await this.deps.vision.parseReceipt(media.base64, media.mimeType, nama, this.msg.caption);
+    const v = validasiStruk(raw, nama, this.today);
+    if (!v.ok) return v.alasan === "tidak_jelas" ? TEKS_FOTO_TIDAK_JELAS : TEKS_FOTO_GAGAL;
+
+    const h = v.hasil;
+    const tanggal = h.tanggal ?? this.today;
+    const subId = h.subPos ? this.state.subPosts.find((s) => s.nama === h.subPos)?.id ?? null : null;
+    return this.catatOut({ nominal: h.nominal, uraian: h.label ?? "", tanggal, sumber: "ai", subPostId: subId });
+  }
+
   private async eksekusi(cmd: Cmd, teks: string): Promise<string> {
     switch (cmd.k) {
       case "bantuan": return TEKS_BANTUAN;
@@ -151,6 +198,9 @@ class Sesi {
       case "debt_add": return this.debtTambah(cmd.jenis, cmd.nominal, cmd.nama, cmd.jatuhTempo);
       case "debt_list": return this.debtDaftar(cmd.jenis);
       case "debt_pay": return this.debtBayar(cmd.jenis, cmd.nama, cmd.nominal);
+      case "goal_add": return this.goalTambah(cmd.nominal, cmd.nama, cmd.targetTanggal);
+      case "goal_list": return this.goalDaftar();
+      case "goal_save": return this.goalNabung(cmd.nama, cmd.nominal);
       case "laporan": return teksLaporan(this.state, this.today);
       case "laporan_periode": return teksLaporanPeriode(this.state);
       case "evaluasi": return this.evaluasiManual();
@@ -771,6 +821,51 @@ class Sesi {
     return lunas
       ? `${rp(bayar)} ${kataArah}. ${judul(jenis)} ini lunas.`
       : `${rp(bayar)} ${kataArah}. Sisa ${jenis}: ${rp(d.nominal - dibayar)}.`;
+  }
+
+  // ---------- target tabungan ----------
+
+  private async goalTambah(nominal: number, nama: string, targetTanggal: string | null): Promise<string> {
+    const id = await this.r.addGoal({
+      nama: judul(nama.trim()),
+      targetNominal: nominal,
+      terkumpul: 0,
+      tanggal: this.today,
+      targetTanggal,
+      catatan: null,
+    });
+    await this.muat();
+    const g = this.state.goals.find((x) => x.id === id)!;
+    const jt = targetTanggal ? ` Target tercapai sebelum ${tglPendek(targetTanggal)}.` : "";
+    return `Target tabungan dicatat: ${g.nama}, ${rp(nominal)}.${jt} Ketik "nabung <nominal> ${g.nama}" untuk menabung, atau "target" untuk lihat progres.`;
+  }
+
+  private goalDaftar(): string {
+    const aktif = this.state.goals.filter((g) => g.status === "aktif");
+    if (!aktif.length) return "Target tabungan aktif: tidak ada.";
+    const baris = aktif.map((g) => {
+      const persen = g.targetNominal ? Math.round((g.terkumpul / g.targetNominal) * 100) : 0;
+      const lewat = g.targetTanggal && g.targetTanggal < this.today;
+      return `- ${g.nama}: ${rp(g.terkumpul)} dari ${rp(g.targetNominal)} (${persen}%)${g.targetTanggal ? `, target ${tglPendek(g.targetTanggal)}${lewat ? " (lewat)" : ""}` : ""}`;
+    });
+    return ["Target tabungan aktif:", ...baris].join("\n");
+  }
+
+  private async goalNabung(nama: string, nominal: number): Promise<string> {
+    const n = norm(nama);
+    const cocok = this.state.goals.filter((g) => g.status === "aktif" && norm(g.nama).includes(n));
+    if (!cocok.length) return `Tidak ada target tabungan aktif bernama "${nama}". Ketik "target" untuk lihat daftar.`;
+    if (cocok.length > 1) {
+      return `Ada lebih dari satu target cocok: ${cocok.map((g) => g.nama).join(", ")}. Sebutkan nama lebih lengkap.`;
+    }
+    const g = cocok[0];
+    const terkumpul = g.terkumpul + nominal;
+    const selesai = terkumpul >= g.targetNominal;
+    await this.r.updateGoal(g.id, { terkumpul, status: selesai ? "selesai" : "aktif" });
+    await this.muat();
+    return selesai
+      ? `${rp(nominal)} ditabung ke ${g.nama}. Target tercapai! Total terkumpul ${rp(terkumpul)}.`
+      : `${rp(nominal)} ditabung ke ${g.nama}. Terkumpul ${rp(terkumpul)} dari ${rp(g.targetNominal)} (sisa ${rp(g.targetNominal - terkumpul)}).`;
   }
 
   private async ekspor(): Promise<string> {

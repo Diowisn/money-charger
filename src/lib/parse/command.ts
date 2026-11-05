@@ -22,6 +22,9 @@ export type Cmd =
   | { k: "debt_add"; jenis: DebtJenis; nominal: number; nama: string; jatuhTempo: string | null }
   | { k: "debt_list"; jenis: DebtJenis }
   | { k: "debt_pay"; jenis: DebtJenis; nama: string; nominal: number | null }
+  | { k: "goal_add"; nominal: number; nama: string; targetTanggal: string | null }
+  | { k: "goal_list" }
+  | { k: "goal_save"; nama: string; nominal: number }
   | { k: "error"; pesan: string }
   | { k: "bebas" };
 
@@ -37,11 +40,12 @@ const SATU_KATA: Record<string, Cmd> = {
   tolak: { k: "tolak" },
   piutang: { k: "debt_list", jenis: "piutang" },
   utang: { k: "debt_list", jenis: "utang" },
+  target: { k: "goal_list" },
 };
 
 const AWAL_PERINTAH = new Set([
   "out", "in", "gaji", "bonus", "koreksi", "set", "geser", "pos", "tarik", "pindah", "sisa", "setup",
-  "piutang", "utang", "lunasi", "bayar",
+  "piutang", "utang", "lunasi", "bayar", "target", "nabung",
 ]);
 
 const CONTOH: Record<string, string> = {
@@ -61,6 +65,8 @@ const CONTOH: Record<string, string> = {
   utang: "utang 50rb Budi",
   lunasi: "lunasi piutang Andi",
   bayar: "bayar piutang Andi 50rb",
+  target: "target 5 juta Laptop Baru",
+  nabung: "nabung 100rb Laptop Baru",
 };
 
 function isWadah(s: string): s is Wadah {
@@ -250,6 +256,24 @@ export function parseCommand(raw: string, today: string): Cmd {
       const a = parseAmount(m[3]);
       if (!a.ok) return salah(a.pesan);
       return { k: "debt_pay", jenis: m[1].toLowerCase() as DebtJenis, nama: m[2].trim(), nominal: a.value };
+    }
+
+    case "target": {
+      const d = extractDate(sisa, today);
+      if (d.error) return salah(d.error);
+      const a = parseAmount(d.rest);
+      if (!a.ok) return salah(a.pesan);
+      const nama = buangSpan(d.rest, a.start, a.end);
+      if (!nama) return format("target");
+      return { k: "goal_add", nominal: a.value, nama, targetTanggal: d.date };
+    }
+
+    case "nabung": {
+      const m = /^(\S+(?:\s*(?:juta|jt|ribu|rb|k))?)\s+(.+)$/i.exec(sisa);
+      if (!m) return format("nabung");
+      const a = parseAmount(m[1]);
+      if (!a.ok) return salah(a.pesan);
+      return { k: "goal_save", nama: m[2].trim(), nominal: a.value };
     }
 
     case "setup": {

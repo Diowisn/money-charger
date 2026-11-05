@@ -3,13 +3,16 @@ import { tolakJikaBelumLogin } from "@/lib/auth";
 import { AksiError } from "@/lib/web-actions";
 import {
   batalkanDebtFinance,
+  batalkanGoalFinance,
   batalkanTransaksiFinance,
   bayarDebtFinance,
   kelolaPos,
   muatDashboard,
+  nabungGoalFinance,
   simpanRencanaFinance,
   simpanSetupFinance,
   tambahDebtFinance,
+  tambahGoalFinance,
   tambahTransaksiFinance,
 } from "./model";
 import { bacaBody, dashboard, galat, ok } from "./view";
@@ -92,6 +95,29 @@ export async function postDebt(req: NextRequest) {
       return ok();
     }
     throw new AksiError("Aksi piutang/utang tidak dikenal.");
+  } catch (e) {
+    return galat(e);
+  }
+}
+
+export async function postGoal(req: NextRequest) {
+  const tolak = tolakJikaBelumLogin(req);
+  if (tolak) return tolak;
+  try {
+    const body = await bacaBody(req);
+    const aksi = String(body.aksi ?? "");
+    if (aksi === "tambah") {
+      const hasil = await tambahGoalFinance(body as unknown as Parameters<typeof tambahGoalFinance>[0]);
+      return ok(hasil);
+    }
+    if (aksi === "nabung") {
+      return ok(await nabungGoalFinance(Number(body.id), Number(body.nominal)));
+    }
+    if (aksi === "batal") {
+      await batalkanGoalFinance(Number(body.id));
+      return ok();
+    }
+    throw new AksiError("Aksi target tabungan tidak dikenal.");
   } catch (e) {
     return galat(e);
   }

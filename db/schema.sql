@@ -82,6 +82,19 @@ CREATE TABLE IF NOT EXISTS debts (
 CREATE INDEX IF NOT EXISTS idx_debts_status ON debts (status);
 CREATE INDEX IF NOT EXISTS idx_debts_jenis ON debts (jenis);
 
+CREATE TABLE IF NOT EXISTS saving_goals (
+  id              BIGSERIAL PRIMARY KEY,
+  nama            TEXT NOT NULL,
+  target_nominal  BIGINT NOT NULL CHECK (target_nominal > 0),
+  terkumpul       BIGINT NOT NULL DEFAULT 0 CHECK (terkumpul >= 0),
+  tanggal         DATE NOT NULL,
+  target_tanggal  DATE,
+  catatan         TEXT,
+  status          TEXT NOT NULL DEFAULT 'aktif' CHECK (status IN ('aktif','selesai','batal')),
+  dibuat_pada     TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_goals_status ON saving_goals (status);
+
 CREATE TABLE IF NOT EXISTS pending_actions (
   id                BIGSERIAL PRIMARY KEY,
   jenis             TEXT NOT NULL,

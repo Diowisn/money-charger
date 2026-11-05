@@ -121,6 +121,24 @@ export interface Debt {
 
 export type NewDebt = Omit<Debt, "id" | "status"> & { status?: DebtStatus };
 
+export type GoalStatus = "aktif" | "selesai" | "batal";
+
+export interface SavingGoal {
+  id: number;
+  nama: string;
+  targetNominal: number;
+  terkumpul: number;
+  tanggal: string;
+  targetTanggal: string | null;
+  catatan: string | null;
+  status: GoalStatus;
+}
+
+export type NewSavingGoal = Omit<SavingGoal, "id" | "status" | "terkumpul"> & {
+  terkumpul?: number;
+  status?: GoalStatus;
+};
+
 export interface State {
   config: Config;
   groups: Group[];
@@ -129,6 +147,7 @@ export interface State {
   plans: PlanVersion[];
   txs: Tx[];
   debts: Debt[];
+  goals: SavingGoal[];
 }
 
 export interface Pending {

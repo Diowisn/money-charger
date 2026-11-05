@@ -16,6 +16,8 @@ export interface PesanMasuk {
   from: string;
   type: string;
   text?: string;
+  mediaId?: string;
+  caption?: string;
   timestampMs: number;
 }
 
@@ -31,12 +33,46 @@ export function ekstrakPesan(payload: any): PesanMasuk[] {
           from: String(m.from).replace(/[^0-9]/g, ""),
           type: String(m.type ?? "unknown"),
           text: m.type === "text" ? String(m.text?.body ?? "") : undefined,
+          mediaId: m.type === "image" ? (m.image?.id ? String(m.image.id) : undefined) : undefined,
+          caption: m.type === "image" && m.image?.caption ? String(m.image.caption) : undefined,
           timestampMs: Number(m.timestamp) > 0 ? Number(m.timestamp) * 1000 : Date.now(),
         });
       }
     }
   }
   return out;
+}
+
+const MAKS_UKURAN_MEDIA = 8 * 1024 * 1024; // 8 MB, cukup untuk foto struk
+
+/**
+ * Mengunduh media WhatsApp (foto) lewat dua langkah Cloud API: ambil URL sementara
+ * dari media ID, lalu unduh isinya sebagai base64. Butuh WA_ACCESS_TOKEN.
+ */
+export async function unduhMediaWhatsapp(
+  mediaId: string,
+  env: NodeJS.ProcessEnv = process.env,
+): Promise<{ base64: string; mimeType: string } | null> {
+  const token = env.WA_ACCESS_TOKEN;
+  if (!token) return null;
+  const versi = env.WA_API_VERSION || "v25.0";
+  try {
+    const meta = await fetch(`https://graph.facebook.com/${versi}/${mediaId}`, {
+      headers: { authorization: `Bearer ${token}` },
+    });
+    if (!meta.ok) return null;
+    const info = (await meta.json()) as { url?: string; mime_type?: string; file_size?: number };
+    if (!info.url) return null;
+    if (info.file_size && info.file_size > MAKS_UKURAN_MEDIA) return null;
+
+    const isi = await fetch(info.url, { headers: { authorization: `Bearer ${token}` } });
+    if (!isi.ok) return null;
+    const buf = Buffer.from(await isi.arrayBuffer());
+    if (buf.byteLength > MAKS_UKURAN_MEDIA) return null;
+    return { base64: buf.toString("base64"), mimeType: info.mime_type || "image/jpeg" };
+  } catch {
+    return null;
+  }
 }
 
 export function maskNomor(n: string): string {

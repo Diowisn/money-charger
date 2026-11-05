@@ -13,6 +13,7 @@ Acuan: [PRD Money-Charger SaaS](./prd-catatan-keuangan-whatsapp.md) dan [SRS](./
 | `src/lib/parse/` | Parser nominal, tanggal, alias pos, perintah |
 | `src/lib/handler.ts` | Aturan domain pemrosesan pesan dan transaksi |
 | `src/lib/ai.ts` | Groq sebagai cadangan bahasa bebas, beserta validasi hasil AI |
+| `src/lib/ai-vision.ts` | Groq vision untuk membaca foto struk/transaksi, beserta validasi hasil |
 | `src/lib/pg-repo.ts` | Akses Neon Postgres. `mem-repo.ts` adalah versi memori untuk tes |
 | `src/modules/whatsapp/` | Modul HMVC webhook: controller, model, dan respons |
 | `src/modules/finance/` | Modul HMVC keuangan/dashboard: controller, model, view, dan halaman dashboard |
@@ -28,7 +29,7 @@ Acuan: [PRD Money-Charger SaaS](./prd-catatan-keuangan-whatsapp.md) dan [SRS](./
 | `src/lib/dashboard.ts` | View-model dashboard dari `State` + engine |
 | `src/lib/web-actions.ts` | Aksi web: simpan rencana, transaksi, pos, setup |
 | `db/schema.sql` | Skema tabel |
-| `tests/` | 119 tes, termasuk skenario AC-01 sampai AC-26, aksi web, piutang/utang, biaya admin, dan controller HMVC |
+| `tests/` | 130 tes, termasuk skenario AC-01 sampai AC-26, aksi web, piutang/utang, target tabungan, biaya admin, foto struk, dan controller HMVC |
 
 ## Arsitektur aplikasi (HMVC internal)
 
@@ -54,6 +55,9 @@ Struktur ini **belum** menjadikan aplikasi multi-pelanggan: autentikasi, whiteli
 2. **Nyalakan Zero Data Retention di pengaturan akun dulu**, baru buat API key.
 3. Model awal `openai/gpt-oss-20b`. Ganti lewat `GROQ_MODEL` bila akurasinya kurang.
 4. Bot tetap jalan tanpa Groq (`GROQ_API_KEY` kosong): kalimat bebas dibalas permintaan format kaku.
+5. Key Groq yang sama juga dipakai untuk membaca **foto struk/screenshot transaksi** yang dikirim ke bot
+   (model vision diatur lewat `GROQ_VISION_MODEL`, default `meta-llama/llama-4-scout-17b-16e-instruct`).
+   Tanpa `GROQ_API_KEY`, foto dibalas permintaan catat manual seperti pesan teks lainnya.
 
 ### 3. Meta WhatsApp Cloud API
 1. Buat aplikasi Meta dengan use case **Connect with customers through WhatsApp** dan buka **Langkah 1. Cobalah**.
@@ -211,6 +215,8 @@ Isi dashboard:
 - **Rencana**: slider jatah per pos, Dana Darurat, Tabungan, dan Investasi. Simpan membuat versi rencana baru (versi lama diarsipkan). Opsi "berlaku juga di periode berjalan" menyesuaikan gaji periode aktif dan mencatat selisih ke Saldo.
 - **Transaksi**: catat pengeluaran, pemasukan, gaji, bonus, tarik, dan pindah; hapus transaksi (pembatalan, bukan hapus permanen). Menghapus gaji juga membatalkan alokasi dan selisihnya.
 - **Pos**: tambah pos (langsung masuk rencana aktif), ganti nama, tambah alias, nonaktifkan, dan setup awal sebelum gaji pertama.
+- **Piutang**: catat piutang (orang berutang ke kita) dan utang (kita berutang), bayar sebagian/lunas, atau batalkan.
+- **Target**: buat target tabungan (nama, nominal, target tanggal opsional), tambah tabungan sebagian demi sebagian, otomatis "Tercapai" saat terkumpul mencapai target.
 
 Perubahan dari web dan WhatsApp memakai database yang sama. Dashboard menyegarkan data otomatis setiap 5 detik dan saat tab kembali aktif/fokus, jadi transaksi dari WhatsApp muncul tanpa hard reload. Respons dashboard memakai `no-store` agar tidak tertahan cache browser/CDN. Semua API dashboard wajib login; `/api/health` tetap publik untuk diagnosa.
 
@@ -219,6 +225,18 @@ Saat deploy, tambahkan `DASHBOARD_PASSWORD` (dan `AUTH_SECRET` bila dipakai) di 
 ## Perintah chat
 
 Ketik `bantuan` di bot. Contoh: `out 25rb kopi`, `gaji masuk 1.8 juta`, `bonus 200rb`, `saldo`, `sisa jajan`, `laporan`, `evaluasi`, `hapus terakhir`, `ekspor`.
+
+Perintah tambahan: `piutang 100rb Andi` / `utang 50rb Budi` (catat), `piutang` / `utang` (lihat daftar aktif),
+`bayar piutang Andi 50rb` / `lunasi piutang Andi`; `target 5 juta Laptop Baru` (buat target tabungan), `target`
+(lihat progres), `nabung 100rb Laptop Baru` (tambah tabungan ke target itu).
+
+### Foto struk / screenshot transaksi
+
+Kirim foto struk belanja atau tangkapan layar transaksi bank/e-wallet ke bot (tanpa teks tambahan, atau dengan
+caption bila perlu konteks). Groq vision membaca nominal total, nama toko, dan mencoba menebak posnya; hasilnya
+langsung tercatat sebagai pengeluaran (ditandai "dibaca AI", bisa dibatalkan dengan `hapus terakhir`). Bila foto
+tidak jelas atau nominal totalnya tidak terbaca, bot membalas minta foto ulang atau catat manual — tidak pernah
+menebak nominal.
 
 ## Yang WAJIB dicek sebelum dipakai sungguhan
 

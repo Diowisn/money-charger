@@ -62,6 +62,20 @@ export interface DebtView {
   lewatTempo: boolean;
 }
 
+export interface GoalView {
+  id: number;
+  nama: string;
+  targetNominal: number;
+  terkumpul: number;
+  sisa: number;
+  progres: number;
+  tanggal: string;
+  targetTanggal: string | null;
+  catatan: string | null;
+  status: "aktif" | "selesai" | "batal";
+  lewatTempo: boolean;
+}
+
 export interface DashboardData {
   hariIni: string;
   periode: {
@@ -88,9 +102,12 @@ export interface DashboardData {
     kekuranganDD: number;
     piutangAktif: number;
     utangAktif: number;
+    goalTerkumpulAktif: number;
+    goalTargetAktif: number;
   };
   grup: GrupView[];
   piutang: DebtView[];
+  goals: GoalView[];
   posLain: { dd: number; tabungan: number; investasi: number; ddSisa: number };
   transaksi: TxView[];
   posSemua: PosView[];
@@ -226,6 +243,29 @@ export function bangunDashboard(state: State, hariIni: string): DashboardData {
     .filter((d) => d.status === "aktif" && d.jenis === "utang")
     .reduce((s, d) => s + d.sisa, 0);
 
+  const goals: GoalView[] = state.goals
+    .filter((g) => g.status !== "batal")
+    .map((g) => ({
+      id: g.id,
+      nama: g.nama,
+      targetNominal: g.targetNominal,
+      terkumpul: g.terkumpul,
+      sisa: Math.max(0, g.targetNominal - g.terkumpul),
+      progres: g.targetNominal ? Math.min(1, g.terkumpul / g.targetNominal) : 0,
+      tanggal: g.tanggal,
+      targetTanggal: g.targetTanggal,
+      catatan: g.catatan,
+      status: g.status,
+      lewatTempo: g.status === "aktif" && Boolean(g.targetTanggal && g.targetTanggal < hariIni),
+    }))
+    .sort((a, b) => {
+      if (a.status !== b.status) return a.status === "aktif" ? -1 : 1;
+      return a.tanggal < b.tanggal ? 1 : a.tanggal > b.tanggal ? -1 : b.id - a.id;
+    });
+  const goalAktifList = goals.filter((g) => g.status === "aktif");
+  const goalTerkumpulAktif = goalAktifList.reduce((s, g) => s + g.terkumpul, 0);
+  const goalTargetAktif = goalAktifList.reduce((s, g) => s + g.targetNominal, 0);
+
   return {
     hariIni,
     periode: {
@@ -252,9 +292,12 @@ export function bangunDashboard(state: State, hariIni: string): DashboardData {
       kekuranganDD: statistik.kekuranganDD,
       piutangAktif,
       utangAktif,
+      goalTerkumpulAktif,
+      goalTargetAktif,
     },
     grup,
     piutang,
+    goals,
     posLain: {
       dd,
       tabungan: nominalItem(planPeriode, "tabungan"),

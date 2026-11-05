@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactElement } 
 import type { DashboardData } from "@/lib/dashboard";
 
 type Pesan = { jenis: "ok" | "error"; teks: string };
-type Tab = "ringkasan" | "rencana" | "transaksi" | "pos" | "piutang";
+type Tab = "ringkasan" | "rencana" | "transaksi" | "pos" | "piutang" | "target";
 type StatusLive = "hidup" | "terputus";
 
 const INTERVAL_LIVE_MS = 5000;
@@ -69,6 +69,16 @@ function IkonPiutang({ aktif }: { aktif: boolean }) {
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={aktif ? 2.4 : 1.8}>
       <circle cx="12" cy="12" r="9" />
       <path d="M9.5 9.5a2.5 2.5 0 0 1 5 0c0 2-2.5 2.5-2.5 4.5M12 17v.5" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function IkonTarget({ aktif }: { aktif: boolean }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={aktif ? 2.4 : 1.8}>
+      <circle cx="12" cy="12" r="8" />
+      <circle cx="12" cy="12" r="4" />
+      <circle cx="12" cy="12" r="0.6" fill="currentColor" stroke="none" />
     </svg>
   );
 }
@@ -277,6 +287,7 @@ export default function Dashboard({ awal }: { awal: DashboardData }) {
             ["transaksi", "Transaksi"],
             ["pos", "Pos"],
             ["piutang", "Piutang"],
+            ["target", "Target"],
           ] as [Tab, string][]
         ).map(([id, label]) => (
           <button
@@ -302,6 +313,7 @@ export default function Dashboard({ awal }: { awal: DashboardData }) {
         ) : null}
         {tab === "pos" ? <Pos data={data} kirim={kirim} sibuk={sibuk} /> : null}
         {tab === "piutang" ? <Piutang data={data} kirim={kirim} sibuk={sibuk} /> : null}
+        {tab === "target" ? <Target data={data} kirim={kirim} sibuk={sibuk} /> : null}
       </main>
 
       <nav className="bottom-nav" aria-label="Menu dashboard (mobile)">
@@ -312,6 +324,7 @@ export default function Dashboard({ awal }: { awal: DashboardData }) {
             ["transaksi", "Transaksi", IkonTransaksi],
             ["pos", "Pos", IkonPos],
             ["piutang", "Piutang", IkonPiutang],
+            ["target", "Target", IkonTarget],
           ] as [Tab, string, (p: { aktif: boolean }) => ReactElement][]
         ).map(([id, label, Ikon]) => (
           <button
@@ -517,6 +530,20 @@ function Ringkasan({
             <p className="label">Utang Aktif</p>
             <p className="angka">{rp(r.utangAktif)}</p>
             <p className="muted">Kita berutang</p>
+          </div>
+        </section>
+      ) : null}
+
+      {r.goalTargetAktif > 0 ? (
+        <section className="kartu">
+          <div className="baris-antara">
+            <p className="label">Target Tabungan Aktif</p>
+            <span className="muted kecil">
+              {rp(r.goalTerkumpulAktif)} / {rp(r.goalTargetAktif)}
+            </span>
+          </div>
+          <div className="bar tebal">
+            <span style={{ width: persenDari(r.goalTerkumpulAktif, r.goalTargetAktif) }} />
           </div>
         </section>
       ) : null}
@@ -1136,6 +1163,164 @@ function Pos({
     </div>
   );
 }
+
+function Target({
+  data,
+  kirim,
+  sibuk,
+}: {
+  data: DashboardData;
+  kirim: (url: string, method: string, body?: unknown) => Promise<boolean>;
+  sibuk: boolean;
+}) {
+  const [nama, setNama] = useState("");
+  const [targetNominal, setTargetNominal] = useState("");
+  const [targetTanggal, setTargetTanggal] = useState("");
+  const [catatan, setCatatan] = useState("");
+  const [nabungInput, setNabungInput] = useState<Record<number, string>>({});
+
+  async function tambah() {
+    const ok = await kirim("/api/goals", "POST", {
+      aksi: "tambah",
+      nama,
+      targetNominal: Number(targetNominal),
+      tanggal: data.hariIni,
+      targetTanggal: targetTanggal || null,
+      catatan: catatan || null,
+    });
+    if (ok) {
+      setNama("");
+      setTargetNominal("");
+      setTargetTanggal("");
+      setCatatan("");
+    }
+  }
+
+  async function nabung(id: number) {
+    const nominal = Number(nabungInput[id] || 0);
+    if (!nominal || nominal <= 0) return;
+    const ok = await kirim("/api/goals", "POST", { aksi: "nabung", id, nominal });
+    if (ok) setNabungInput((b) => ({ ...b, [id]: "" }));
+  }
+
+  async function batal(id: number, nama: string) {
+    if (!window.confirm(`Batalkan target "${nama}"?`)) return;
+    await kirim("/api/goals", "POST", { aksi: "batal", id });
+  }
+
+  const aktif = data.goals.filter((g) => g.status === "aktif");
+  const selesai = data.goals.filter((g) => g.status !== "aktif");
+
+  return (
+    <div className="tumpuk">
+      <section className="kartu">
+        <h2>Buat Target Tabungan</h2>
+        <div className="form">
+          <label>
+            Nama target
+            <input value={nama} onChange={(e) => setNama(e.target.value)} placeholder="contoh: Laptop Baru" />
+          </label>
+          <label>
+            Nominal target (Rp)
+            <input
+              type="number"
+              min={1}
+              step={10000}
+              inputMode="numeric"
+              value={targetNominal}
+              onChange={(e) => setTargetNominal(e.target.value)}
+              placeholder="contoh 5000000"
+            />
+          </label>
+          <label>
+            Target tanggal tercapai (opsional)
+            <input type="date" value={targetTanggal} onChange={(e) => setTargetTanggal(e.target.value)} />
+          </label>
+          <label>
+            Catatan (opsional)
+            <input value={catatan} onChange={(e) => setCatatan(e.target.value)} placeholder="contoh untuk kerja" />
+          </label>
+          <button
+            type="button"
+            className="utama lebar"
+            onClick={() => void tambah()}
+            disabled={sibuk || !nama || !targetNominal}
+          >
+            Simpan
+          </button>
+        </div>
+      </section>
+
+      <section className="kartu">
+        <h2>Aktif</h2>
+        <ul className="daftar-transaksi">
+          {aktif.map((g) => (
+            <li key={g.id}>
+              <div className="transaksi-kiri" style={{ flex: 1 }}>
+                <div style={{ flex: 1 }}>
+                  <div className="baris-antara">
+                    <p className="nama-transaksi">{g.nama}</p>
+                    <span className="muted kecil">{Math.round(g.progres * 100)}%</span>
+                  </div>
+                  <div className="bar">
+                    <span style={{ width: `${Math.round(g.progres * 100)}%` }} />
+                  </div>
+                  <p className="muted kecil">
+                    Terkumpul {rp(g.terkumpul)} dari {rp(g.targetNominal)} (sisa {rp(g.sisa)})
+                    {g.targetTanggal ? ` · target ${g.targetTanggal}${g.lewatTempo ? " (lewat)" : ""}` : ""}
+                  </p>
+                  <div className="baris-tombol" style={{ marginTop: 6 }}>
+                    <input
+                      type="number"
+                      min={1}
+                      step={1000}
+                      placeholder="Nabung nominal"
+                      value={nabungInput[g.id] ?? ""}
+                      onChange={(e) => setNabungInput((b) => ({ ...b, [g.id]: e.target.value }))}
+                    />
+                    <button type="button" className="utama" onClick={() => void nabung(g.id)} disabled={sibuk}>
+                      Nabung
+                    </button>
+                  </div>
+                </div>
+              </div>
+              <div className="transaksi-kanan">
+                <button type="button" className="hapus" onClick={() => void batal(g.id, g.nama)} disabled={sibuk}>
+                  Batal
+                </button>
+              </div>
+            </li>
+          ))}
+          {!aktif.length ? <li className="kosong">Belum ada target tabungan aktif.</li> : null}
+        </ul>
+      </section>
+
+      {selesai.length ? (
+        <section className="kartu">
+          <h2>Riwayat</h2>
+          <ul className="daftar-transaksi">
+            {selesai.map((g) => (
+              <li key={g.id} className={g.status === "batal" ? "batal" : undefined}>
+                <div className="transaksi-kiri">
+                  <span className={`badge ${g.status === "selesai" ? "tipe-in" : ""}`}>
+                    {g.status === "selesai" ? "Tercapai" : "Dibatalkan"}
+                  </span>
+                  <div>
+                    <p className="nama-transaksi">{g.nama}</p>
+                    <p className="muted kecil">
+                      {rp(g.terkumpul)} dari {rp(g.targetNominal)}
+                    </p>
+                  </div>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
+    </div>
+  );
+}
+
 
 function Piutang({
   data,

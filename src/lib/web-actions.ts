@@ -459,3 +459,51 @@ export async function batalkanDebt(r: Repo, id: number): Promise<void> {
     await tx.updateDebt(d.id, { status: "batal" });
   });
 }
+
+export interface InputGoal {
+  nama: string;
+  targetNominal: number;
+  tanggal: string;
+  targetTanggal?: string | null;
+  catatan?: string | null;
+}
+
+export async function tambahGoal(r: Repo, hariIni: string, input: InputGoal): Promise<{ id: number }> {
+  return r.transaction(async (tx) => {
+    const nama = String(input.nama ?? "").trim().slice(0, 80);
+    if (!nama) throw new AksiError("Nama target wajib diisi.");
+    const targetNominal = bulat(input.targetNominal, false);
+    const tanggal = tanggalSah(input.tanggal, hariIni);
+    const targetTanggal = input.targetTanggal ? tanggalKalender(input.targetTanggal) : null;
+    const catatan = typeof input.catatan === "string" ? input.catatan.trim().slice(0, 200) || null : null;
+    const id = await tx.addGoal({ nama, targetNominal, terkumpul: 0, tanggal, targetTanggal, catatan });
+    return { id };
+  });
+}
+
+export async function nabungGoal(
+  r: Repo,
+  id: number,
+  nominal: number,
+): Promise<{ terkumpul: number; selesai: boolean }> {
+  return r.transaction(async (tx) => {
+    const state = await tx.load();
+    const g = state.goals.find((x) => x.id === Number(id));
+    if (!g) throw new AksiError("Target tabungan tidak ditemukan.");
+    if (g.status !== "aktif") throw new AksiError("Target ini sudah tidak aktif.");
+    const tambah = bulat(nominal, false);
+    const terkumpul = g.terkumpul + tambah;
+    const selesai = terkumpul >= g.targetNominal;
+    await tx.updateGoal(g.id, { terkumpul, status: selesai ? "selesai" : "aktif" });
+    return { terkumpul, selesai };
+  });
+}
+
+export async function batalkanGoal(r: Repo, id: number): Promise<void> {
+  await r.transaction(async (tx) => {
+    const state = await tx.load();
+    const g = state.goals.find((x) => x.id === Number(id));
+    if (!g) throw new AksiError("Target tabungan tidak ditemukan.");
+    await tx.updateGoal(g.id, { status: "batal" });
+  });
+}

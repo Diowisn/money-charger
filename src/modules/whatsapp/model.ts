@@ -1,7 +1,8 @@
 import { buatGroqClient } from "@/lib/ai";
+import { buatGroqVisionClient } from "@/lib/ai-vision";
 import { tanganiPesan } from "@/lib/handler";
 import { PgRepo } from "@/lib/pg-repo";
-import { ekstrakPesan, kirimBalasan, maskNomor, verifySignature } from "@/lib/whatsapp";
+import { ekstrakPesan, kirimBalasan, maskNomor, unduhMediaWhatsapp, verifySignature } from "@/lib/whatsapp";
 
 export function tokenVerifikasi(): string | undefined {
   return process.env.WA_VERIFY_TOKEN;
@@ -26,6 +27,8 @@ export async function prosesPesanWebhook(raw: string): Promise<{ status: number;
   const repo = new PgRepo();
   const deps = {
     ai: buatGroqClient(),
+    vision: buatGroqVisionClient(),
+    unduhMedia: (mediaId: string) => unduhMediaWhatsapp(mediaId),
     baseUrl: process.env.APP_BASE_URL,
     log: (s: string) => console.warn(s),
   };

@@ -3,17 +3,21 @@ import { wibDate } from "@/lib/parse/date";
 import { PgRepo } from "@/lib/pg-repo";
 import {
   batalkanDebt,
+  batalkanGoal,
   batalkanTransaksi,
   bayarDebt,
   gantiNamaPos,
+  nabungGoal,
   nonaktifkanPos,
   simpanRencana,
   simpanSetup,
   tambahAliasPos,
   tambahDebt,
+  tambahGoal,
   tambahPos,
   tambahTransaksi,
   type InputDebt,
+  type InputGoal,
   type InputTransaksi,
   type ItemRencana,
 } from "@/lib/web-actions";
@@ -80,4 +84,16 @@ export async function bayarDebtFinance(id: number, nominal?: number | null) {
 
 export async function batalkanDebtFinance(id: number) {
   return batalkanDebt(new PgRepo(), id);
+}
+
+export async function tambahGoalFinance(input: InputGoal) {
+  return tambahGoal(new PgRepo(), wibDate(Date.now()), input);
+}
+
+export async function nabungGoalFinance(id: number, nominal: number) {
+  return nabungGoal(new PgRepo(), id, nominal);
+}
+
+export async function batalkanGoalFinance(id: number) {
+  return batalkanGoal(new PgRepo(), id);
 }

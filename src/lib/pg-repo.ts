@@ -10,7 +10,7 @@ import {
   SEED_SUBPOS,
   SEED_TABUNGAN,
 } from "./seed";
-import type { Debt, NewDebt, NewTx, Pending, PlanItem, State, Tx, Wadah } from "./types";
+import type { Debt, NewDebt, NewSavingGoal, NewTx, Pending, PlanItem, SavingGoal, State, Tx, Wadah } from "./types";
 
 // bigint (int8) -> number, date -> string 'YYYY-MM-DD' (hindari konversi zona waktu)
 types.setTypeParser(20, (v) => Number(v));
@@ -37,7 +37,7 @@ export class PgRepo implements Repo {
 
   async load(): Promise<State> {
     const q = (t: string) => this.db.query(t).then((r) => r.rows);
-    const [cfg, groups, subs, aliases, plans, items, txs, debts] = await Promise.all([
+    const [cfg, groups, subs, aliases, plans, items, txs, debts, goals] = await Promise.all([
       q("SELECT kunci, nilai FROM config"),
       q("SELECT id, nama, urutan FROM groups ORDER BY urutan, id"),
       q("SELECT id, group_id, nama, kategori, aktif, urutan FROM sub_posts ORDER BY urutan, id"),
@@ -46,6 +46,7 @@ export class PgRepo implements Repo {
       q("SELECT plan_version_id, tipe, sub_post_id, nominal FROM plan_items ORDER BY id"),
       q("SELECT * FROM transactions ORDER BY id"),
       q("SELECT * FROM debts ORDER BY id"),
+      q("SELECT * FROM saving_goals ORDER BY id"),
     ]);
     const config = parseConfig(Object.fromEntries(cfg.map((r) => [r.kunci, r.nilai])));
     return {
@@ -99,6 +100,18 @@ export class PgRepo implements Repo {
           jatuhTempo: d.jatuh_tempo,
           catatan: d.catatan,
           status: d.status,
+        }),
+      ),
+      goals: goals.map(
+        (g): SavingGoal => ({
+          id: g.id,
+          nama: g.nama,
+          targetNominal: g.target_nominal,
+          terkumpul: g.terkumpul,
+          tanggal: g.tanggal,
+          targetTanggal: g.target_tanggal,
+          catatan: g.catatan,
+          status: g.status,
         }),
       ),
     };
@@ -212,6 +225,19 @@ export class PgRepo implements Repo {
   async updateDebt(id: number, patch: { dibayar?: number; status?: Debt["status"] }) {
     if (patch.dibayar !== undefined) await this.db.query("UPDATE debts SET dibayar = $2 WHERE id = $1", [id, patch.dibayar]);
     if (patch.status !== undefined) await this.db.query("UPDATE debts SET status = $2 WHERE id = $1", [id, patch.status]);
+  }
+
+  async addGoal(g: NewSavingGoal) {
+    const r = await this.db.query(
+      `INSERT INTO saving_goals (nama, target_nominal, terkumpul, tanggal, target_tanggal, catatan, status)
+       VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING id`,
+      [g.nama, g.targetNominal, g.terkumpul ?? 0, g.tanggal, g.targetTanggal, g.catatan, g.status ?? "aktif"],
+    );
+    return r.rows[0].id as number;
+  }
+  async updateGoal(id: number, patch: { terkumpul?: number; status?: SavingGoal["status"] }) {
+    if (patch.terkumpul !== undefined) await this.db.query("UPDATE saving_goals SET terkumpul = $2 WHERE id = $1", [id, patch.terkumpul]);
+    if (patch.status !== undefined) await this.db.query("UPDATE saving_goals SET status = $2 WHERE id = $1", [id, patch.status]);
   }
 
   async addPending(jenis: string, payload: Record<string, unknown>, kedaluwarsaPada: number) {
