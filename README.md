@@ -3,6 +3,8 @@
 Bot WhatsApp pribadi untuk mencatat gaji dan pengeluaran, plus dashboard web ringkas untuk melihat ringkasan, mengatur jatah, dan mengelola transaksi/pos.
 Next.js di Vercel + Postgres online di Neon + Groq (AI cadangan). Tidak perlu memasang DBMS di komputer.
 
+SRS SaaS adalah target masa depan; aplikasi ini masih satu pemilik. Multi-tenant, akun pelanggan, billing, dan isolasi data tenant belum tersedia—jangan buka sebagai layanan publik/berbayar.
+
 Acuan: [PRD Money-Charger SaaS](./prd-catatan-keuangan-whatsapp.md) dan [SRS](./srs-catatan-keuangan-whatsapp.md).
 
 ## Struktur
@@ -16,22 +18,26 @@ Acuan: [PRD Money-Charger SaaS](./prd-catatan-keuangan-whatsapp.md) dan [SRS](./
 | `src/lib/ai-vision.ts` | Groq vision untuk membaca foto struk/transaksi, beserta validasi hasil |
 | `src/lib/insight.ts` | Konteks keuangan untuk asisten AI + klien Groq tanya jawab (tab Asisten) |
 | `src/lib/pg-repo.ts` | Akses Neon Postgres. `mem-repo.ts` adalah versi memori untuk tes |
-| `src/modules/whatsapp/` | Modul HMVC webhook: controller, model, dan respons |
+| `src/lib/inbound-queue.ts` | Antrean pesan masuk durable: idempoten, lease, retry, retensi |
+| `src/lib/outbox.ts` | Antrean balasan WhatsApp, retry backoff, dan pembersihan pesan lama |
+| `src/lib/audit.ts` | Audit event tanpa isi pesan atau rahasia |
+| `src/modules/whatsapp/` | Modul HMVC webhook: controller, model, worker antrean, dan respons |
 | `src/modules/finance/` | Modul HMVC keuangan/dashboard: controller, model, view, dan halaman dashboard |
 | `src/modules/auth/` | Modul HMVC autentikasi dashboard |
 | `src/modules/export/` | Modul HMVC unduh CSV |
 | `src/modules/health/` | Modul HMVC diagnosa kesiapan |
+| `src/modules/outbox/` | Endpoint terjaga untuk memproses ulang balasan WhatsApp tertunda |
 | `src/modules/email/` | Modul HMVC penerima email payroll generik (`/api/email/inbound`) |
 | `src/modules/insight/` | Modul HMVC asisten tanya jawab keuangan (`/api/insight`) |
 | `src/lib/email.ts` | Heuristik ekstraksi nominal & deteksi "gaji/payroll" dari teks email |
 | `src/app/api/` | Adapter Next.js tipis yang meneruskan request ke controller modul |
 | `src/app/page.tsx` | Adapter halaman dashboard Next.js |
 | `src/app/login/` | Halaman login password |
-| `src/lib/auth.ts` | Sesi cookie HMAC (`DASHBOARD_PASSWORD` + `AUTH_SECRET`) |
+| `src/lib/auth.ts` | Sesi cookie HMAC (`DASHBOARD_PASSWORD` + `AUTH_SECRET`) dengan epoch pencabutan semua sesi |
 | `src/lib/dashboard.ts` | View-model dashboard dari `State` + engine |
 | `src/lib/web-actions.ts` | Aksi web: simpan rencana, transaksi, pos, setup |
 | `db/schema.sql` | Skema tabel |
-| `tests/` | 135 tes, termasuk skenario AC-01 sampai AC-26, aksi web, piutang/utang, target tabungan, biaya admin, foto struk, tren pengeluaran, konteks asisten, dan controller HMVC |
+| `tests/` | Tes parser, domain, controller, rate limit, outbox retry, dan failover model AI |
 
 ## Arsitektur aplikasi (HMVC internal)
 
@@ -82,18 +88,21 @@ Untuk percobaan lokal, isi variabel WhatsApp berikut sesuai API Setup Meta: `WA_
 ```bash
 npm install
 npm run db:setup     # membuat tabel, mengisi Draft 1 + alias, dan whitelist nomor
-npm test             # opsional, memastikan mesin uang benar
+npm run lint
+npm run typecheck
+npm test
 ```
 
 ### 5. Deploy ke Vercel
 1. Push ke repo GitHub baru (akun terpisah dari Redigma), import di Vercel.
 2. Di **Vercel > Project > Settings > Environment Variables**, tambahkan variabel yang sama dengan `.env.example` untuk **Production**. Untuk uji awal, masukkan token uji Meta; jangan masukkan rahasia ke Git atau chat. Isi `APP_BASE_URL` dengan URL production Vercel Anda.
 3. Redeploy setelah menambah atau mengubah environment variables.
-4. Di pengaturan WhatsApp aplikasi Meta, daftarkan webhook:
+4. Tambahkan GitHub repository secrets `APP_BASE_URL` dan `CRON_SECRET` untuk mengaktifkan retry outbox setiap 10 menit.
+5. Di pengaturan WhatsApp aplikasi Meta, daftarkan webhook:
    - Callback URL: `https://<domain-vercel-anda>/api/whatsapp/webhook`
    - Verify token: nilai `WA_VERIFY_TOKEN` yang sama persis dengan di Vercel
    - Subscribe ke field `messages`
-5. Setelah webhook terverifikasi, kirim `bantuan` dari nomor penerima uji yang sudah diizinkan Meta. Untuk nomor produksi, pastikan nomor pengirim juga ada di `ALLOWED_NUMBERS`.
+6. Setelah webhook terverifikasi, kirim `bantuan` dari nomor penerima uji yang sudah diizinkan Meta. Untuk nomor produksi, pastikan nomor pengirim juga ada di `ALLOWED_NUMBERS`.
 
 #### Contoh nilai Production di Vercel
 
@@ -111,6 +120,8 @@ Contoh berikut hanya format pengisian. Ganti semua nilai bertanda `GANTI_...` de
 | `DATABASE_URL` | Connection string pooled dari Neon |
 | `GROQ_API_KEY` | `GANTI_DENGAN_API_KEY_GROQ` |
 | `GROQ_MODEL` | `openai/gpt-oss-20b` |
+| `GROQ_FALLBACK_MODELS` | opsional; model cadangan Groq dipisahkan koma (error model/server, bukan 429) |
+| `CRON_SECRET` | secret untuk `POST /api/cron/outbox` |
 | `DASHBOARD_PASSWORD` | password kuat untuk login dashboard web |
 | `AUTH_SECRET` | opsional; string acak panjang untuk menandatangani cookie sesi |
 | `HEALTH_TOKEN` | opsional; bila diisi, detail `/api/health` hanya bisa dibuka dengan header `X-Health-Token` atau `Authorization: Bearer <nilai ini>` |
@@ -149,6 +160,16 @@ Arti hasil penting:
 
 Tanpa `HEALTH_TOKEN`, endpoint ini hanya memberi status ringkas. Isi `HEALTH_TOKEN` untuk
 melihat detail diagnosa; detail hanya bisa dibaca dengan header token.
+
+#### Retry balasan WhatsApp
+
+Webhook menyimpan pesan ke antrean inbound sebelum membalas 200; pemrosesan AI dan pengiriman
+dijalankan setelah respons. Balasan disimpan di outbox; bila Meta gagal, retry memakai backoff
+(1 menit, 5 menit, 15 menit, 1 jam, 6 jam). Workflow GitHub `Process WhatsApp queues` memanggil
+worker tiap 10 menit. Isi repository secrets `APP_BASE_URL` dan `CRON_SECRET` untuk mengaktifkannya.
+Payload job selesai dibersihkan setelah 7 hari, job gagal setelah 30 hari; outbox 30 hari; audit 180 hari.
+
+`Keluar semua` di dashboard mencabut semua sesi dengan menaikkan epoch di database.
 
 #### Contoh panggilan WhatsApp Cloud API (PowerShell)
 
@@ -254,7 +275,7 @@ menebak nominal.
 
 Hal ini belum bisa diverifikasi dari sandbox dan juga ditandai terbuka di SRS bagian 14:
 
-1. **Batas waktu fungsi Vercel gratis.** Webhook menyelesaikan semuanya (termasuk Groq sampai 20 detik) dalam satu permintaan, dan `maxDuration` diset 30. Kalau paket Anda membatasi lebih pendek, pesan format kaku tetap aman, tetapi pesan lewat AI bisa terpotong. Meta lalu mengirim ulang dan pencatatan ganda dicegah oleh ID pesan.
+1. **Batas waktu fungsi Vercel gratis.** Webhook hanya menyimpan job lalu membalas; pemrosesan AI dijalankan setelah respons (`maxDuration` 30 detik). Bila fungsi terhenti, job/outbox tetap tersimpan dan dicoba ulang oleh scheduler. Isi secrets agar worker terjadwal aktif.
 2. **Verifikasi bisnis Meta** untuk pemakaian pribadi, dan apakah SIM cadangan bisa menerima OTP.
 3. **Backup.** Neon punya pemulihan bawaan (cek jendela waktunya di paket gratis). Cadangan tambahan: ketik `ekspor` berkala dan simpan CSV-nya.
 4. **Akurasi Groq untuk bahasa Indonesia** (AC-12): uji dengan 50 kalimat sebelum percaya penuh. 

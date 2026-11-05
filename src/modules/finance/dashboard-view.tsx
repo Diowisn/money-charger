@@ -232,6 +232,13 @@ export default function Dashboard({ awal }: { awal: DashboardData }) {
     window.location.href = "/login";
   }
 
+  async function keluarSemua() {
+    if (!window.confirm("Cabut semua sesi dashboard? Perangkat ini juga akan keluar.")) return;
+    const res = await fetch("/api/auth/logout-all", { method: "POST" });
+    if (res.ok) window.location.href = "/login";
+    else setPesan({ jenis: "error", teks: "Gagal mencabut semua sesi." });
+  }
+
   const jamTerakhir = terakhir
     ? new Date(terakhir).toLocaleTimeString("id-ID", {
         hour: "2-digit",
@@ -272,6 +279,9 @@ export default function Dashboard({ awal }: { awal: DashboardData }) {
             title={tema === "gelap" ? "Mode terang" : "Mode gelap"}
           >
             {tema === "gelap" ? "Terang" : "Gelap"}
+          </button>
+          <button className="ghost" onClick={() => void keluarSemua()} type="button">
+            Keluar semua
           </button>
           <button className="ghost" onClick={keluar} type="button">
             Keluar

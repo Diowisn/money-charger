@@ -10,7 +10,6 @@ const OWNER = "628111";
 let repo: MemRepo;
 let seq = 0;
 let ai: AiClient | null;
-let clock: number;
 
 /** Waktu pesan: tengah hari WIB pada tanggal tertentu. */
 const at = (iso: string, jam = 12) => {
@@ -20,13 +19,14 @@ const at = (iso: string, jam = 12) => {
 
 async function kirim(teks: string, tgl: string, opsi: { id?: string; from?: string; type?: string; now?: number } = {}) {
   const deps: Deps = { ai, baseUrl: "https://uji.example", now: () => opsi.now ?? at(tgl) };
-  return tanganiPesan(repo, deps, {
+  const hasil = await tanganiPesan(repo, deps, {
     id: opsi.id ?? `wamid.${++seq}`,
     from: opsi.from ?? OWNER,
     type: opsi.type ?? "text",
     text: opsi.type && opsi.type !== "text" ? undefined : teks,
     timestampMs: at(tgl),
   });
+  return hasil?.balasan ?? null;
 }
 
 /** Kirim pesan bertipe gambar (foto struk), dengan vision client mock. */
@@ -47,7 +47,7 @@ async function kirimFoto(
     baseUrl: "https://uji.example",
     now: () => opsi.now ?? at(tgl),
   };
-  return tanganiPesan(repo, deps, {
+  const hasil = await tanganiPesan(repo, deps, {
     id: opsi.id ?? `wamid.${++seq}`,
     from: OWNER,
     type: "image",
@@ -55,6 +55,7 @@ async function kirimFoto(
     caption: opsi.caption,
     timestampMs: at(tgl),
   });
+  return hasil?.balasan ?? null;
 }
 
 const visionClient = (raw: StrukRaw | null): VisionClient => ({ parseReceipt: async () => raw });
@@ -65,7 +66,6 @@ beforeEach(() => {
   repo = new MemRepo([OWNER]);
   ai = null;
   seq = 0;
-  clock = 0;
 });
 
 /** Setup standar: mulai 17/10 dengan Saldo 300rb, gaji pertama tgl 31/10 -> periode 1. */

@@ -78,8 +78,12 @@ const KONFIRMASI_MS = 10 * MENIT; // FR-82
 const PETAKAN_MS = 24 * 60 * MENIT;
 const EKSPOR_MS = 15 * MENIT; // NFR-10
 
-/** Titik masuk. null = tidak ada balasan (nomor asing atau pesan duplikat). */
-export async function tanganiPesan(repo: Repo, deps: Deps, msg: Masuk): Promise<string | null> {
+/** Titik masuk. null = nomor asing atau pesan duplikat. */
+export async function tanganiPesan(
+  repo: Repo,
+  deps: Deps,
+  msg: Masuk,
+): Promise<{ balasan: string; outboxId: number } | null> {
   if (!(await repo.isAllowed(msg.from))) {
     deps.log?.(`Pesan dari nomor di luar whitelist diabaikan: ${maskNomor(msg.from)}`);
     return null; // FR-01: diabaikan tanpa balasan
@@ -91,8 +95,9 @@ export async function tanganiPesan(repo: Repo, deps: Deps, msg: Masuk): Promise<
     if (msg.type === "text") balasan = await sesi.jalankan();
     else if (msg.type === "image" && msg.mediaId) balasan = await sesi.jalankanFoto();
     else balasan = TEKS_NON_TEKS;
+    const outboxId = await r.addOutbox(msg.from, balasan);
     await r.setInboundResult(msg.id, balasan.slice(0, 120));
-    return balasan;
+    return { balasan, outboxId };
   });
 }
 

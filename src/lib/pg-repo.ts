@@ -149,6 +149,13 @@ export class PgRepo implements Repo {
   async setInboundResult(id: string, hasil: string) {
     await this.db.query("UPDATE inbound_messages SET hasil = $2 WHERE wa_message_id = $1", [id, hasil]);
   }
+  async addOutbox(waNumber: string, pesan: string) {
+    const r = await this.db.query(
+      "INSERT INTO outbox (wa_number, pesan) VALUES ($1, $2) RETURNING id",
+      [waNumber, pesan],
+    );
+    return Number(r.rows[0].id);
+  }
 
   async insertTx(t: NewTx) {
     const r = await this.db.query(

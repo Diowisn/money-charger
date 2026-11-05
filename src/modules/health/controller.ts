@@ -1,4 +1,5 @@
 import type { NextRequest } from "next/server";
+import { rahasiaCocok } from "@/lib/secret";
 import { periksaKesiapan, tokenHealth } from "./model";
 import { responsHealth } from "./view";
 
@@ -11,7 +12,7 @@ export async function health(req: NextRequest) {
   }
   const bearer = req.headers.get("authorization")?.replace(/^Bearer\s+/i, "").trim();
   const kunciDikirim = req.headers.get("x-health-token")?.trim() || bearer;
-  if (kunciDikirim !== kunci) {
+  if (!rahasiaCocok(kunciDikirim, kunci)) {
     return Response.json({ ok: false, error: "unauthorized" }, { status: 401 });
   }
   return responsHealth(data);

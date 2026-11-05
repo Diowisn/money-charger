@@ -23,7 +23,8 @@ interface Data {
   goals: SavingGoal[];
   pendings: (Pending & { status: string })[];
   inbound: Map<string, string>;
-  seq: { tx: number; plan: number; sub: number; pending: number; debt: number; goal: number };
+  outbox: { id: number; waNumber: string; pesan: string }[];
+  seq: { tx: number; plan: number; sub: number; pending: number; debt: number; goal: number; outbox: number };
 }
 
 /** Implementasi dalam memori, dipakai pengujian. Perilakunya mengikuti PgRepo. */
@@ -44,7 +45,8 @@ export class MemRepo implements Repo {
       goals: [],
       pendings: [],
       inbound: new Map(),
-      seq: { tx: 0, plan: 0, sub: 0, pending: 0, debt: 0, goal: 0 },
+      outbox: [],
+      seq: { tx: 0, plan: 0, sub: 0, pending: 0, debt: 0, goal: 0, outbox: 0 },
     };
     this.seed();
   }
@@ -107,6 +109,11 @@ export class MemRepo implements Repo {
   }
   async setInboundResult(id: string, hasil: string) {
     this.d.inbound.set(id, hasil);
+  }
+  async addOutbox(waNumber: string, pesan: string) {
+    const id = ++this.d.seq.outbox;
+    this.d.outbox.push({ id, waNumber, pesan });
+    return id;
   }
 
   async insertTx(tx: NewTx) {

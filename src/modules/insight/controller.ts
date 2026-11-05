@@ -6,7 +6,7 @@ import { galat, ok } from "./view";
 import { tanyaInsight } from "./model";
 
 export async function postInsight(req: NextRequest) {
-  const tolak = tolakJikaBelumLogin(req);
+  const tolak = await tolakJikaBelumLogin(req);
   if (tolak) return tolak;
   const batas = batasi(`insight:${ipDariRequest(req)}`, 10, 60_000);
   if (!batas.boleh) {

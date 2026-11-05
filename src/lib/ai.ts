@@ -89,8 +89,10 @@ export function buatGroqClient(env: NodeJS.ProcessEnv = process.env): AiClient |
   const key = env.GROQ_API_KEY;
   if (!key) return null;
   const model = env.GROQ_MODEL || "openai/gpt-oss-20b";
+  const models = [model, ...(env.GROQ_FALLBACK_MODELS ?? "").split(",").map((s) => s.trim()).filter(Boolean)]
+    .filter((m, i, a) => a.indexOf(m) === i);
 
-  async function sekali(pesan: string, nama: string[]): Promise<AiRaw | null | "ulang"> {
+  async function sekali(modelAktif: string, pesan: string, nama: string[]): Promise<AiRaw | null | "ulang" | "model_tidak_ada"> {
     const ctrl = new AbortController();
     const timer = setTimeout(() => ctrl.abort(), 20_000);
     try {
@@ -99,7 +101,7 @@ export function buatGroqClient(env: NodeJS.ProcessEnv = process.env): AiClient |
         signal: ctrl.signal,
         headers: { "content-type": "application/json", authorization: `Bearer ${key}` },
         body: JSON.stringify({
-          model,
+          model: modelAktif,
           temperature: 0,
           response_format: { type: "json_object" },
           messages: [
@@ -108,7 +110,8 @@ export function buatGroqClient(env: NodeJS.ProcessEnv = process.env): AiClient |
           ],
         }),
       });
-      if (res.status === 429) return null; // kuota habis: kegagalan AI (FR-72), tidak diulang
+      if (res.status === 429) return null; // kuota habis tidak dibantu model Groq lain
+      if (res.status === 404) return "model_tidak_ada";
       if (res.status >= 500) return "ulang";
       if (!res.ok) return null;
       const data = (await res.json()) as { choices?: { message?: { content?: string } }[] };
@@ -125,10 +128,14 @@ export function buatGroqClient(env: NodeJS.ProcessEnv = process.env): AiClient |
   return {
     async parse(pesan, nama) {
       // Hanya teks pesan dan nama sub-pos yang dikirim; tidak ada nomor telepon (FR-74).
-      const r = await sekali(pesan, nama);
-      if (r !== "ulang") return r;
-      const r2 = await sekali(pesan, nama); // maksimal 1 percobaan ulang
-      return r2 === "ulang" ? null : r2;
+      for (const modelAktif of models) {
+        let r = await sekali(modelAktif, pesan, nama);
+        if (r === "model_tidak_ada") continue;
+        if (r === "ulang") r = await sekali(modelAktif, pesan, nama);
+        if (r === "ulang" || r === "model_tidak_ada") continue;
+        return r;
+      }
+      return null;
     },
   };
 }

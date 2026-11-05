@@ -14,6 +14,7 @@ export interface Repo {
   /** true bila pesan baru, false bila ID Meta ini sudah pernah diproses (FR-80). */
   tryRecordInbound(waMessageId: string): Promise<boolean>;
   setInboundResult(waMessageId: string, hasil: string): Promise<void>;
+  addOutbox(waNumber: string, pesan: string): Promise<number>;
 
   insertTx(tx: NewTx): Promise<number>;
   updateTx(id: number, patch: { status?: "berlaku" | "batal"; subPostId?: number | null }): Promise<void>;

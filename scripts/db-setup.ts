@@ -20,6 +20,18 @@ async function main() {
 
   const seeded = await new PgRepo().seed(nomor);
   console.log(seeded ? "Draft 1 dan alias bawaan terisi." : "Data bawaan sudah ada, dilewati.");
+  const integrasi = [
+    ["whatsapp", "cloud-api", process.env.WA_PHONE_NUMBER_ID && process.env.WA_ACCESS_TOKEN ? "aktif" : "nonaktif"],
+    ["email", "inbound", process.env.EMAIL_INBOUND_SECRET ? "aktif" : "nonaktif"],
+    ["ai", "groq", process.env.GROQ_API_KEY ? "aktif" : "nonaktif"],
+  ] as const;
+  for (const [jenis, nama, status] of integrasi) {
+    await getPool().query(
+      `INSERT INTO integrations (jenis, nama, status) VALUES ($1, $2, $3)
+       ON CONFLICT (jenis, nama) DO UPDATE SET status = EXCLUDED.status, diperbarui_pada = now()`,
+      [jenis, nama, status],
+    );
+  }
   console.log(`Nomor diizinkan: ${nomor.map((n) => n.slice(0, 4) + "***" + n.slice(-2)).join(", ")}`);
   await getPool().end();
 }

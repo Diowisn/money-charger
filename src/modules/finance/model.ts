@@ -1,3 +1,4 @@
+import { catatAudit } from "@/lib/audit";
 import { bangunDashboard } from "@/lib/dashboard";
 import { wibDate } from "@/lib/parse/date";
 import { PgRepo } from "@/lib/pg-repo";
@@ -29,15 +30,21 @@ export async function muatDashboard() {
 }
 
 export async function simpanRencanaFinance(items: ItemRencana[], sekarang: boolean) {
-  return simpanRencana(new PgRepo(), wibDate(Date.now()), items, sekarang);
+  const hasil = await simpanRencana(new PgRepo(), wibDate(Date.now()), items, sekarang);
+  await catatAudit("web", "rencana_diubah", { sekarang });
+  return hasil;
 }
 
 export async function tambahTransaksiFinance(input: InputTransaksi) {
-  return tambahTransaksi(new PgRepo(), wibDate(Date.now()), input);
+  const hasil = await tambahTransaksi(new PgRepo(), wibDate(Date.now()), input);
+  await catatAudit("web", "transaksi_ditambah", { tipe: input.tipe, id: hasil.id });
+  return hasil;
 }
 
 export async function batalkanTransaksiFinance(id: number) {
-  return batalkanTransaksi(new PgRepo(), id);
+  const hasil = await batalkanTransaksi(new PgRepo(), id);
+  await catatAudit("web", "transaksi_dibatalkan", { id });
+  return hasil;
 }
 
 export async function kelolaPos(body: Record<string, unknown>) {

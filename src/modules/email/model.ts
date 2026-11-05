@@ -1,4 +1,6 @@
+import { catatAudit } from "@/lib/audit";
 import { ekstrakNominalEmail, kemungkinanGaji } from "@/lib/email";
+import { rahasiaCocok as cocokRahasia } from "@/lib/secret";
 import { wibDate } from "@/lib/parse/date";
 import { PgRepo } from "@/lib/pg-repo";
 import { AksiError, tambahTransaksi } from "@/lib/web-actions";
@@ -20,9 +22,7 @@ export interface HasilEmail {
 }
 
 function rahasiaCocok(nilai: string | null): boolean {
-  const rahasia = process.env.EMAIL_INBOUND_SECRET?.trim();
-  if (!rahasia) return false;
-  return nilai === rahasia;
+  return cocokRahasia(nilai, process.env.EMAIL_INBOUND_SECRET?.trim());
 }
 
 export function emailDikonfigurasi(): boolean {
@@ -43,7 +43,7 @@ export async function prosesEmailMasuk(input: EmailMasuk): Promise<HasilEmail> {
   const hariIni = wibDate(Date.now());
   const teksGabung = `${input.subjek ?? ""}\n${input.teks ?? ""}`;
 
-  return repo.transaction(async (tx) => {
+  const hasil = await repo.transaction(async (tx) => {
     const idInbound = `email:${input.id}`;
     if (!(await tx.tryRecordInbound(idInbound))) {
       return { dicatat: false, pesan: "Email ini sudah pernah diproses (ID sama), dilewati." };
@@ -87,4 +87,6 @@ export async function prosesEmailMasuk(input: EmailMasuk): Promise<HasilEmail> {
       throw e;
     }
   });
+  await catatAudit("email", "email_diproses", { dicatat: hasil.dicatat });
+  return hasil;
 }

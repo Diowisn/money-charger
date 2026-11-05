@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
+import { buatToken } from "@/lib/auth";
 import { login } from "@/modules/auth/controller";
 import { getDashboard } from "@/modules/finance/controller";
 import { dashboard } from "@/modules/finance/view";
@@ -15,6 +16,11 @@ afterEach(() => {
 });
 
 describe("controller HMVC", () => {
+  it("epoch sesi berbeda menghasilkan token berbeda untuk pencabutan massal", () => {
+    process.env.AUTH_SECRET = "secret-uji";
+    expect(buatToken("1")).not.toBe(buatToken("2"));
+  });
+
   it("login memberi respons konfigurasi yang jelas bila password belum diatur", async () => {
     delete process.env.DASHBOARD_PASSWORD;
     const res = await login(new Request("https://app.example/api/auth/login", { method: "POST" }));

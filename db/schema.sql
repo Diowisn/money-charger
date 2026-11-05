@@ -114,3 +114,48 @@ CREATE TABLE IF NOT EXISTS config (
   kunci  TEXT PRIMARY KEY,
   nilai  TEXT NOT NULL
 );
+
+CREATE TABLE IF NOT EXISTS inbound_jobs (
+  id              BIGSERIAL PRIMARY KEY,
+  wa_message_id   TEXT NOT NULL UNIQUE,
+  payload         JSONB NOT NULL,
+  status          TEXT NOT NULL DEFAULT 'menunggu' CHECK (status IN ('menunggu','mengirim','selesai','gagal')),
+  percobaan       INT NOT NULL DEFAULT 0 CHECK (percobaan >= 0),
+  berikutnya_pada TIMESTAMPTZ NOT NULL DEFAULT now(),
+  error           TEXT,
+  dibuat_pada     TIMESTAMPTZ NOT NULL DEFAULT now(),
+  selesai_pada    TIMESTAMPTZ
+);
+CREATE INDEX IF NOT EXISTS idx_inbound_jobs_antre ON inbound_jobs (status, berikutnya_pada, id);
+
+CREATE TABLE IF NOT EXISTS outbox (
+  id               BIGSERIAL PRIMARY KEY,
+  wa_number        TEXT NOT NULL,
+  pesan            TEXT NOT NULL,
+  status           TEXT NOT NULL DEFAULT 'menunggu' CHECK (status IN ('menunggu','mengirim','terkirim','gagal')),
+  percobaan        INT NOT NULL DEFAULT 0 CHECK (percobaan >= 0),
+  berikutnya_pada  TIMESTAMPTZ NOT NULL DEFAULT now(),
+  error            TEXT,
+  dibuat_pada      TIMESTAMPTZ NOT NULL DEFAULT now(),
+  terkirim_pada    TIMESTAMPTZ
+);
+CREATE INDEX IF NOT EXISTS idx_outbox_antre ON outbox (status, berikutnya_pada, id);
+
+CREATE TABLE IF NOT EXISTS audit_events (
+  id          BIGSERIAL PRIMARY KEY,
+  aktor       TEXT NOT NULL,
+  aksi        TEXT NOT NULL,
+  detail      JSONB NOT NULL DEFAULT '{}'::jsonb,
+  dibuat_pada TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_audit_dibuat ON audit_events (dibuat_pada DESC);
+
+CREATE TABLE IF NOT EXISTS integrations (
+  id              SERIAL PRIMARY KEY,
+  jenis           TEXT NOT NULL CHECK (jenis IN ('whatsapp','email','ai')),
+  nama            TEXT NOT NULL,
+  status          TEXT NOT NULL DEFAULT 'aktif' CHECK (status IN ('aktif','nonaktif','perlu_perhatian')),
+  metadata        JSONB NOT NULL DEFAULT '{}'::jsonb,
+  diperbarui_pada TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (jenis, nama)
+);

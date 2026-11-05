@@ -1,6 +1,7 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { cookies } from "next/headers";
 import type { NextRequest } from "next/server";
+import { getPool } from "./pg-repo";
 
 export const AUTH_COOKIE = "mc_auth";
 const UMUR_COOKIE = 60 * 60 * 24 * 30;
@@ -14,10 +15,21 @@ export function authDikonfigurasi(): boolean {
   return Boolean(process.env.DASHBOARD_PASSWORD?.trim());
 }
 
-export function buatToken(): string | null {
+async function epochSesi(): Promise<string | null> {
+  if (!process.env.DATABASE_URL) return "0";
+  try {
+    const r = await getPool().query("SELECT nilai FROM config WHERE kunci = 'session_epoch'");
+    return String(r.rows[0]?.nilai ?? "0");
+  } catch {
+    return null;
+  }
+}
+
+export function buatToken(epoch: string): string | null {
   const s = rahasia();
   if (!s) return null;
-  return createHmac("sha256", s).update("money-charger-web-v1").digest("hex");
+  const tanda = createHmac("sha256", s).update(`money-charger-web-v1:${epoch}`).digest("hex");
+  return `${epoch}.${tanda}`;
 }
 
 export function cocokkanPassword(masuk: string): boolean {
@@ -28,12 +40,20 @@ export function cocokkanPassword(masuk: string): boolean {
   return a.length === b.length && timingSafeEqual(a, b);
 }
 
-function cocokkanToken(nilai: string | undefined): boolean {
-  const t = buatToken();
-  if (!t || !nilai) return false;
+async function cocokkanToken(nilai: string | undefined): Promise<boolean> {
+  if (!nilai) return false;
+  const epoch = await epochSesi();
+  if (epoch === null) return false;
+  const t = buatToken(epoch);
+  if (!t) return false;
   const a = Buffer.from(nilai, "utf8");
   const b = Buffer.from(t, "utf8");
   return a.length === b.length && timingSafeEqual(a, b);
+}
+
+export async function buatTokenSesi(): Promise<string | null> {
+  const epoch = await epochSesi();
+  return epoch === null ? null : buatToken(epoch);
 }
 
 export async function sesiValid(): Promise<boolean> {
@@ -41,7 +61,7 @@ export async function sesiValid(): Promise<boolean> {
   return cocokkanToken(c.get(AUTH_COOKIE)?.value);
 }
 
-export function sesiValidDariRequest(req: NextRequest): boolean {
+export async function sesiValidDariRequest(req: NextRequest): Promise<boolean> {
   return cocokkanToken(req.cookies.get(AUTH_COOKIE)?.value);
 }
 
@@ -55,8 +75,8 @@ export function opsiCookie() {
   };
 }
 
-export function tolakJikaBelumLogin(req: NextRequest): Response | null {
-  if (!sesiValidDariRequest(req)) {
+export async function tolakJikaBelumLogin(req: NextRequest): Promise<Response | null> {
+  if (!(await sesiValidDariRequest(req))) {
     return Response.json({ ok: false, error: "Sesi habis. Silakan login ulang." }, { status: 401 });
   }
   return null;

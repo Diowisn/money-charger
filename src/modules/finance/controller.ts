@@ -18,7 +18,7 @@ import {
 import { bacaBody, dashboard, galat, ok } from "./view";
 
 export async function getDashboard(req: NextRequest) {
-  const tolak = tolakJikaBelumLogin(req);
+  const tolak = await tolakJikaBelumLogin(req);
   if (tolak) return tolak;
   try {
     return dashboard(await muatDashboard());
@@ -29,7 +29,7 @@ export async function getDashboard(req: NextRequest) {
 }
 
 export async function postPlan(req: NextRequest) {
-  const tolak = tolakJikaBelumLogin(req);
+  const tolak = await tolakJikaBelumLogin(req);
   if (tolak) return tolak;
   try {
     const body = await bacaBody(req);
@@ -42,7 +42,7 @@ export async function postPlan(req: NextRequest) {
 }
 
 export async function postTransaction(req: NextRequest) {
-  const tolak = tolakJikaBelumLogin(req);
+  const tolak = await tolakJikaBelumLogin(req);
   if (tolak) return tolak;
   try {
     const body = await bacaBody(req);
@@ -53,7 +53,7 @@ export async function postTransaction(req: NextRequest) {
 }
 
 export async function deleteTransaction(req: NextRequest) {
-  const tolak = tolakJikaBelumLogin(req);
+  const tolak = await tolakJikaBelumLogin(req);
   if (tolak) return tolak;
   try {
     const body = await bacaBody(req);
@@ -65,7 +65,7 @@ export async function deleteTransaction(req: NextRequest) {
 }
 
 export async function postPosition(req: NextRequest) {
-  const tolak = tolakJikaBelumLogin(req);
+  const tolak = await tolakJikaBelumLogin(req);
   if (tolak) return tolak;
   try {
     const body = await bacaBody(req);
@@ -77,7 +77,7 @@ export async function postPosition(req: NextRequest) {
 }
 
 export async function postDebt(req: NextRequest) {
-  const tolak = tolakJikaBelumLogin(req);
+  const tolak = await tolakJikaBelumLogin(req);
   if (tolak) return tolak;
   try {
     const body = await bacaBody(req);
@@ -101,7 +101,7 @@ export async function postDebt(req: NextRequest) {
 }
 
 export async function postGoal(req: NextRequest) {
-  const tolak = tolakJikaBelumLogin(req);
+  const tolak = await tolakJikaBelumLogin(req);
   if (tolak) return tolak;
   try {
     const body = await bacaBody(req);
@@ -124,7 +124,7 @@ export async function postGoal(req: NextRequest) {
 }
 
 export async function postSetup(req: NextRequest) {
-  const tolak = tolakJikaBelumLogin(req);
+  const tolak = await tolakJikaBelumLogin(req);
   if (tolak) return tolak;
   try {
     const body = await bacaBody(req);

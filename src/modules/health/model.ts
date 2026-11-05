@@ -12,6 +12,7 @@ const SEMUA_VARS = [
   "AUTH_SECRET",
   "HEALTH_TOKEN",
   "EMAIL_INBOUND_SECRET",
+  "CRON_SECRET",
 ] as const;
 
 const TABEL = [
@@ -27,6 +28,10 @@ const TABEL = [
   "config",
   "debts",
   "saving_goals",
+  "inbound_jobs",
+  "outbox",
+  "audit_events",
+  "integrations",
 ] as const;
 
 function hostDari(url: string | undefined): string | null {
@@ -57,6 +62,7 @@ export async function periksaKesiapan() {
   if (!env.DASHBOARD_PASSWORD) peringatan.push("DASHBOARD_PASSWORD kosong; dashboard web menolak login.");
   if (!env.HEALTH_TOKEN) peringatan.push("HEALTH_TOKEN kosong; endpoint /api/health hanya menampilkan status ringkas.");
   if (!env.EMAIL_INBOUND_SECRET) peringatan.push("EMAIL_INBOUND_SECRET kosong; webhook email menolak semua permintaan.");
+  if (!env.CRON_SECRET) peringatan.push("CRON_SECRET kosong; retry terjadwal outbox belum aktif.");
 
   const db: Record<string, unknown> = {
     tersambung: false,
@@ -88,7 +94,13 @@ export async function periksaKesiapan() {
              (SELECT COUNT(*) FROM transactions)::int AS transaksi,
              (SELECT COUNT(*) FROM inbound_messages)::int AS pesan_masuk,
              (SELECT COUNT(*) FROM debts WHERE status = 'aktif')::int AS utang_piutang_aktif,
-             (SELECT COUNT(*) FROM saving_goals WHERE status = 'aktif')::int AS target_aktif`,
+             (SELECT COUNT(*) FROM saving_goals WHERE status = 'aktif')::int AS target_aktif,
+             (SELECT COUNT(*) FROM inbound_jobs WHERE status IN ('menunggu','mengirim'))::int AS inbound_tertunda,
+             (SELECT COUNT(*) FROM inbound_jobs WHERE status = 'gagal')::int AS inbound_gagal,
+             (SELECT COUNT(*) FROM outbox WHERE status = 'menunggu')::int AS outbox_menunggu,
+             (SELECT COUNT(*) FROM outbox WHERE status = 'gagal')::int AS outbox_gagal,
+             (SELECT COUNT(*) FROM audit_events)::int AS audit_events,
+             (SELECT COUNT(*) FROM integrations)::int AS integrations`,
         );
         db.jumlah = hitung.rows[0];
       }
@@ -97,10 +109,12 @@ export async function periksaKesiapan() {
     }
   }
 
-  const jumlah = db.jumlah as { nomor_aktif?: number } | null;
+  const jumlah = db.jumlah as { nomor_aktif?: number; outbox_gagal?: number; inbound_gagal?: number } | null;
   if (db.tersambung && db.skemaSiap && (!jumlah || jumlah.nomor_aktif === 0)) {
     peringatan.push("Tabel allowed_numbers kosong; jalankan `npm run db:setup` agar nomor Anda diterima.");
   }
+  if (jumlah?.inbound_gagal) peringatan.push(`${jumlah.inbound_gagal} pesan masuk gagal permanen; perlu diperiksa.`);
+  if (jumlah?.outbox_gagal) peringatan.push(`${jumlah.outbox_gagal} balasan WhatsApp gagal permanen; perlu diperiksa.`);
 
   return {
     ok: Boolean(env.DATABASE_URL && waSiap && db.tersambung && db.skemaSiap && (jumlah?.nomor_aktif ?? 0) > 0),
