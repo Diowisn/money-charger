@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactElement } 
 import type { DashboardData } from "@/lib/dashboard";
 
 type Pesan = { jenis: "ok" | "error"; teks: string };
-type Tab = "ringkasan" | "rencana" | "transaksi" | "pos" | "piutang" | "target" | "asisten";
+type Tab = "ringkasan" | "rencana" | "catat" | "riwayat" | "pos" | "piutang" | "target" | "asisten";
 type StatusLive = "hidup" | "terputus";
 
 const INTERVAL_LIVE_MS = 5000;
@@ -51,6 +51,14 @@ function IkonTransaksi({ aktif }: { aktif: boolean }) {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={aktif ? 2.4 : 1.8}>
       <path d="M12 3v18M7 7l5-4 5 4M7 17l5 4 5-4" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function IkonTambah({ aktif }: { aktif: boolean }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={aktif ? 2.5 : 2}>
+      <path d="M12 5v14M5 12h14" strokeLinecap="round" />
     </svg>
   );
 }
@@ -103,10 +111,30 @@ function IkonLain({ aktif }: { aktif: boolean }) {
 }
 
 const MENU_LAIN: [Tab, string, (p: { aktif: boolean }) => ReactElement][] = [
-  ["pos", "Pos", IkonPos],
-  ["piutang", "Piutang", IkonPiutang],
-  ["target", "Target", IkonTarget],
+  ["pos", "Pos pengeluaran", IkonPos],
+  ["piutang", "Piutang & utang", IkonPiutang],
+  ["target", "Target tabungan", IkonTarget],
+  ["asisten", "Asisten keuangan", IkonAsisten],
 ];
+
+const MENU_SAMPING: [Tab, string, (p: { aktif: boolean }) => ReactElement][] = [
+  ["ringkasan", "Ringkasan", IkonRingkasan],
+  ["catat", "Catat transaksi", IkonTransaksi],
+  ["riwayat", "Riwayat transaksi", IkonTransaksi],
+  ["rencana", "Rencana bulanan", IkonRencana],
+  ...MENU_LAIN,
+];
+
+const JUDUL_TAB: Record<Tab, string> = {
+  ringkasan: "Ringkasan",
+  rencana: "Rencana bulanan",
+  catat: "Catat transaksi",
+  riwayat: "Riwayat transaksi",
+  pos: "Pos pengeluaran",
+  piutang: "Piutang & utang",
+  target: "Target tabungan",
+  asisten: "Asisten keuangan",
+};
 
 function drafRencana(data: DashboardData): Record<string, number> {
   const d: Record<string, number> = {
@@ -256,6 +284,12 @@ export default function Dashboard({ awal }: { awal: DashboardData }) {
     else setPesan({ jenis: "error", teks: "Gagal mencabut semua sesi." });
   }
 
+  function navigasiKe(tujuan: Tab) {
+    setTab(tujuan);
+    setMenuLain(false);
+    window.scrollTo(0, 0);
+  }
+
   const jamTerakhir = terakhir
     ? new Date(terakhir).toLocaleTimeString("id-ID", {
         hour: "2-digit",
@@ -263,160 +297,170 @@ export default function Dashboard({ awal }: { awal: DashboardData }) {
         second: "2-digit",
       })
     : null;
-  const lebihAktif = tab === "pos" || tab === "piutang" || tab === "target";
+  const lebihAktif = MENU_LAIN.some(([id]) => id === tab);
 
   return (
     <div className="app">
-      <header className="topbar">
-        <div className="merek">
-          <img className="logo-app" src="/icon-192.png" alt="" width={48} height={48} />
-          <div className="merek-teks">
-            <p className="eyebrow">Money-Charger</p>
-            <h1>{data.periode.aktif ? "Periode aktif" : "Periode awal"}</h1>
-            <p className="muted kecil">
-              {data.periode.aktif
-                ? `Hari ke-${data.periode.hariKe} · mulai ${data.periode.mulai}${
-                    data.periode.akhir ? ` · sampai ${data.periode.akhir}` : ""
-                  }`
-                : `Hari ini ${data.hariIni}`}
-            </p>
+      <aside className="sidebar">
+        <div className="sidebar-merek">
+          <img src="/icon-192.png" alt="" width={42} height={42} />
+          <div>
+            <b>Money-Charger</b>
+            <span>Keuangan pribadi</span>
           </div>
         </div>
-        <div className="topbar-aksi">
-          <span
-            className={`status-live ${statusLive}`}
-            role="status"
-            aria-live="polite"
-            title={statusLive === "hidup" ? "Data tersinkron otomatis" : "Koneksi terputus"}
-          >
-            <i />
-            <span className="status-teks">{statusLive === "hidup" ? "Live" : "Terputus"}</span>
-          </span>
-          <button
-            className="ghost"
-            type="button"
-            onClick={() => setTema((t) => (t === "gelap" ? "terang" : "gelap"))}
-            aria-label={tema === "gelap" ? "Pakai mode terang" : "Pakai mode gelap"}
-            title={tema === "gelap" ? "Mode terang" : "Mode gelap"}
-          >
-            {tema === "gelap" ? "Terang" : "Gelap"}
-          </button>
-          <details className="menu-akun">
-            <summary className="ghost">Akun</summary>
-            <div className="menu-akun-isi">
-              <button type="button" onClick={() => void keluarSemua()}>
-                Keluar semua perangkat
-              </button>
-              <button type="button" onClick={() => void keluar()}>
-                Keluar
-              </button>
-            </div>
-          </details>
-        </div>
-      </header>
-
-      {pesan ? (
-        <div className={`toast ${pesan.jenis}`} role="status">
-          <span>{pesan.teks}</span>
-          <button type="button" onClick={() => setPesan(null)} aria-label="Tutup">
-            ×
-          </button>
-        </div>
-      ) : null}
-
-      <nav className="tabs" aria-label="Menu dashboard">
-        {(
-          [
-            ["ringkasan", "Ringkasan"],
-            ["rencana", "Rencana"],
-            ["transaksi", "Transaksi"],
-            ["pos", "Pos"],
-            ["piutang", "Piutang"],
-            ["target", "Target"],
-            ["asisten", "Asisten"],
-          ] as [Tab, string][]
-        ).map(([id, label]) => (
-          <button
-            key={id}
-            type="button"
-            className={tab === id ? "tab aktif" : "tab"}
-            onClick={() => setTab(id)}
-          >
-            {label}
-          </button>
-        ))}
-      </nav>
-
-      <main className="konten">
-        {tab === "ringkasan" ? (
-          <Ringkasan data={data} buka={buka} setBuka={setBuka} />
-        ) : null}
-        {tab === "rencana" ? (
-          <Rencana data={data} kirim={kirim} sibuk={sibuk} />
-        ) : null}
-        {tab === "transaksi" ? (
-          <Transaksi data={data} kirim={kirim} sibuk={sibuk} />
-        ) : null}
-        {tab === "pos" ? <Pos data={data} kirim={kirim} sibuk={sibuk} /> : null}
-        {tab === "piutang" ? <Piutang data={data} kirim={kirim} sibuk={sibuk} /> : null}
-        {tab === "target" ? <Target data={data} kirim={kirim} sibuk={sibuk} /> : null}
-        {tab === "asisten" ? <Asisten /> : null}
-      </main>
-
-      {menuLain ? (
-        <div className="lebih-panel" id="menu-lain" aria-label="Menu lainnya">
-          {MENU_LAIN.map(([id, label, Ikon]) => (
+        <button className="sidebar-cat-button" type="button" onClick={() => navigasiKe("catat")}>
+          <span aria-hidden="true">＋</span> Catat transaksi
+        </button>
+        <nav className="sidebar-nav" aria-label="Navigasi utama">
+          <p className="sidebar-label">MENU</p>
+          {MENU_SAMPING.map(([id, label, Ikon]) => (
             <button
               key={id}
               type="button"
-              className={tab === id ? "lebih-item aktif" : "lebih-item"}
+              className={tab === id ? "sidebar-link aktif" : "sidebar-link"}
+              aria-current={tab === id ? "page" : undefined}
+              onClick={() => navigasiKe(id)}
+            >
+              <Ikon aktif={tab === id} />
+              <span>{label}</span>
+            </button>
+          ))}
+        </nav>
+        <div className="sidebar-status">
+          <span className={`status-live ${statusLive}`} role="status" aria-live="polite">
+            <i /> {statusLive === "hidup" ? "Tersinkron" : "Koneksi terputus"}
+          </span>
+          {jamTerakhir ? <span className="muted kecil">Pembaruan {jamTerakhir}</span> : null}
+        </div>
+      </aside>
+
+      <div className="app-main">
+        <header className="topbar">
+          <div className="merek">
+            <img className="logo-app" src="/icon-192.png" alt="" width={44} height={44} />
+            <div className="merek-teks">
+              <p className="eyebrow">Money-Charger</p>
+              <h1>{JUDUL_TAB[tab]}</h1>
+              <p className="muted kecil">
+                {data.periode.aktif
+                  ? `Periode aktif · hari ke-${data.periode.hariKe} · mulai ${data.periode.mulai}${
+                      data.periode.akhir ? ` · sampai ${data.periode.akhir}` : ""
+                    }`
+                  : `Periode awal · hari ini ${data.hariIni}`}
+              </p>
+            </div>
+          </div>
+          <div className="topbar-aksi">
+            <span
+              className={`status-live ${statusLive}`}
+              role="status"
+              aria-live="polite"
+              title={statusLive === "hidup" ? "Data tersinkron otomatis" : "Koneksi terputus"}
+            >
+              <i />
+              <span className="status-teks">{statusLive === "hidup" ? "Tersinkron" : "Terputus"}</span>
+            </span>
+            <button
+              className="ghost theme-toggle"
+              type="button"
+              onClick={() => setTema((t) => (t === "gelap" ? "terang" : "gelap"))}
+              aria-label={tema === "gelap" ? "Pakai mode terang" : "Pakai mode gelap"}
+              title={tema === "gelap" ? "Mode terang" : "Mode gelap"}
+            >
+              {tema === "gelap" ? "Terang" : "Gelap"}
+            </button>
+            <button className="utama header-cat-button" type="button" onClick={() => navigasiKe("catat")}>
+              Catat transaksi
+            </button>
+            <details className="menu-akun">
+              <summary className="ghost">Akun</summary>
+              <div className="menu-akun-isi">
+                <button type="button" onClick={() => void keluarSemua()}>
+                  Keluar semua perangkat
+                </button>
+                <button type="button" onClick={() => void keluar()}>
+                  Keluar
+                </button>
+              </div>
+            </details>
+          </div>
+        </header>
+
+        {pesan ? (
+          <div className={`toast ${pesan.jenis}`} role="status">
+            <span>{pesan.teks}</span>
+            <button type="button" onClick={() => setPesan(null)} aria-label="Tutup">
+              ×
+            </button>
+          </div>
+        ) : null}
+
+        <main className="konten">
+          {tab === "ringkasan" ? (
+            <Ringkasan data={data} buka={buka} setBuka={setBuka} navigasi={navigasiKe} />
+          ) : null}
+          {tab === "rencana" ? <Rencana data={data} kirim={kirim} sibuk={sibuk} /> : null}
+          {tab === "catat" || tab === "riwayat" ? (
+            <Transaksi data={data} kirim={kirim} sibuk={sibuk} mode={tab} />
+          ) : null}
+          {tab === "pos" ? <Pos data={data} kirim={kirim} sibuk={sibuk} /> : null}
+          {tab === "piutang" ? <Piutang data={data} kirim={kirim} sibuk={sibuk} /> : null}
+          {tab === "target" ? <Target data={data} kirim={kirim} sibuk={sibuk} /> : null}
+          {tab === "asisten" ? <Asisten /> : null}
+        </main>
+
+        {menuLain ? (
+          <div className="lebih-panel" id="menu-lain" aria-label="Menu lainnya">
+            {MENU_LAIN.map(([id, label, Ikon]) => (
+              <button
+                key={id}
+                type="button"
+                className={tab === id ? "lebih-item aktif" : "lebih-item"}
+              onClick={() => navigasiKe(id)}
+              >
+                <Ikon aktif={tab === id} />
+                <span>{label}</span>
+              </button>
+            ))}
+          </div>
+        ) : null}
+
+        <nav className="bottom-nav" aria-label="Navigasi dashboard">
+          {(
+            [
+              ["ringkasan", "Beranda", IkonRingkasan],
+              ["riwayat", "Riwayat", IkonTransaksi],
+              ["catat", "Catat", IkonTambah],
+              ["rencana", "Rencana", IkonRencana],
+            ] as [Tab, string, (p: { aktif: boolean }) => ReactElement][]
+          ).map(([id, label, Ikon]) => (
+            <button
+              key={id}
+              type="button"
+              className={`nav-item${id === "catat" ? " nav-item-cat" : ""}${tab === id ? " aktif" : ""}`}
+              aria-current={tab === id ? "page" : undefined}
               onClick={() => {
-                setTab(id);
-                setMenuLain(false);
+                navigasiKe(id);
               }}
             >
               <Ikon aktif={tab === id} />
               <span>{label}</span>
             </button>
           ))}
-        </div>
-      ) : null}
-
-      <nav className="bottom-nav" aria-label="Menu dashboard (mobile)">
-        {(
-          [
-            ["ringkasan", "Ringkasan", IkonRingkasan],
-            ["rencana", "Rencana", IkonRencana],
-            ["transaksi", "Transaksi", IkonTransaksi],
-            ["asisten", "Asisten", IkonAsisten],
-          ] as [Tab, string, (p: { aktif: boolean }) => ReactElement][]
-        ).map(([id, label, Ikon]) => (
           <button
-            key={id}
             type="button"
-            className={tab === id ? "nav-item aktif" : "nav-item"}
-            onClick={() => {
-              setTab(id);
-              setMenuLain(false);
-            }}
+            className={lebihAktif || menuLain ? "nav-item aktif" : "nav-item"}
+            onClick={() => setMenuLain((v) => !v)}
+            aria-expanded={menuLain}
+            aria-controls="menu-lain"
           >
-            <Ikon aktif={tab === id} />
-            <span>{label}</span>
+            <IkonLain aktif={lebihAktif || menuLain} />
+            <span>Lainnya</span>
           </button>
-        ))}
-        <button
-          type="button"
-          className={lebihAktif || menuLain ? "nav-item aktif" : "nav-item"}
-          onClick={() => setMenuLain((v) => !v)}
-          aria-expanded={menuLain}
-          aria-controls="menu-lain"
-        >
-          <IkonLain aktif={lebihAktif || menuLain} />
-          <span>Lainnya</span>
-        </button>
-      </nav>
+        </nav>
 
-      <footer className="kaki">
+        <footer className="kaki">
         <span>
           {statusLive === "hidup"
             ? `Tersinkron otomatis${jamTerakhir ? ` · ${jamTerakhir}` : ""}`
@@ -424,8 +468,9 @@ export default function Dashboard({ awal }: { awal: DashboardData }) {
         </span>
         <button type="button" className="tautan" onClick={() => void muatUlang(false)} disabled={sibuk}>
           Muat ulang
-        </button>
-      </footer>
+          </button>
+        </footer>
+      </div>
     </div>
   );
 }
@@ -434,10 +479,12 @@ function Ringkasan({
   data,
   buka,
   setBuka,
+  navigasi,
 }: {
   data: DashboardData;
   buka: Record<number, boolean>;
   setBuka: (v: Record<number, boolean>) => void;
+  navigasi: (tab: Tab) => void;
 }) {
   const r = data.ringkasan;
   const totalGrup = data.grup.reduce((s, g) => s + g.jatah, 0);
@@ -473,16 +520,31 @@ function Ringkasan({
       </section>
 
       <section className="grid-2">
-        <div className="kartu">
-          <p className="label">Pendapatan Bulan Ini</p>
+        <div className="kartu metric-card">
+          <p className="label">Pendapatan bulan ini</p>
           <p className="angka">{rp(r.pendapatanBulanIni)}</p>
-          <p className="muted">Gaji, pemasukan, bonus</p>
+          <p className="muted">Gaji, pemasukan, dan bonus</p>
         </div>
-        <div className="kartu">
-          <p className="label">Pengeluaran Bulan Ini</p>
+        <div className="kartu metric-card">
+          <p className="label">Pengeluaran bulan ini</p>
           <p className="angka">{rp(r.pengeluaranBulanIni)}</p>
           <p className="muted">Semua pengeluaran tercatat</p>
         </div>
+      </section>
+
+      <section className="quick-actions" aria-label="Aksi cepat">
+        <button type="button" className="quick-action primary" onClick={() => navigasi("catat")}>
+          <span className="quick-icon" aria-hidden="true">＋</span>
+          <span>Catat transaksi</span>
+        </button>
+        <button type="button" className="quick-action" onClick={() => navigasi("riwayat")}>
+          <span className="quick-icon" aria-hidden="true">↗</span>
+          <span>Lihat riwayat</span>
+        </button>
+        <button type="button" className="quick-action" onClick={() => navigasi("rencana")}>
+          <span className="quick-icon" aria-hidden="true">▤</span>
+          <span>Atur rencana</span>
+        </button>
       </section>
 
       <section className="kartu setengah">
@@ -924,10 +986,12 @@ function Transaksi({
   data,
   kirim,
   sibuk,
+  mode,
 }: {
   data: DashboardData;
   kirim: (url: string, method: string, body?: unknown) => Promise<boolean>;
   sibuk: boolean;
+  mode: "catat" | "riwayat";
 }) {
   const [tipe, setTipe] = useState("out");
   const [nominal, setNominal] = useState("");
@@ -993,21 +1057,38 @@ function Transaksi({
   }
 
   return (
-    <div className="tumpuk dua-kolom">
-      <section className="kartu">
-        <h2>Catat Transaksi</h2>
-        <div className="form">
-          <label>
-            Jenis
-            <select value={tipe} onChange={(e) => setTipe(e.target.value)}>
-              <option value="out">Pengeluaran</option>
-              <option value="in">Pemasukan</option>
-              <option value="gaji">Gaji</option>
-              <option value="bonus">Bonus</option>
-              <option value="tarik">Tarik dari wadah</option>
-              <option value="pindah">Pindah antar wadah</option>
-            </select>
-          </label>
+    <div className={mode === "catat" ? "tumpuk layar-catat" : "tumpuk layar-riwayat"}>
+      {mode === "catat" ? (
+      <section className="kartu form-transaksi">
+        <div className="section-title">
+          <div>
+            <p className="eyebrow">TRANSAKSI BARU</p>
+            <h2>Catat transaksi</h2>
+          </div>
+          <span className="badge">{data.hariIni}</span>
+        </div>
+        <div className="form form-transaksi-grid">
+          <fieldset className="segmented">
+            <legend>Jenis transaksi</legend>
+            {([
+              ["out", "Pengeluaran"],
+              ["in", "Pemasukan"],
+              ["gaji", "Gaji"],
+              ["bonus", "Bonus"],
+              ["tarik", "Tarik"],
+              ["pindah", "Pindah"],
+            ] as [string, string][]).map(([value, label]) => (
+              <button
+                key={value}
+                type="button"
+                className={tipe === value ? "segmented-item aktif" : "segmented-item"}
+                aria-pressed={tipe === value}
+                onClick={() => setTipe(value)}
+              >
+                {label}
+              </button>
+            ))}
+          </fieldset>
 
           <label>
             Nominal (Rp)
@@ -1116,17 +1197,20 @@ function Transaksi({
           </button>
         </div>
       </section>
+      ) : null}
 
-      <section className="kartu">
-        <div className="baris-antara">
-          <h2>Riwayat</h2>
-          <span className="muted kecil">
-            {tersaring.length} dari {data.transaksi.length} catatan
-          </span>
+      {mode === "riwayat" ? (
+      <section className="kartu riwayat-panel">
+        <div className="section-title">
+          <div>
+            <p className="eyebrow">AKTIVITAS</p>
+            <h2>Riwayat transaksi</h2>
+          </div>
+          <span className="badge">{tersaring.length} catatan</span>
         </div>
-        <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
-          <label className="muted kecil">
-            Jenis{" "}
+        <div className="filter-riwayat">
+          <label className="filter-jenis">
+            Jenis transaksi
             <select
               value={filterTipe}
               onChange={(e) => {
@@ -1134,7 +1218,7 @@ function Transaksi({
                 setHalaman(1);
               }}
             >
-              <option value="semua">Semua</option>
+              <option value="semua">Semua transaksi</option>
               <option value="out">Pengeluaran</option>
               <option value="in">Pemasukan</option>
               <option value="gaji">Gaji</option>
@@ -1143,16 +1227,19 @@ function Transaksi({
               <option value="pindah">Pindah</option>
             </select>
           </label>
-          <input
-            value={cari}
-            onChange={(e) => {
-              setCari(e.target.value);
-              setHalaman(1);
-            }}
-            placeholder="Cari pos, catatan, atau tanggal..."
-            style={{ flex: 1, minWidth: 180 }}
-          />
+          <label className="filter-cari">
+            Cari transaksi
+            <input
+              value={cari}
+              onChange={(e) => {
+                setCari(e.target.value);
+                setHalaman(1);
+              }}
+              placeholder="Cari pos, catatan, atau tanggal"
+            />
+          </label>
         </div>
+        <p className="muted kecil">Menampilkan {tersaring.length} dari {data.transaksi.length} catatan terbaru.</p>
         <ul className="daftar-transaksi">
           {tampil.map((t) => (
             <li key={t.id} className={t.status === "batal" ? "batal" : undefined}>
@@ -1208,6 +1295,7 @@ function Transaksi({
           </div>
         ) : null}
       </section>
+      ) : null}
     </div>
   );
 }
