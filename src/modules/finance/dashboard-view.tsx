@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactElement } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState, type ReactElement } from "react";
 import type { DashboardData } from "@/lib/dashboard";
 
 type Pesan = { jenis: "ok" | "error"; teks: string };
@@ -25,7 +25,6 @@ const NAMA_TIPE: Record<string, string> = {
 };
 
 const rp = (n: number) => `Rp${Math.round(n).toLocaleString("id-ID")}`;
-const persen = (n: number) => `${Math.round(n * 100)}%`;
 const persenDari = (n: number, total: number) =>
   total > 0 ? `${Math.min(100, Math.round((n / total) * 100))}%` : "0%";
 
@@ -100,6 +99,15 @@ function IkonAsisten({ aktif }: { aktif: boolean }) {
   );
 }
 
+function IkonLonceng({ aktif }: { aktif: boolean }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={aktif ? 2.4 : 1.8}>
+      <path d="M6 9a6 6 0 0 1 12 0c0 5 2 6 2 6H4s2-1 2-6z" strokeLinejoin="round" />
+      <path d="M10 19a2 2 0 0 0 4 0" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 function IkonLain({ aktif }: { aktif: boolean }) {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={aktif ? 2.4 : 1.8}>
@@ -107,6 +115,80 @@ function IkonLain({ aktif }: { aktif: boolean }) {
       <circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none" />
       <circle cx="19" cy="12" r="1.6" fill="currentColor" stroke="none" />
     </svg>
+  );
+}
+
+const BULAN_PENDEK = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des"];
+
+function tanggalPendek(iso: string) {
+  const [tahun, bulan, hari] = iso.split("-").map(Number);
+  if (!tahun || !bulan || !hari) return iso;
+  return `${hari} ${BULAN_PENDEK[bulan - 1] ?? ""} ${tahun}`;
+}
+
+function GrafikArea({ nilai, warna, label }: { nilai: number[]; warna: string; label: string }) {
+  const id = useId().replace(/:/g, "");
+  const w = 320;
+  const h = 100;
+  const pad = 10;
+  const n = Math.max(1, nilai.length);
+  const maks = Math.max(1, ...nilai);
+  const titik = nilai.map((v, i) => {
+    const x = n <= 1 ? w / 2 : (i / (n - 1)) * w;
+    const y = h - pad - (v / maks) * (h - pad * 2);
+    return [x, y] as const;
+  });
+  let garis = "";
+  if (titik.length) {
+    garis = `M ${titik[0][0]} ${titik[0][1]}`;
+    for (let i = 0; i < titik.length - 1; i++) {
+      const xTengah = (titik[i][0] + titik[i + 1][0]) / 2;
+      garis += ` C ${xTengah} ${titik[i][1]}, ${xTengah} ${titik[i + 1][1]}, ${titik[i + 1][0]} ${titik[i + 1][1]}`;
+    }
+  }
+  const area = `${garis} L ${w} ${h} L 0 ${h} Z`;
+  const indeksPuncak = nilai.indexOf(maks);
+  const puncak = titik[indeksPuncak] ?? [w / 2, h / 2];
+  const adaData = nilai.some((v) => v > 0);
+
+  return (
+    <div className="grafik-area">
+      <svg viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none" role="img" aria-label={label}>
+        <defs>
+          <linearGradient id={`grad-${id}`} x1="0" x2="0" y1="0" y2="1">
+            <stop offset="0%" stopColor={warna} stopOpacity="0.32" />
+            <stop offset="100%" stopColor={warna} stopOpacity="0" />
+          </linearGradient>
+        </defs>
+        <path d={area} fill={`url(#grad-${id})`} />
+        <path
+          d={garis}
+          fill="none"
+          stroke={warna}
+          strokeWidth="2.2"
+          strokeLinecap="round"
+          vectorEffect="non-scaling-stroke"
+        />
+      </svg>
+      {adaData ? (
+        <>
+          <span
+            className="grafik-titik"
+            style={{ left: `${(puncak[0] / w) * 100}%`, top: `${(puncak[1] / h) * 100}%`, background: warna }}
+          />
+          <span
+            className="grafik-pil"
+            style={{
+              left: `${Math.min(76, Math.max(20, (puncak[0] / w) * 100))}%`,
+              top: `${Math.max(4, (puncak[1] / h) * 100 - 6)}%`,
+              background: warna,
+            }}
+          >
+            {rp(maks)}
+          </span>
+        </>
+      ) : null}
+    </div>
   );
 }
 
@@ -336,7 +418,7 @@ export default function Dashboard({ awal }: { awal: DashboardData }) {
       </aside>
 
       <div className="app-main">
-        <header className="topbar">
+        <header className={`topbar topbar-${tab}`}>
           <div className="merek">
             <img className="logo-app" src="/icon-192.png" alt="" width={44} height={44} />
             <div className="merek-teks">
@@ -426,19 +508,28 @@ export default function Dashboard({ awal }: { awal: DashboardData }) {
           </div>
         ) : null}
 
+        <button
+          type="button"
+          className="fab-catat"
+          onClick={() => navigasiKe("catat")}
+          aria-label="Catat transaksi"
+          title="Catat transaksi"
+        >
+          <IkonTambah aktif />
+        </button>
+
         <nav className="bottom-nav" aria-label="Navigasi dashboard">
           {(
             [
               ["ringkasan", "Beranda", IkonRingkasan],
               ["riwayat", "Riwayat", IkonTransaksi],
-              ["catat", "Catat", IkonTambah],
               ["rencana", "Rencana", IkonRencana],
             ] as [Tab, string, (p: { aktif: boolean }) => ReactElement][]
           ).map(([id, label, Ikon]) => (
             <button
               key={id}
               type="button"
-              className={`nav-item${id === "catat" ? " nav-item-cat" : ""}${tab === id ? " aktif" : ""}`}
+              className={`nav-item${tab === id ? " aktif" : ""}`}
               aria-current={tab === id ? "page" : undefined}
               onClick={() => {
                 navigasiKe(id);
@@ -489,47 +580,132 @@ function Ringkasan({
   const r = data.ringkasan;
   const totalGrup = data.grup.reduce((s, g) => s + g.jatah, 0);
   const toggle = (id: number) => setBuka({ ...buka, [id]: !buka[id] });
+  const [aliran, setAliran] = useState<"masuk" | "keluar">("keluar");
+  const masuk = aliran === "masuk";
   const tren = data.tren ?? [];
-  const maksTren = Math.max(1, ...tren.map((t) => t.pengeluaran));
-  const totalTren = tren.reduce((s, t) => s + t.pengeluaran, 0);
-  const hariTren = tren.filter((t) => t.pengeluaran > 0).length;
+  const hari = tren.map((t) => t.tanggal);
+  const seriKeluar = tren.map((t) => t.pengeluaran);
+  const seriMasuk = useMemo(() => {
+    const peta = new Map<string, number>();
+    for (const t of data.transaksi) {
+      if (t.status !== "berlaku") continue;
+      if (t.tipe !== "in" && t.tipe !== "gaji" && t.tipe !== "bonus") continue;
+      peta.set(t.tanggal, (peta.get(t.tanggal) ?? 0) + t.nominal);
+    }
+    return hari.map((tanggal) => peta.get(tanggal) ?? 0);
+  }, [data.transaksi, data.tren]);
+  const seri = masuk ? seriMasuk : seriKeluar;
+  const totalSeri = seri.reduce((s, v) => s + v, 0);
+  const totalBulan = masuk ? r.pendapatanBulanIni : r.pengeluaranBulanIni;
+  const terbaru = useMemo(
+    () =>
+      data.transaksi
+        .filter((t) => t.status === "berlaku")
+        .filter((t) =>
+          masuk ? t.tipe === "in" || t.tipe === "gaji" || t.tipe === "bonus" : t.tipe === "out",
+        )
+        .slice(0, 5),
+    [data.transaksi, masuk],
+  );
 
   return (
-    <div className="tumpuk ringkasan-grid">
-      <section className="kartu sorot">
-        <div className="baris-antara">
+    <div className="tumpuk ringkasan-grid home">
+      <section className="hero-uang">
+        <div className="hero-atas">
           <div>
-            <p className="label">Sisa Uang</p>
-            <p className="angka-besar">{rp(r.sisaUang)}</p>
-            <p className="muted">Potensi Dana Darurat &amp; Investasi Diri</p>
+            <p className="hero-sapaan">Hai!</p>
+            <p className="hero-label">Total saldo</p>
+            <p className="hero-angka">{rp(r.saldo)}</p>
           </div>
-          <div className="cincin">
-            <span>{persen(r.rasio)}</span>
-          </div>
+          <button
+            type="button"
+            className="hero-lonceng"
+            onClick={() => navigasi("asisten")}
+            aria-label="Buka asisten keuangan"
+            title="Asisten keuangan"
+          >
+            <IkonLonceng aktif={false} />
+            <i />
+          </button>
         </div>
-        <div className="bar tebal">
-          <span style={{ width: persen(r.rasio) }} />
+        <div className="hero-tabs" role="tablist" aria-label="Jenis arus uang">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={masuk}
+            className={masuk ? "hero-tab aktif" : "hero-tab"}
+            onClick={() => setAliran("masuk")}
+          >
+            Pemasukan
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={!masuk}
+            className={!masuk ? "hero-tab aktif" : "hero-tab"}
+            onClick={() => setAliran("keluar")}
+          >
+            Pengeluaran
+          </button>
         </div>
-        <div className="baris-antara kecil">
-          <span>Terpakai {rp(r.terpakai)}</span>
-          <span>Total {rp(r.totalRencana)}</span>
-        </div>
-        {r.belumDipetakan > 0 ? (
-          <p className="muted kecil">Termasuk {rp(r.belumDipetakan)} pengeluaran tanpa pos.</p>
-        ) : null}
       </section>
 
-      <section className="grid-2">
-        <div className="kartu metric-card">
-          <p className="label">Pendapatan bulan ini</p>
-          <p className="angka">{rp(r.pendapatanBulanIni)}</p>
-          <p className="muted">Gaji, pemasukan, dan bonus</p>
+      <section className="kartu kartu-grafik">
+        <div className="baris-antara">
+          <div>
+            <p className="label">{masuk ? "Pemasukan bulan ini" : "Pengeluaran bulan ini"}</p>
+            <p className="angka">{rp(totalBulan)}</p>
+          </div>
+          <span className={masuk ? "badge hijau" : "badge tipe-out"}>{rp(totalSeri)} / 14 hari</span>
         </div>
-        <div className="kartu metric-card">
-          <p className="label">Pengeluaran bulan ini</p>
-          <p className="angka">{rp(r.pengeluaranBulanIni)}</p>
-          <p className="muted">Semua pengeluaran tercatat</p>
+        <GrafikArea
+          nilai={seri}
+          warna={masuk ? "var(--hijau)" : "var(--merah)"}
+          label={`Grafik ${masuk ? "pemasukan" : "pengeluaran"} 14 hari terakhir`}
+        />
+        <p className="muted kecil">
+          Rata-rata {rp(totalSeri / Math.max(1, tren.length))} per hari
+        </p>
+      </section>
+
+      <section className="kartu kartu-terbaru">
+        <div className="baris-antara">
+          <div>
+            <h2>{masuk ? "Pemasukan terbaru" : "Pengeluaran terbaru"}</h2>
+            <p className="muted kecil">5 catatan terakhir</p>
+          </div>
+          <button type="button" className="tautan" onClick={() => navigasi("riwayat")}>
+            Lihat semua
+          </button>
         </div>
+        <ul className="daftar-ringkas">
+          {terbaru.map((t) => {
+            const judul = t.subPost ?? t.label ?? NAMA_TIPE[t.tipe] ?? t.tipe;
+            const nilai = t.tipe === "out" ? t.nominal + t.biayaAdmin : t.nominal;
+            return (
+              <li key={t.id}>
+                <span className={masuk ? "avatar-uang masuk" : "avatar-uang"}>
+                  {judul.trim().charAt(0).toUpperCase() || "?"}
+                </span>
+                <div className="ringkas-info">
+                  <p className="ringkas-nama">{judul}</p>
+                  <p className="muted kecil">{tanggalPendek(t.tanggal)}</p>
+                </div>
+                <b className={masuk ? "ringkas-jumlah masuk" : "ringkas-jumlah"}>
+                  {masuk ? "+" : "−"} {rp(nilai)}
+                </b>
+              </li>
+            );
+          })}
+          {!terbaru.length ? (
+            <li className="kosong-ringkas">
+              <p className="muted">Belum ada {masuk ? "pemasukan" : "pengeluaran"} pada rentang ini.</p>
+              <button type="button" className="sekunder" onClick={() => navigasi("catat")}>
+                Catat sekarang
+              </button>
+            </li>
+          ) : null}
+        </ul>
       </section>
 
       <section className="quick-actions" aria-label="Aksi cepat">
@@ -545,43 +721,6 @@ function Ringkasan({
           <span className="quick-icon" aria-hidden="true">▤</span>
           <span>Atur rencana</span>
         </button>
-      </section>
-
-      <section className="kartu setengah">
-        <div className="baris-antara">
-          <div>
-            <h2>Tren Pengeluaran</h2>
-            <p className="muted kecil">{tren.length} hari terakhir</p>
-          </div>
-          <div style={{ textAlign: "right" }}>
-            <p className="angka-kecil">{rp(totalTren)}</p>
-            <p className="muted kecil">
-              {hariTren} hari ada pengeluaran
-            </p>
-          </div>
-        </div>
-        {totalTren > 0 ? (
-          <>
-            <div className="tren" role="img" aria-label={`Pengeluaran ${tren.length} hari terakhir`}>
-              {tren.map((t) => (
-                <div className="tren-kolom" key={t.tanggal} title={`${t.tanggal}: ${rp(t.pengeluaran)}`}>
-                  <span
-                    className="tren-batang"
-                    style={{ height: `${Math.max(2, (t.pengeluaran / maksTren) * 100)}%` }}
-                  />
-                </div>
-              ))}
-            </div>
-            <div className="tren-label">
-              {tren.map((t, i) => (
-                <span key={t.tanggal}>{i % 2 === 0 ? t.tanggal.slice(8) : ""}</span>
-              ))}
-            </div>
-          </>
-        ) : (
-          <p className="muted kecil">Belum ada pengeluaran pada rentang ini.</p>
-        )}
-        <p className="muted kecil">Rata-rata {rp(totalTren / Math.max(1, tren.length))} per hari · tertinggi {rp(maksTren)}</p>
       </section>
 
       <section className="kartu setengah">
@@ -1021,6 +1160,21 @@ function Transaksi({
     });
   }, [data.transaksi, filterTipe, cari]);
 
+  const populer = useMemo(() => {
+    const peta = new Map<string, { nama: string; total: number; tipe: string }>();
+    for (const t of data.transaksi) {
+      if (t.status !== "berlaku") continue;
+      if (t.tipe !== "out" && t.tipe !== "in" && t.tipe !== "gaji" && t.tipe !== "bonus") continue;
+      const nama = t.subPost ?? t.label ?? NAMA_TIPE[t.tipe] ?? t.tipe;
+      const isi = peta.get(nama) ?? { nama, total: 0, tipe: t.tipe };
+      isi.total += t.tipe === "out" ? t.nominal + t.biayaAdmin : t.nominal;
+      peta.set(nama, isi);
+    }
+    return [...peta.values()].sort((a, b) => b.total - a.total).slice(0, 5);
+  }, [data.transaksi]);
+
+  const trenPengeluaran = data.tren ?? [];
+  const totalPengeluaran = trenPengeluaran.reduce((s, t) => s + t.pengeluaran, 0);
   const totalHalaman = Math.max(1, Math.ceil(tersaring.length / PER_HALAMAN));
   const halamanAman = Math.min(halaman, totalHalaman);
   const tampil = tersaring.slice((halamanAman - 1) * PER_HALAMAN, halamanAman * PER_HALAMAN);
@@ -1208,6 +1362,47 @@ function Transaksi({
           </div>
           <span className="badge">{tersaring.length} catatan</span>
         </div>
+
+        <div className="riwayat-stats">
+          <div className="stat-blok stat-grafik">
+            <div className="baris-antara">
+              <div>
+                <p className="label">Tren pengeluaran</p>
+                <p className="angka-kecil">{rp(totalPengeluaran)}</p>
+              </div>
+              <span className="badge">14 hari</span>
+            </div>
+            <GrafikArea
+              nilai={trenPengeluaran.map((t) => t.pengeluaran)}
+              warna="var(--merah)"
+              label="Grafik pengeluaran 14 hari terakhir"
+            />
+          </div>
+          <div className="stat-blok">
+            <div className="baris-antara">
+              <p className="label">Paling sering</p>
+              <span className="badge">Top 5</span>
+            </div>
+            <ul className="daftar-populer">
+              {populer.map((p) => {
+                const keluar = p.tipe === "out";
+                return (
+                  <li key={p.nama}>
+                    <span className={keluar ? "avatar-uang kecil" : "avatar-uang kecil masuk"}>
+                      {p.nama.trim().charAt(0).toUpperCase() || "?"}
+                    </span>
+                    <span className="populer-nama">{p.nama}</span>
+                    <b className={keluar ? "ringkas-jumlah" : "ringkas-jumlah masuk"}>
+                      {keluar ? "−" : "+"} {rp(p.total)}
+                    </b>
+                  </li>
+                );
+              })}
+              {!populer.length ? <li className="muted kecil">Belum ada data.</li> : null}
+            </ul>
+          </div>
+        </div>
+
         <div className="filter-riwayat">
           <label className="filter-jenis">
             Jenis transaksi
