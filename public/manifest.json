@@ -9,8 +9,8 @@
   "scope": "/",
   "display": "standalone",
   "orientation": "portrait",
-  "background_color": "#f7efd9",
-  "theme_color": "#f2a900",
+  "background_color": "#eef2f5",
+  "theme_color": "#1e2a37",
   "categories": ["finance"],
   "icons": [
     { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },

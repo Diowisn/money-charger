@@ -9,7 +9,7 @@ type StatusLive = "hidup" | "terputus";
 
 const INTERVAL_LIVE_MS = 5000;
 
-const WARNA = ["#f2a900", "#c56a00", "#8a6a3a", "#b3261e", "#6f4518", "#d98b24", "#3e7d44"];
+const WARNA = ["#5d7184", "#8fa2b4", "#2e4053", "#b4c1cd", "#728699", "#4a5f73", "#9aaebd"];
 const NAMA_WADAH: Record<string, string> = { saldo: "Saldo", tabungan: "Tabungan", investasi: "Investasi" };
 const NAMA_TIPE: Record<string, string> = {
   out: "Pengeluaran",
@@ -92,6 +92,22 @@ function IkonAsisten({ aktif }: { aktif: boolean }) {
   );
 }
 
+function IkonLain({ aktif }: { aktif: boolean }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={aktif ? 2.4 : 1.8}>
+      <circle cx="5" cy="12" r="1.6" fill="currentColor" stroke="none" />
+      <circle cx="12" cy="12" r="1.6" fill="currentColor" stroke="none" />
+      <circle cx="19" cy="12" r="1.6" fill="currentColor" stroke="none" />
+    </svg>
+  );
+}
+
+const MENU_LAIN: [Tab, string, (p: { aktif: boolean }) => ReactElement][] = [
+  ["pos", "Pos", IkonPos],
+  ["piutang", "Piutang", IkonPiutang],
+  ["target", "Target", IkonTarget],
+];
+
 function drafRencana(data: DashboardData): Record<string, number> {
   const d: Record<string, number> = {
     dd: data.rencanaLain.dd,
@@ -120,6 +136,7 @@ export default function Dashboard({ awal }: { awal: DashboardData }) {
   const [statusLive, setStatusLive] = useState<StatusLive>("hidup");
   const [terakhir, setTerakhir] = useState<number | null>(null);
   const [tema, setTema] = useState<Tema>("terang");
+  const [menuLain, setMenuLain] = useState(false);
   const dataRef = useRef(awal);
   const sibukRef = useRef(false);
   const urutanRef = useRef(0);
@@ -246,20 +263,24 @@ export default function Dashboard({ awal }: { awal: DashboardData }) {
         second: "2-digit",
       })
     : null;
+  const lebihAktif = tab === "pos" || tab === "piutang" || tab === "target";
 
   return (
     <div className="app">
       <header className="topbar">
-        <div>
-          <p className="eyebrow">Money-Charger</p>
-          <h1>{data.periode.aktif ? "Periode aktif" : "Periode awal"}</h1>
-          <p className="muted">
-            {data.periode.aktif
-              ? `Hari ke-${data.periode.hariKe} · mulai ${data.periode.mulai}${
-                  data.periode.akhir ? ` · sampai ${data.periode.akhir}` : ""
-                }`
-              : `Hari ini ${data.hariIni}`}
-          </p>
+        <div className="merek">
+          <img className="logo-app" src="/icon-192.png" alt="" width={48} height={48} />
+          <div className="merek-teks">
+            <p className="eyebrow">Money-Charger</p>
+            <h1>{data.periode.aktif ? "Periode aktif" : "Periode awal"}</h1>
+            <p className="muted kecil">
+              {data.periode.aktif
+                ? `Hari ke-${data.periode.hariKe} · mulai ${data.periode.mulai}${
+                    data.periode.akhir ? ` · sampai ${data.periode.akhir}` : ""
+                  }`
+                : `Hari ini ${data.hariIni}`}
+            </p>
+          </div>
         </div>
         <div className="topbar-aksi">
           <span
@@ -269,7 +290,7 @@ export default function Dashboard({ awal }: { awal: DashboardData }) {
             title={statusLive === "hidup" ? "Data tersinkron otomatis" : "Koneksi terputus"}
           >
             <i />
-            {statusLive === "hidup" ? "Live" : "Terputus"}
+            <span className="status-teks">{statusLive === "hidup" ? "Live" : "Terputus"}</span>
           </span>
           <button
             className="ghost"
@@ -280,12 +301,17 @@ export default function Dashboard({ awal }: { awal: DashboardData }) {
           >
             {tema === "gelap" ? "Terang" : "Gelap"}
           </button>
-          <button className="ghost" onClick={() => void keluarSemua()} type="button">
-            Keluar semua
-          </button>
-          <button className="ghost" onClick={keluar} type="button">
-            Keluar
-          </button>
+          <details className="menu-akun">
+            <summary className="ghost">Akun</summary>
+            <div className="menu-akun-isi">
+              <button type="button" onClick={() => void keluarSemua()}>
+                Keluar semua perangkat
+              </button>
+              <button type="button" onClick={() => void keluar()}>
+                Keluar
+              </button>
+            </div>
+          </details>
         </div>
       </header>
 
@@ -337,15 +363,31 @@ export default function Dashboard({ awal }: { awal: DashboardData }) {
         {tab === "asisten" ? <Asisten /> : null}
       </main>
 
+      {menuLain ? (
+        <div className="lebih-panel" id="menu-lain" aria-label="Menu lainnya">
+          {MENU_LAIN.map(([id, label, Ikon]) => (
+            <button
+              key={id}
+              type="button"
+              className={tab === id ? "lebih-item aktif" : "lebih-item"}
+              onClick={() => {
+                setTab(id);
+                setMenuLain(false);
+              }}
+            >
+              <Ikon aktif={tab === id} />
+              <span>{label}</span>
+            </button>
+          ))}
+        </div>
+      ) : null}
+
       <nav className="bottom-nav" aria-label="Menu dashboard (mobile)">
         {(
           [
             ["ringkasan", "Ringkasan", IkonRingkasan],
             ["rencana", "Rencana", IkonRencana],
             ["transaksi", "Transaksi", IkonTransaksi],
-            ["pos", "Pos", IkonPos],
-            ["piutang", "Piutang", IkonPiutang],
-            ["target", "Target", IkonTarget],
             ["asisten", "Asisten", IkonAsisten],
           ] as [Tab, string, (p: { aktif: boolean }) => ReactElement][]
         ).map(([id, label, Ikon]) => (
@@ -353,12 +395,25 @@ export default function Dashboard({ awal }: { awal: DashboardData }) {
             key={id}
             type="button"
             className={tab === id ? "nav-item aktif" : "nav-item"}
-            onClick={() => setTab(id)}
+            onClick={() => {
+              setTab(id);
+              setMenuLain(false);
+            }}
           >
             <Ikon aktif={tab === id} />
             <span>{label}</span>
           </button>
         ))}
+        <button
+          type="button"
+          className={lebihAktif || menuLain ? "nav-item aktif" : "nav-item"}
+          onClick={() => setMenuLain((v) => !v)}
+          aria-expanded={menuLain}
+          aria-controls="menu-lain"
+        >
+          <IkonLain aktif={lebihAktif || menuLain} />
+          <span>Lainnya</span>
+        </button>
       </nav>
 
       <footer className="kaki">
@@ -393,7 +448,7 @@ function Ringkasan({
   const hariTren = tren.filter((t) => t.pengeluaran > 0).length;
 
   return (
-    <div className="tumpuk">
+    <div className="tumpuk ringkasan-grid">
       <section className="kartu sorot">
         <div className="baris-antara">
           <div>
@@ -430,7 +485,7 @@ function Ringkasan({
         </div>
       </section>
 
-      <section className="kartu">
+      <section className="kartu setengah">
         <div className="baris-antara">
           <div>
             <h2>Tren Pengeluaran</h2>
@@ -467,7 +522,7 @@ function Ringkasan({
         <p className="muted kecil">Rata-rata {rp(totalTren / Math.max(1, tren.length))} per hari · tertinggi {rp(maksTren)}</p>
       </section>
 
-      <section className="kartu">
+      <section className="kartu setengah">
         <div className="baris-antara">
           <h2>Alokasi per Grup</h2>
           <span className="muted kecil">{rp(totalGrup)}</span>
@@ -665,7 +720,7 @@ function Asisten() {
   }
 
   return (
-    <div className="tumpuk">
+    <div className="tumpuk sempit">
       <section className="kartu">
         <h2>Tanya Asisten</h2>
         <p className="muted">
@@ -759,7 +814,7 @@ function Rencana({
   }
 
   return (
-    <div className="tumpuk">
+    <div className="tumpuk rencana-grid">
       <section className="kartu">
         <div className="baris-antara">
           <div>
@@ -776,7 +831,7 @@ function Rencana({
       </section>
 
       {data.grup.map((g) => (
-        <section className="kartu" key={g.id}>
+        <section className="kartu grup-rencana" key={g.id}>
           <div className="baris-antara">
             <h2>{g.nama}</h2>
             <span className="muted">
@@ -938,7 +993,7 @@ function Transaksi({
   }
 
   return (
-    <div className="tumpuk">
+    <div className="tumpuk dua-kolom">
       <section className="kartu">
         <h2>Catat Transaksi</h2>
         <div className="form">
@@ -1240,9 +1295,10 @@ function Pos({
   }
 
   return (
-    <div className="tumpuk">
-      <section className="kartu">
-        <h2>Tambah Pos</h2>
+    <div className="tumpuk dua-kolom">
+      <div className="tumpuk kolom">
+        <section className="kartu">
+          <h2>Tambah Pos</h2>
         <div className="form">
           <label>
             Grup
@@ -1307,6 +1363,7 @@ function Pos({
           </button>
         </div>
       </section>
+      </div>
 
       <section className="kartu">
         <h2>Daftar Pos</h2>
@@ -1331,7 +1388,7 @@ function Pos({
       </section>
 
       {data.bolehSetup ? (
-        <section className="kartu">
+        <section className="kartu lebar">
           <h2>Setup Awal</h2>
           <p className="muted">
             Hanya bisa diubah sebelum gaji pertama. Setelah gaji masuk, pengaturan ini dikunci.
@@ -1379,7 +1436,7 @@ function Pos({
           </div>
         </section>
       ) : (
-        <section className="kartu">
+        <section className="kartu lebar">
           <h2>Pengaturan Terkunci</h2>
           <p className="muted">
             Gaji pertama sudah tercatat. Setup awal tidak bisa diubah lagi dari web.
@@ -1456,7 +1513,7 @@ function Target({
   const selesai = data.goals.filter((g) => g.status !== "aktif");
 
   return (
-    <div className="tumpuk">
+    <div className="tumpuk dua-kolom">
       <section className="kartu">
         <h2>Buat Target Tabungan</h2>
         <div className="form">
@@ -1540,7 +1597,7 @@ function Target({
       </section>
 
       {selesai.length ? (
-        <section className="kartu">
+        <section className="kartu lebar">
           <h2>Riwayat</h2>
           <ul className="daftar-transaksi">
             {selesai.map((g) => (
@@ -1618,8 +1675,8 @@ function Piutang({
   const totalUtang = aktif.filter((d) => d.jenis === "utang").reduce((s, d) => s + d.sisa, 0);
 
   return (
-    <div className="tumpuk">
-      <section className="grid-2">
+    <div className="tumpuk dua-kolom">
+      <section className="grid-2 lebar">
         <div className="kartu">
           <p className="label">Piutang Aktif</p>
           <p className="angka">{rp(totalPiutang)}</p>
@@ -1722,7 +1779,7 @@ function Piutang({
       </section>
 
       {selesai.length ? (
-        <section className="kartu">
+        <section className="kartu lebar">
           <h2>Riwayat</h2>
           <ul className="daftar-transaksi">
             {selesai.map((d) => (

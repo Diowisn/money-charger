@@ -9,6 +9,7 @@ export default async function LoginPage() {
   return (
     <main className="auth">
       <div className="auth-kartu">
+        <img className="auth-logo" src="/icon-192.png" alt="" width={64} height={64} />
         <p className="eyebrow">Money-Charger</p>
         <h1>Masuk</h1>
         <p className="muted">Dashboard pribadi keuangan. Masukkan password untuk melanjutkan.</p>

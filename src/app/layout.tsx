@@ -11,7 +11,7 @@ export const metadata = {
 export const viewport = {
   width: "device-width",
   initialScale: 1,
-  themeColor: "#f2a900",
+  themeColor: "#1e2a37",
 };
 
 const SKRIP_TEMA = `
