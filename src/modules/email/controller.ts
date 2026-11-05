@@ -25,6 +25,7 @@ export async function terimaEmail(req: NextRequest) {
     subjek: typeof body.subject === "string" ? body.subject : undefined,
     teks: typeof body.text === "string" ? body.text : typeof body.html === "string" ? body.html : undefined,
     nominal: typeof body.nominal === "number" ? body.nominal : undefined,
+    tanggal: typeof body.tanggal === "string" ? body.tanggal : undefined,
   };
 
   try {

@@ -199,41 +199,42 @@ Invoke-RestMethod `
 Ganti `WA_PHONE_NUMBER_ID` dan `WA_ACCESS_TOKEN` di Vercel, redeploy. Kode dan data tidak berubah.
 Ganti nomor pribadi: ubah `ALLOWED_NUMBERS`, jalankan `npm run db:setup` lagi.
 
-### 7. Email payroll otomatis (opsional, generik)
+### 7. Email transaksi otomatis (opsional, dua arah)
 
-`POST /api/email/inbound` mencatat email masuk sebagai **gaji** (bila subjek/isi menyebut "gaji"/"payroll"/"salary"/"upah"/"THR")
-atau **pemasukan biasa** ke Saldo. Endpoint ini **tidak terikat ke satu bank atau penyedia email tertentu**: kirim
-request JSON dari layanan forwarding email pilihan Anda (mis. Resend Inbound, Cloudflare Email Workers, Mailgun Routes,
-atau Zapier/Make yang membaca email lalu memanggil webhook ini).
+`POST /api/email/inbound` mencatat email notifikasi transaksi menjadi:
+- **Pengeluaran** (`out`) untuk email pembayaran/QRIS. Label diambil dari `Nama Merchant`.
+- **Gaji** untuk email payroll/gaji/THR.
+- **Pemasukan** ke Saldo untuk transfer masuk biasa.
+
+Arah dideteksi dari subjek/isi email. Email yang arahnya tidak dikenali dilewati, bukan dicatat asal-asalan.
 
 1. Isi `EMAIL_INBOUND_SECRET` dengan string acak panjang di `.env.local` dan di Vercel, lalu redeploy.
-2. Konfigurasikan penyedia forwarding email Anda untuk meneruskan email BSI Syariah payroll ke endpoint ini sebagai
-   `POST https://<domain-vercel-anda>/api/email/inbound`, dengan header `X-Email-Secret: <EMAIL_INBOUND_SECRET>`.
-   Secret lewat query string tidak lagi diterima agar tidak bocor ke log/proxy.
+   Opsional: isi `EMAIL_ALLOWED_SENDERS=banksi.co.id` agar hanya email dari domain itu yang diterima.
+2. Jembatan termudah untuk Gmail: buka `script.google.com`, buat project baru, tempel isi
+   [`scripts/gmail-bsi.gs`](./scripts/gmail-bsi.gs), ganti `WEBHOOK_URL` dan `SECRET`, lalu jalankan
+   `pasangTrigger` sekali dan izinkan akses Gmail. Script memeriksa email BSI belum dibaca tiap 5 menit dan
+   meneruskannya ke webhook. Alternatif: Resend Inbound, Cloudflare Email Workers, Mailgun Routes, atau Zapier/Make.
 3. Body JSON yang dikenali:
 
    ```json
    {
      "id": "id-unik-email-ini",
-     "from": "noreply@bsimobile.example",
-     "subject": "Notifikasi Gaji Diterima",
-     "text": "Dana masuk Rp1.800.000 ke rekening Anda...",
+     "from": "noreply-crm@banksi.co.id",
+     "subject": "INCOMING TRANSACTION NOTIFICATION",
+     "text": "Nominal\n1,800,000.00\nJenis Transaksi\nPayroll",
+     "tanggal": "2026-10-31",
      "nominal": 1800000
    }
    ```
 
    - `id` wajib dan harus unik per email (dipakai untuk mencegah pencatatan ganda bila penyedia mengirim ulang).
-   - `nominal` opsional tapi **sangat disarankan** diisi langsung oleh penyedia (lebih akurat). Bila kosong, server
-     mencoba mengambil angka rupiah pertama dari `text`/`html` dengan heuristik sederhana (`Rp1.800.000`, `2.500.000`, dst).
-   - Tanggal yang dipakai selalu tanggal hari ini (WIB) saat email diproses, bukan tanggal di isi email.
+   - `nominal` opsional. Bila kosong, server membaca label `Nominal`/`Nominal Transaksi`/`Total`, lalu angka `Rp`,
+     lalu angka bergrup; mendukung `Rp 25.925,00` maupun `1,800,000.00`.
+   - `tanggal` opsional (`YYYY-MM-DD`). Bila kosong, server mencoba membaca tanggal dari isi email
+     (`31-OKT-26`, `5 November 2026`), lalu memakai tanggal hari ini (WIB).
 
-4. Uji dengan `curl`/Postman sebelum menyambungkan penyedia sungguhan, supaya format JSON dan heuristik nominal sudah
-   sesuai dengan contoh email BSI Syariah Anda yang sebenarnya.
-
-Catatan penting: parser nominal ini adalah heuristik umum, **belum disesuaikan dengan format email BSI Syariah yang
-sebenarnya** karena belum ada contoh email asli. Setelah menerima contoh (boleh dengan nominal/identitas disamarkan),
-sesuaikan `ekstrakNominalEmail` di `src/lib/email.ts` agar presisi, dan pertimbangkan mengirim `nominal` langsung dari
-penyedia forwarding bila formatnya mendukung ekstraksi di sisi mereka.
+4. Uji dengan `curl`/Postman sebelum menyambungkan penyedia sungguhan. Email yang sama boleh dikirim ulang:
+   `id` yang sama tidak dicatat dua kali.
 
 ## Dashboard web
 

@@ -5,7 +5,7 @@ import { extractDate, wibDate } from "@/lib/parse/date";
 import { rp, splitPesan } from "@/lib/format";
 import { validasiAi } from "@/lib/ai";
 import { validasiStruk } from "@/lib/ai-vision";
-import { ekstrakNominalEmail, kemungkinanGaji } from "@/lib/email";
+import { arahEmail, ekstrakNominalEmail, ekstrakTanggalEmail, kemungkinanGaji, labelEmail } from "@/lib/email";
 
 const v = (t: string) => {
   const r = parseAmount(t);
@@ -208,5 +208,26 @@ describe("parser email masuk (payroll)", () => {
     const transfer = "Transfer masuk dari ANDI sebesar Rp1.250.000 telah diterima di rekening Anda.";
     expect(ekstrakNominalEmail(transfer)).toBe(1_250_000);
     expect(kemungkinanGaji("Transfer Masuk", transfer)).toBe(false);
+  });
+
+  it("membaca nominal tabel incoming BSI tanpa Rp", () => {
+    const teks = "Nominal\n1,800,000.00\nDeskripsi\nSuccess";
+    expect(ekstrakNominalEmail(teks)).toBe(1_800_000);
+  });
+
+  it("membedakan email keluar QRIS dan email masuk payroll", () => {
+    const keluar = "Nominal Transaksi Rp 25.925,00\nNama Merchant\nTrijaya Digital";
+    expect(arahEmail("Transaksi Pembayaran QRIS MPM Kamu Berhasil", keluar)).toBe("keluar");
+    expect(labelEmail("Transaksi Pembayaran QRIS MPM Kamu Berhasil", keluar, "keluar")).toBe("Trijaya Digital");
+
+    const masuk = "Anda menerima transfer uang pada Rekening Anda.\nNominal\n1,800,000.00\nJenis Transaksi Payroll";
+    expect(arahEmail("INCOMING TRANSACTION NOTIFICATION", masuk)).toBe("gaji");
+    expect(ekstrakNominalEmail(masuk)).toBe(1_800_000);
+  });
+
+  it("mengambil tanggal transaksi dari isi email", () => {
+    expect(ekstrakTanggalEmail("Tanggal 31-OKT-26 21:16", "2026-11-05")).toBe("2026-10-31");
+    expect(ekstrakTanggalEmail("5 November 2026 20.41", "2026-11-05")).toBe("2026-11-05");
+    expect(ekstrakTanggalEmail("tanpa tanggal", "2026-11-05")).toBeNull();
   });
 });
