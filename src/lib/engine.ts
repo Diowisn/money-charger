@@ -15,6 +15,9 @@ export function parseConfig(m: Record<string, string>): Config {
     persenJajan: n("persen_jajan", 50),
     gajiPokok: n("gaji_pokok", 1_800_000),
     bonusSubPostId: m.bonus_subpos_id ? Number(m.bonus_subpos_id) : null,
+    // Bawaan aktif agar perilaku lama tetap jalan; "ai off" mencabut izin.
+    aiAktif: m.ai_aktif !== "0",
+    aiKonfirmasi: m.ai_konfirmasi !== "0",
   };
 }
 

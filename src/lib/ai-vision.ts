@@ -67,7 +67,7 @@ Jika nominal total tidak terlihat jelas, intent harus "tidak_jelas".`;
 export function buatGroqVisionClient(env: NodeJS.ProcessEnv = process.env): VisionClient | null {
   const key = env.GROQ_API_KEY;
   if (!key) return null;
-  const model = env.GROQ_VISION_MODEL || "meta-llama/llama-4-scout-17b-16e-instruct";
+  const model = env.GROQ_VISION_MODEL || "qwen/qwen3.8-27b";
 
   async function sekali(
     b64: string,

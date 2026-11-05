@@ -585,12 +585,39 @@ describe("AI cadangan (AC-12 sebagian, AC-13, AC-14)", () => {
   beforeEach(mulaiPeriode1);
   const ok = (raw: AiRaw): AiClient => ({ parse: async () => raw });
 
-  it("bahasa bebas dibaca AI, ditandai (dibaca AI), dan angka tetap dihitung parser", async () => {
+  it("bahasa bebas dibaca AI, ditampilkan sebagai pratinjau, lalu dicatat setelah ya", async () => {
     ai = ok({ intent: "out", amount_text: "25rb", sub_pos: "Jajan / Kopi / Self-Reward", label: "kopi" });
-    const r = await kirim("tadi beli kopi 25rb pakai gopay", "2026-11-02");
+    const pratinjau = await kirim("tadi beli kopi 25rb pakai gopay", "2026-11-02");
+    expect(pratinjau).toContain("Pratinjau AI (belum dicatat)");
+    expect(pratinjau).toContain("pengeluaran Rp25.000");
+    expect(pratinjau).toContain("Jajan / Kopi / Self-Reward");
+    expect((await repo.load()).txs.filter((t) => t.tipe === "out")).toHaveLength(0);
+
+    const r = await kirim("ya", "2026-11-02");
     expect(r).toContain("Tercatat (dibaca AI): Rp25.000, Jajan / Kopi / Self-Reward.");
     expect(r).toContain('Salah? Ketik "hapus terakhir".');
     expect((await repo.load()).txs.at(-1)?.sumber).toBe("ai");
+  });
+
+  it("pratinjau AI bisa dibatalkan tanpa mengubah data", async () => {
+    ai = ok({ intent: "out", amount_text: "25rb", sub_pos: "Jajan / Kopi / Self-Reward" });
+    expect(await kirim("tadi beli kopi 25rb", "2026-11-02")).toContain("Pratinjau AI");
+    expect(await kirim("batal", "2026-11-02")).toContain("Dibatalkan");
+    expect((await repo.load()).txs.filter((t) => t.tipe === "out")).toHaveLength(0);
+  });
+
+  it("ai off menghentikan pengiriman ke provider AI", async () => {
+    expect(await kirim("ai off", "2026-11-02")).toContain("AI dinonaktifkan");
+    let dipanggil = false;
+    ai = {
+      parse: async () => {
+        dipanggil = true;
+        throw new Error("tidak boleh dipanggil");
+      },
+    };
+    expect(await kirim("tadi beli kopi 25rb", "2026-11-02")).toContain("AI sedang nonaktif");
+    expect(dipanggil).toBe(false);
+    expect(await kirim("ai on", "2026-11-02")).toContain("AI diaktifkan");
   });
 
   it("AC-13: nominal AI yang tidak ada di pesan ditolak, bot minta format kaku", async () => {
@@ -624,9 +651,10 @@ describe("AI cadangan (AC-12 sebagian, AC-13, AC-14)", () => {
     expect((await wadah()).tabungan).toBe(400_000);
   });
 
-  it("AI tanpa sub_pos valid -> belum dipetakan dan ditanya", async () => {
+  it("AI tanpa sub_pos valid -> belum dipetakan dan ditanya setelah ya", async () => {
     ai = ok({ intent: "out", amount_text: "25rb", sub_pos: null });
-    expect(await kirim("tadi beli sesuatu 25rb", "2026-11-02")).toContain("untuk apa?");
+    expect(await kirim("tadi beli sesuatu 25rb", "2026-11-02")).toContain("Pratinjau AI");
+    expect(await kirim("ya", "2026-11-02")).toContain("untuk apa?");
   });
 });
 

@@ -1,9 +1,18 @@
+import { batasi, ipDariRequest } from "@/lib/rate-limit";
 import { masuk, sudahDikonfigurasi } from "./model";
 import { loginBerhasil, loginGagal, logoutBerhasil } from "./view";
 
 export async function login(req: Request) {
   if (!sudahDikonfigurasi()) {
     return loginGagal("DASHBOARD_PASSWORD belum diatur di server.", 503);
+  }
+
+  const batas = batasi(`login:${ipDariRequest(req)}`, 5, 15 * 60_000);
+  if (!batas.boleh) {
+    return loginGagal(
+      `Terlalu banyak percobaan login. Coba lagi dalam ${batas.detikTunggu} detik.`,
+      429,
+    );
   }
 
   let password = "";

@@ -6,9 +6,9 @@ export async function terimaEmail(req: NextRequest) {
   if (!emailDikonfigurasi()) {
     return emailGagal("EMAIL_INBOUND_SECRET belum diatur di server.", 503);
   }
+  // Hanya lewat header: secret di query string mudah bocor ke log/proxy.
   const header = req.headers.get("x-email-secret");
-  const query = req.nextUrl.searchParams.get("secret");
-  if (!verifikasiRahasiaEmail(header ?? query)) {
+  if (!verifikasiRahasiaEmail(header)) {
     return emailGagal("Rahasia email tidak cocok.", 401);
   }
 

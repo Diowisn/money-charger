@@ -65,11 +65,24 @@ export interface AiClient {
 
 const SISTEM = `Kamu mengubah satu pesan catatan keuangan pribadi berbahasa Indonesia menjadi JSON.
 Balas HANYA dengan satu objek JSON berisi kunci:
-- "intent": "out" (pengeluaran), "in" (pemasukan lain), "bonus", "gaji", atau "tidak_jelas"
+- "intent": "out", "in", "bonus", "gaji", atau "tidak_jelas"
+  * "out" = pengeluaran/pembayaran, termasuk top up e-wallet, isi pulsa, dan bayar tagihan.
+  * "in" = uang masuk selain gaji/bonus, termasuk transfer masuk, cashback, komisi, undian,
+    bunga bank, penjualan barang, dan pembayaran utang orang ke kita.
+  * "bonus" HANYA bila pesan menyebut kata "bonus" secara eksplisit.
+  * "gaji" HANYA untuk gaji/upah/payroll dari pekerjaan.
+  * "tidak_jelas" bila bukan transaksi keuangan atau nominal tidak ada.
 - "amount_text": potongan teks nominal PERSIS seperti tertulis di pesan (jangan diubah, jangan dihitung)
 - "sub_pos": salah satu nama dari daftar yang diberikan PERSIS, atau null bila tidak yakin
-- "tanggal_text": potongan teks tanggal persis dari pesan (mis. "kemarin", "tgl 20"), atau null
+- "tanggal_text": potongan teks tanggal persis dari pesan bila ada tanggal yang didukung
+  ("kemarin", "kemarin lusa", "tgl 20", "17/10"). Untuk kata seperti "tadi"/"barusan", isi null.
+  Jangan mengarang tanggal.
 - "label": uraian singkat, atau null
+Contoh arah uang:
+- "Andi bayar utang 200rb" = Andi mengembalikan utang ke kita -> intent "in".
+- "bayar utang Andi 200rb" = kita membayar utang ke Andi -> intent "out".
+- "top up e-wallet 100rb" -> intent "out".
+- "bonus 200rb" -> intent "bonus".
 Jangan menebak nominal. Jika nominal tidak ada di pesan, intent = "tidak_jelas".`;
 
 export function buatGroqClient(env: NodeJS.ProcessEnv = process.env): AiClient | null {

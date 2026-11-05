@@ -4,8 +4,15 @@ import { responsHealth } from "./view";
 
 export async function health(req: NextRequest) {
   const kunci = tokenHealth();
-  if (kunci && req.nextUrl.searchParams.get("token") !== kunci) {
+  const data = await periksaKesiapan();
+  if (!kunci) {
+    // Tanpa HEALTH_TOKEN jangan bocorkan nama env, host, atau jumlah data.
+    return responsHealth({ ok: data.ok, waktu: data.waktu });
+  }
+  const bearer = req.headers.get("authorization")?.replace(/^Bearer\s+/i, "").trim();
+  const kunciDikirim = req.headers.get("x-health-token")?.trim() || bearer;
+  if (kunciDikirim !== kunci) {
     return Response.json({ ok: false, error: "unauthorized" }, { status: 401 });
   }
-  return responsHealth(await periksaKesiapan());
+  return responsHealth(data);
 }

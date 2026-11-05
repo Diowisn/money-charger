@@ -57,6 +57,10 @@ export function extractDate(teks: string, today: string): DateResult {
   m = /\bkemarin\b/.exec(low);
   if (m) return hasil(hapus(m), addDays(today, -1));
 
+  // "tadi"/"barusan" berarti hari ini; jangan sampai gagal validasi hanya karena kata ini.
+  m = /\b(?:tadi|barusan|baru saja|baru aja)\b/.exec(low);
+  if (m) return hasil(hapus(m), today);
+
   // tgl 17/10, tanggal 17/10/2026, atau 17/10 saja
   m = /(?:\b(?:tgl|tanggal)\.?\s*)?\b(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?\b/.exec(low);
   if (m) {

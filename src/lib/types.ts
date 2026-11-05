@@ -102,6 +102,10 @@ export interface Config {
   persenJajan: number;
   gajiPokok: number;
   bonusSubPostId: number | null;
+  /** Izin mengirim isi pesan ke provider AI (bisa dicabut dengan "ai off"). */
+  aiAktif: boolean;
+  /** Tampilkan pratinjau dan minta "ya" sebelum transaksi hasil AI dicatat. */
+  aiKonfirmasi: boolean;
 }
 
 export type DebtJenis = "piutang" | "utang";

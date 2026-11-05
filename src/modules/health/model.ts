@@ -10,6 +10,8 @@ const SEMUA_VARS = [
   "GROQ_API_KEY",
   "DASHBOARD_PASSWORD",
   "AUTH_SECRET",
+  "HEALTH_TOKEN",
+  "EMAIL_INBOUND_SECRET",
 ] as const;
 
 const TABEL = [
@@ -23,6 +25,8 @@ const TABEL = [
   "pending_actions",
   "inbound_messages",
   "config",
+  "debts",
+  "saving_goals",
 ] as const;
 
 function hostDari(url: string | undefined): string | null {
@@ -51,6 +55,8 @@ export async function periksaKesiapan() {
   if (!env.ALLOWED_NUMBERS) peringatan.push("ALLOWED_NUMBERS kosong (hanya dipakai saat db:setup).");
   if (!env.APP_BASE_URL) peringatan.push("APP_BASE_URL kosong; perintah ekspor tidak bisa membuat tautan.");
   if (!env.DASHBOARD_PASSWORD) peringatan.push("DASHBOARD_PASSWORD kosong; dashboard web menolak login.");
+  if (!env.HEALTH_TOKEN) peringatan.push("HEALTH_TOKEN kosong; endpoint /api/health hanya menampilkan status ringkas.");
+  if (!env.EMAIL_INBOUND_SECRET) peringatan.push("EMAIL_INBOUND_SECRET kosong; webhook email menolak semua permintaan.");
 
   const db: Record<string, unknown> = {
     tersambung: false,
@@ -80,7 +86,9 @@ export async function periksaKesiapan() {
              (SELECT COUNT(*) FROM groups)::int AS grup,
              (SELECT COUNT(*) FROM plan_versions)::int AS rencana,
              (SELECT COUNT(*) FROM transactions)::int AS transaksi,
-             (SELECT COUNT(*) FROM inbound_messages)::int AS pesan_masuk`,
+             (SELECT COUNT(*) FROM inbound_messages)::int AS pesan_masuk,
+             (SELECT COUNT(*) FROM debts WHERE status = 'aktif')::int AS utang_piutang_aktif,
+             (SELECT COUNT(*) FROM saving_goals WHERE status = 'aktif')::int AS target_aktif`,
         );
         db.jumlah = hitung.rows[0];
       }

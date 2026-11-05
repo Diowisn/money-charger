@@ -58,9 +58,13 @@ Struktur ini **belum** menjadikan aplikasi multi-pelanggan: autentikasi, whiteli
 3. Model awal `openai/gpt-oss-20b`. Ganti lewat `GROQ_MODEL` bila akurasinya kurang.
 4. Bot tetap jalan tanpa Groq (`GROQ_API_KEY` kosong): kalimat bebas dibalas permintaan format kaku.
 5. Key Groq yang sama juga dipakai untuk membaca **foto struk/screenshot transaksi** yang dikirim ke bot
-   (model vision diatur lewat `GROQ_VISION_MODEL`, default `meta-llama/llama-4-scout-17b-16e-instruct`).
+   (model vision diatur lewat `GROQ_VISION_MODEL`, default `qwen/qwen3.8-27b`; Llama 4 Scout tidak tersedia
+   di akun Groq gratis saat uji).
    Tanpa `GROQ_API_KEY`, foto dibalas permintaan catat manual seperti pesan teks lainnya.
-6. Tab **Asisten** di dashboard memakai key yang sama untuk tanya jawab keuangan (`GROQ_INSIGHT_MODEL`,
+6. Isi pesan bebas dikirim ke Groq hanya bila AI aktif. Ketik `ai off` untuk mencabut izin, `ai on` untuk
+   mengaktifkan lagi. Dengan `ai konfirmasi on` (bawaan), hasil AI ditampilkan sebagai pratinjau dan baru
+   dicatat setelah balasan `ya`; `ai konfirmasi off` mengembalikan pencatatan langsung.
+7. Tab **Asisten** di dashboard memakai key yang sama untuk tanya jawab keuangan (`GROQ_INSIGHT_MODEL`,
    default mengikuti `GROQ_MODEL`). AI hanya menerima ringkasan agregat dashboard, bukan nomor telepon atau data mentah.
 
 ### 3. Meta WhatsApp Cloud API
@@ -109,7 +113,7 @@ Contoh berikut hanya format pengisian. Ganti semua nilai bertanda `GANTI_...` de
 | `GROQ_MODEL` | `openai/gpt-oss-20b` |
 | `DASHBOARD_PASSWORD` | password kuat untuk login dashboard web |
 | `AUTH_SECRET` | opsional; string acak panjang untuk menandatangani cookie sesi |
-| `HEALTH_TOKEN` | opsional; bila diisi, `/api/health` hanya bisa dibuka dengan `?token=<nilai ini>` |
+| `HEALTH_TOKEN` | opsional; bila diisi, detail `/api/health` hanya bisa dibuka dengan header `X-Health-Token` atau `Authorization: Bearer <nilai ini>` |
 
 Di halaman Webhooks Meta, gunakan:
 
@@ -121,7 +125,7 @@ Nomor telepon, token, dan App Secret harus berasal dari aset Meta yang benar-ben
 
 ### 5b. Diagnosa setelah deploy
 
-Buka `https://<domain-vercel-anda>/api/health` (tambahkan `?token=<HEALTH_TOKEN>` bila variabel itu diisi). Endpoint ini hanya melaporkan **ada/tidaknya** variabel, tanpa menampilkan nilainya, ditambah status koneksi Neon.
+Buka `https://<domain-vercel-anda>/api/health` (kirim header `X-Health-Token: <HEALTH_TOKEN>` bila variabel itu diisi). Tanpa `HEALTH_TOKEN`, endpoint hanya mengembalikan `{ ok, waktu }`. Dengan token, endpoint melaporkan **ada/tidaknya** variabel (tanpa nilainya) dan status koneksi Neon.
 
 Contoh bila belum lengkap:
 
@@ -143,7 +147,8 @@ Arti hasil penting:
 - `jumlah.nomor_aktif: 0` → jalankan `npm run db:setup` lagi setelah mengisi `ALLOWED_NUMBERS`.
 - `ok: true` berarti konfigurasi dasar, DB, dan whitelist siap; lanjut verifikasi webhook di Meta.
 
-Endpoint ini publik untuk memudahkan diagnosa. Isi `HEALTH_TOKEN` bila tidak ingin hasilnya dapat dibaca orang lain.
+Tanpa `HEALTH_TOKEN`, endpoint ini hanya memberi status ringkas. Isi `HEALTH_TOKEN` untuk
+melihat detail diagnosa; detail hanya bisa dibaca dengan header token.
 
 #### Contoh panggilan WhatsApp Cloud API (PowerShell)
 
@@ -182,8 +187,8 @@ atau Zapier/Make yang membaca email lalu memanggil webhook ini).
 
 1. Isi `EMAIL_INBOUND_SECRET` dengan string acak panjang di `.env.local` dan di Vercel, lalu redeploy.
 2. Konfigurasikan penyedia forwarding email Anda untuk meneruskan email BSI Syariah payroll ke endpoint ini sebagai
-   `POST https://<domain-vercel-anda>/api/email/inbound`, dengan header `X-Email-Secret: <EMAIL_INBOUND_SECRET>`
-   (atau query `?secret=<EMAIL_INBOUND_SECRET>` bila penyedia tidak bisa mengatur header kustom).
+   `POST https://<domain-vercel-anda>/api/email/inbound`, dengan header `X-Email-Secret: <EMAIL_INBOUND_SECRET>`.
+   Secret lewat query string tidak lagi diterima agar tidak bocor ke log/proxy.
 3. Body JSON yang dikenali:
 
    ```json
@@ -224,7 +229,8 @@ Isi dashboard:
 - **Tren pengeluaran**: grafik batang 14 hari terakhir di Ringkasan, lengkap dengan total, rata-rata, dan hari tertinggi.
 - **Asisten**: tanya jawab bebas tentang kondisi keuangan (pos paling boros, sisa uang, saran menabung) yang dijawab dari data dashboard, bukan tebakan.
 
-Perubahan dari web dan WhatsApp memakai database yang sama. Dashboard menyegarkan data otomatis setiap 5 detik dan saat tab kembali aktif/fokus, jadi transaksi dari WhatsApp muncul tanpa hard reload. Respons dashboard memakai `no-store` agar tidak tertahan cache browser/CDN. Semua API dashboard wajib login; `/api/health` tetap publik untuk diagnosa.
+Perubahan dari web dan WhatsApp memakai database yang sama. Dashboard menyegarkan data otomatis setiap 5 detik dan saat tab kembali aktif/fokus, jadi transaksi dari WhatsApp muncul tanpa hard reload. Respons dashboard memakai `no-store` agar tidak tertahan cache browser/CDN. Semua API dashboard wajib login; `/api/health` hanya
+memberi status ringkas tanpa `HEALTH_TOKEN`.
 
 Saat deploy, tambahkan `DASHBOARD_PASSWORD` (dan `AUTH_SECRET` bila dipakai) di Vercel, lalu redeploy. Tanpa itu halaman login akan menampilkan pesan bahwa password belum diatur.
 
@@ -251,8 +257,12 @@ Hal ini belum bisa diverifikasi dari sandbox dan juga ditandai terbuka di SRS ba
 1. **Batas waktu fungsi Vercel gratis.** Webhook menyelesaikan semuanya (termasuk Groq sampai 20 detik) dalam satu permintaan, dan `maxDuration` diset 30. Kalau paket Anda membatasi lebih pendek, pesan format kaku tetap aman, tetapi pesan lewat AI bisa terpotong. Meta lalu mengirim ulang dan pencatatan ganda dicegah oleh ID pesan.
 2. **Verifikasi bisnis Meta** untuk pemakaian pribadi, dan apakah SIM cadangan bisa menerima OTP.
 3. **Backup.** Neon punya pemulihan bawaan (cek jendela waktunya di paket gratis). Cadangan tambahan: ketik `ekspor` berkala dan simpan CSV-nya.
-4. **Akurasi Groq untuk bahasa Indonesia** (AC-12): uji dengan 50 kalimat sebelum percaya penuh. Setiap catatan hasil AI selalu ditandai "(dibaca AI)" dan bisa dibatalkan dengan `hapus terakhir`.
-5. Versi API Meta di `WA_API_VERSION` (bawaan `v25.0`): samakan dengan versi yang didukung dan ditampilkan di Meta.
+4. **Akurasi Groq untuk bahasa Indonesia** (AC-12): uji dengan 50 kalimat sebelum percaya penuh. 
+Setiap catatan hasil AI selalu ditandai "(dibaca AI)" dan bisa dibatalkan dengan `hapus terakhir`.
+   Dengan pratinjau (`ai konfirmasi on`, bawaan), catatan baru dibuat setelah balasan `ya`.
+5. **Kuota Groq gratis** saat uji: 8.000 token/menit. Foto struk memakai ~1.900 token, jadi beberapa
+   foto/pertanyaan beruntun bisa kena 429. Bot otomatis jatuh ke format kaku; tunggu sebentar lalu ulangi.
+6. Versi API Meta di `WA_API_VERSION` (bawaan `v25.0`): samakan dengan versi yang didukung dan ditampilkan di Meta.
 
 ## Catatan perilaku yang perlu diketahui
 

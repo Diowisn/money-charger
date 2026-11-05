@@ -113,6 +113,8 @@ export const TEKS_BANTUAN = [
   "- target  (lihat daftar target tabungan aktif)",
   "- nabung 100rb Laptop Baru  (tambah tabungan ke target itu)",
   "- ekspor  (tautan CSV)",
+  "- ai | ai on | ai off  (status/izin kirim pesan ke AI)",
+  "- ai konfirmasi on | off  (pratinjau sebelum dicatat)",
   "- ya | batal | setuju | tolak  (jawaban konfirmasi)",
   "Kalimat bebas seperti \"tadi beli kopi 25rb\" juga dicoba dibaca AI.",
 ].join("\n");

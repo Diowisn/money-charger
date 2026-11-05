@@ -205,6 +205,7 @@ class Sesi {
       case "laporan_periode": return teksLaporanPeriode(this.state);
       case "evaluasi": return this.evaluasiManual();
       case "ekspor": return this.ekspor();
+      case "ai": return this.aturAi(cmd.aksi);
       case "bebas": return this.bebas(teks);
     }
   }
@@ -558,7 +559,7 @@ class Sesi {
   }
 
   private async konfirmasi(jawab: "ya" | "batal"): Promise<string> {
-    const p = await this.r.getPending(["gaji_ganda", "hapus_gaji"]);
+    const p = await this.r.getPending(["gaji_ganda", "hapus_gaji", "ai_preview"]);
     if (!p) return "Tidak ada aksi yang menunggu konfirmasi.";
     if (p.kedaluwarsaPada < this.nowMs) {
       await this.r.resolvePending(p.id, "kedaluwarsa");
@@ -566,9 +567,19 @@ class Sesi {
     }
     if (jawab === "batal") {
       await this.r.resolvePending(p.id, "batal");
-      return "Dibatalkan. Data tidak berubah.";
+      return p.jenis === "ai_preview" ? "Dibatalkan. Tidak ada yang dicatat." : "Dibatalkan. Data tidak berubah.";
     }
     await this.r.resolvePending(p.id, "selesai");
+    if (p.jenis === "ai_preview") {
+      const intent = String(p.payload.intent);
+      const nominal = Number(p.payload.nominal);
+      const label = String(p.payload.label ?? "");
+      const tanggal = String(p.payload.tanggal);
+      const subPostId = p.payload.subPostId === null ? null : Number(p.payload.subPostId);
+      if (intent === "out") return this.catatOut({ nominal, uraian: label, tanggal, sumber: "ai", subPostId });
+      if (intent === "in") return this.catatIn(nominal, label, "saldo", tanggal, "ai");
+      return this.bonus(nominal, null, "ai");
+    }
     if (p.jenis === "gaji_ganda") {
       return this.gaji(Number(p.payload.nominal), String(p.payload.tanggal), true);
     }
@@ -875,6 +886,31 @@ class Sesi {
     return `Unduh semua transaksi (CSV). Tautan berlaku 15 menit dan hanya bisa dipakai sekali:\n${this.deps.baseUrl.replace(/\/$/, "")}/api/export?t=${token}`;
   }
 
+  // ---------- izin AI ----------
+
+  private async aturAi(aksi: "status" | "on" | "off" | "konfirmasi_on" | "konfirmasi_off"): Promise<string> {
+    const c = this.state.config;
+    if (aksi === "status") {
+      return [
+        `AI: ${c.aiAktif ? "aktif" : "nonaktif"}. Pratinjau sebelum dicatat: ${c.aiKonfirmasi ? "aktif" : "nonaktif"}.`,
+        `Izin hanya berlaku untuk kalimat bebas dan foto; perintah kaku tetap diproses lokal.`,
+        `Ubah: "ai on", "ai off", "ai konfirmasi on", "ai konfirmasi off".`,
+      ].join("\n");
+    }
+    if (aksi === "on" && !this.deps.ai) {
+      return "GROQ_API_KEY belum diatur, jadi AI belum bisa dipakai. Perintah kaku tetap berfungsi.";
+    }
+    if (aksi === "on") await this.r.setConfig("ai_aktif", "1");
+    if (aksi === "off") await this.r.setConfig("ai_aktif", "0");
+    if (aksi === "konfirmasi_on") await this.r.setConfig("ai_konfirmasi", "1");
+    if (aksi === "konfirmasi_off") await this.r.setConfig("ai_konfirmasi", "0");
+    await this.muat();
+    if (aksi === "on") return "AI diaktifkan. Kalimat bebas akan dikirim ke provider AI saat dipakai.";
+    if (aksi === "off") return "AI dinonaktifkan. Tidak ada pesan yang dikirim ke provider AI; gunakan perintah kaku.";
+    if (aksi === "konfirmasi_on") return "Pratinjau AI diaktifkan. Transaksi hasil AI dicatat setelah kamu balas \"ya\".";
+    return "Pratinjau AI dimatikan. Transaksi hasil AI langsung dicatat dan ditandai (dibaca AI).";
+  }
+
   // ---------- bahasa bebas ----------
 
   private async bebas(teks: string): Promise<string> {
@@ -909,6 +945,9 @@ class Sesi {
     }
 
     if (!this.deps.ai) return TEKS_FALLBACK_KAKU;
+    if (!this.state.config.aiAktif) {
+      return 'AI sedang nonaktif, jadi kalimat bebas tidak dikirim ke provider. Ketik "ai on" untuk mengaktifkan, atau pakai perintah kaku seperti "out 25rb kopi".';
+    }
     const nama = this.state.subPosts.filter((s) => s.aktif).map((s) => s.nama);
     const raw = await this.deps.ai.parse(teks, nama); // hanya teks pesan + nama sub-pos (FR-74)
     const v = validasiAi(raw, teks, nama, this.today);
@@ -917,10 +956,26 @@ class Sesi {
     }
     const h = v.hasil;
     const tanggal = h.tanggal ?? this.today;
-    if (h.intent === "out") {
-      const subId = h.subPos ? this.state.subPosts.find((s) => s.nama === h.subPos)?.id ?? null : null;
-      return this.catatOut({ nominal: h.nominal, uraian: h.label ?? "", tanggal, sumber: "ai", subPostId: subId });
+    const subId = h.subPos ? this.state.subPosts.find((s) => s.nama === h.subPos)?.id ?? null : null;
+
+    if (this.state.config.aiKonfirmasi) {
+      await this.r.addPending(
+        "ai_preview",
+        { intent: h.intent, nominal: h.nominal, label: h.label ?? "", tanggal, subPostId: subId },
+        this.nowMs + KONFIRMASI_MS,
+      );
+      const jenis = h.intent === "out" ? "pengeluaran" : h.intent === "in" ? "pemasukan" : "bonus";
+      const pos = subId ? this.state.subPosts.find((s) => s.id === subId)?.nama : null;
+      const rincian = [
+        `${jenis} ${rp(h.nominal)}`,
+        tanggal === this.today ? "hari ini" : `tgl ${tglPendek(tanggal)}`,
+        h.label ? `"${h.label}"` : null,
+        pos ? `pos ${pos}` : h.intent === "out" ? "pos belum dipetakan" : null,
+      ].filter(Boolean).join(", ");
+      return `Pratinjau AI (belum dicatat): ${rincian}. Balas "ya" untuk mencatat atau "batal" untuk membatalkan.`;
     }
+
+    if (h.intent === "out") return this.catatOut({ nominal: h.nominal, uraian: h.label ?? "", tanggal, sumber: "ai", subPostId: subId });
     if (h.intent === "in") return this.catatIn(h.nominal, h.label ?? "", "saldo", tanggal, "ai");
     return this.bonus(h.nominal, null, "ai");
   }

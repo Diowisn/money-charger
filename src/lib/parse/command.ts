@@ -25,6 +25,7 @@ export type Cmd =
   | { k: "goal_add"; nominal: number; nama: string; targetTanggal: string | null }
   | { k: "goal_list" }
   | { k: "goal_save"; nama: string; nominal: number }
+  | { k: "ai"; aksi: "status" | "on" | "off" | "konfirmasi_on" | "konfirmasi_off" }
   | { k: "error"; pesan: string }
   | { k: "bebas" };
 
@@ -41,11 +42,12 @@ const SATU_KATA: Record<string, Cmd> = {
   piutang: { k: "debt_list", jenis: "piutang" },
   utang: { k: "debt_list", jenis: "utang" },
   target: { k: "goal_list" },
+  ai: { k: "ai", aksi: "status" },
 };
 
 const AWAL_PERINTAH = new Set([
   "out", "in", "gaji", "bonus", "koreksi", "set", "geser", "pos", "tarik", "pindah", "sisa", "setup",
-  "piutang", "utang", "lunasi", "bayar", "target", "nabung",
+  "piutang", "utang", "lunasi", "bayar", "target", "nabung", "ai",
 ]);
 
 const CONTOH: Record<string, string> = {
@@ -106,6 +108,15 @@ export function parseCommand(raw: string, today: string): Cmd {
   const sisaLow = sisa.toLowerCase();
 
   switch (kata) {
+    case "ai": {
+      if (sisaLow === "on") return { k: "ai", aksi: "on" };
+      if (sisaLow === "off") return { k: "ai", aksi: "off" };
+      if (sisaLow === "status") return { k: "ai", aksi: "status" };
+      if (sisaLow === "konfirmasi on") return { k: "ai", aksi: "konfirmasi_on" };
+      if (sisaLow === "konfirmasi off") return { k: "ai", aksi: "konfirmasi_off" };
+      return salah('Format AI: "ai", "ai on", "ai off", "ai konfirmasi on", atau "ai konfirmasi off".');
+    }
+
     case "out": {
       const admin = pisahBiayaAdmin(sisa);
       if (admin.error) return salah(admin.error);

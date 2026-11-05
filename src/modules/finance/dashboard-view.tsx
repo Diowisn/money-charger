@@ -875,8 +875,26 @@ function Transaksi({
   const [wadahAsal, setWadahAsal] = useState("tabungan");
   const [wadahTujuan, setWadahTujuan] = useState("saldo");
   const [paksa, setPaksa] = useState(false);
+  const [filterTipe, setFilterTipe] = useState("semua");
+  const [cari, setCari] = useState("");
+  const [halaman, setHalaman] = useState(1);
 
   const posAktif = data.posSemua.filter((p) => p.aktif);
+  const PER_HALAMAN = 10;
+
+  const tersaring = useMemo(() => {
+    const q = cari.trim().toLowerCase();
+    return data.transaksi.filter((t) => {
+      if (filterTipe !== "semua" && t.tipe !== filterTipe) return false;
+      if (!q) return true;
+      const isi = `${t.subPost ?? ""} ${t.label ?? ""} ${t.tanggal} ${t.wadahTujuan ?? ""} ${t.wadahAsal ?? ""}`;
+      return isi.toLowerCase().includes(q);
+    });
+  }, [data.transaksi, filterTipe, cari]);
+
+  const totalHalaman = Math.max(1, Math.ceil(tersaring.length / PER_HALAMAN));
+  const halamanAman = Math.min(halaman, totalHalaman);
+  const tampil = tersaring.slice((halamanAman - 1) * PER_HALAMAN, halamanAman * PER_HALAMAN);
 
   async function simpan() {
     const body: Record<string, unknown> = { tipe, nominal: Number(nominal), tanggal, label: label || null };
@@ -1037,10 +1055,41 @@ function Transaksi({
       <section className="kartu">
         <div className="baris-antara">
           <h2>Riwayat</h2>
-          <span className="muted kecil">{data.transaksi.length} catatan terakhir</span>
+          <span className="muted kecil">
+            {tersaring.length} dari {data.transaksi.length} catatan
+          </span>
+        </div>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
+          <label className="muted kecil">
+            Jenis{" "}
+            <select
+              value={filterTipe}
+              onChange={(e) => {
+                setFilterTipe(e.target.value);
+                setHalaman(1);
+              }}
+            >
+              <option value="semua">Semua</option>
+              <option value="out">Pengeluaran</option>
+              <option value="in">Pemasukan</option>
+              <option value="gaji">Gaji</option>
+              <option value="bonus">Bonus</option>
+              <option value="tarik">Tarik</option>
+              <option value="pindah">Pindah</option>
+            </select>
+          </label>
+          <input
+            value={cari}
+            onChange={(e) => {
+              setCari(e.target.value);
+              setHalaman(1);
+            }}
+            placeholder="Cari pos, catatan, atau tanggal..."
+            style={{ flex: 1, minWidth: 180 }}
+          />
         </div>
         <ul className="daftar-transaksi">
-          {data.transaksi.map((t) => (
+          {tampil.map((t) => (
             <li key={t.id} className={t.status === "batal" ? "batal" : undefined}>
               <div className="transaksi-kiri">
                 <span className={`badge tipe-${t.tipe}`}>{NAMA_TIPE[t.tipe] ?? t.tipe}</span>
@@ -1072,8 +1121,27 @@ function Transaksi({
               </div>
             </li>
           ))}
-          {!data.transaksi.length ? <li className="kosong">Belum ada transaksi.</li> : null}
+          {!tersaring.length ? (
+            <li className="kosong">{data.transaksi.length ? "Tidak ada catatan yang cocok." : "Belum ada transaksi."}</li>
+          ) : null}
         </ul>
+        {totalHalaman > 1 ? (
+          <div className="baris-antara" style={{ marginTop: 12 }}>
+            <button type="button" onClick={() => setHalaman((h) => Math.max(1, h - 1))} disabled={halamanAman <= 1}>
+              Sebelumnya
+            </button>
+            <span className="muted kecil">
+              Halaman {halamanAman} dari {totalHalaman}
+            </span>
+            <button
+              type="button"
+              onClick={() => setHalaman((h) => Math.min(totalHalaman, h + 1))}
+              disabled={halamanAman >= totalHalaman}
+            >
+              Berikutnya
+            </button>
+          </div>
+        ) : null}
       </section>
     </div>
   );

@@ -199,4 +199,14 @@ describe("parser email masuk (payroll)", () => {
     expect(kemungkinanGaji("", "Payroll telah dikirim ke rekening Anda")).toBe(true);
     expect(kemungkinanGaji("Transfer Masuk", "Dana masuk Rp500.000")).toBe(false);
   });
+
+  it("contoh notifikasi BSI Syariah: gaji vs transfer masuk", () => {
+    const gaji = "Yth. Nasabah, gaji payroll bulan November telah dikreditkan sebesar Rp8.500.000 ke rekening Anda.";
+    expect(ekstrakNominalEmail(gaji)).toBe(8_500_000);
+    expect(kemungkinanGaji("Notifikasi Payroll BSI", gaji)).toBe(true);
+
+    const transfer = "Transfer masuk dari ANDI sebesar Rp1.250.000 telah diterima di rekening Anda.";
+    expect(ekstrakNominalEmail(transfer)).toBe(1_250_000);
+    expect(kemungkinanGaji("Transfer Masuk", transfer)).toBe(false);
+  });
 });
