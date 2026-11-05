@@ -10,7 +10,7 @@ import {
   totalJatahSubPos,
   totalPlan,
 } from "./engine";
-import { diffDays } from "./parse/date";
+import { addDays, diffDays } from "./parse/date";
 import { TURUNAN, type State, type Tx, type TxTipe, type Wadah } from "./types";
 
 export interface PosView {
@@ -76,6 +76,11 @@ export interface GoalView {
   lewatTempo: boolean;
 }
 
+export interface TrenHari {
+  tanggal: string;
+  pengeluaran: number;
+}
+
 export interface DashboardData {
   hariIni: string;
   periode: {
@@ -106,6 +111,7 @@ export interface DashboardData {
     goalTargetAktif: number;
   };
   grup: GrupView[];
+  tren: TrenHari[];
   piutang: DebtView[];
   goals: GoalView[];
   posLain: { dd: number; tabungan: number; investasi: number; ddSisa: number };
@@ -145,6 +151,26 @@ function ringkasTx(state: State, t: Tx): TxView {
     status: t.status,
     bisaDihapus: t.status === "berlaku" && !TURUNAN.has(t.tipe),
   };
+}
+
+/**
+ * Pengeluaran harian (termasuk biaya admin) untuk `jumlahHari` hari terakhir
+ * sampai hariIni, diurutkan dari yang paling lama. Transaksi batal tidak dihitung.
+ */
+export function hitungTrenPengeluaran(state: State, hariIni: string, jumlahHari = 14): TrenHari[] {
+  const mulai = addDays(hariIni, -(jumlahHari - 1));
+  const perHari = new Map<string, number>();
+  for (const t of state.txs) {
+    if (t.status !== "berlaku" || t.tipe !== "out") continue;
+    if (t.tanggal < mulai || t.tanggal > hariIni) continue;
+    perHari.set(t.tanggal, (perHari.get(t.tanggal) ?? 0) + nominalKeluar(t));
+  }
+  const hasil: TrenHari[] = [];
+  for (let i = 0; i < jumlahHari; i++) {
+    const tanggal = addDays(mulai, i);
+    hasil.push({ tanggal, pengeluaran: perHari.get(tanggal) ?? 0 });
+  }
+  return hasil;
 }
 
 export function bangunDashboard(state: State, hariIni: string): DashboardData {
@@ -296,6 +322,7 @@ export function bangunDashboard(state: State, hariIni: string): DashboardData {
       goalTargetAktif,
     },
     grup,
+    tren: hitungTrenPengeluaran(state, hariIni),
     piutang,
     goals,
     posLain: {

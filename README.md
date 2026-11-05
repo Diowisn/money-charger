@@ -14,6 +14,7 @@ Acuan: [PRD Money-Charger SaaS](./prd-catatan-keuangan-whatsapp.md) dan [SRS](./
 | `src/lib/handler.ts` | Aturan domain pemrosesan pesan dan transaksi |
 | `src/lib/ai.ts` | Groq sebagai cadangan bahasa bebas, beserta validasi hasil AI |
 | `src/lib/ai-vision.ts` | Groq vision untuk membaca foto struk/transaksi, beserta validasi hasil |
+| `src/lib/insight.ts` | Konteks keuangan untuk asisten AI + klien Groq tanya jawab (tab Asisten) |
 | `src/lib/pg-repo.ts` | Akses Neon Postgres. `mem-repo.ts` adalah versi memori untuk tes |
 | `src/modules/whatsapp/` | Modul HMVC webhook: controller, model, dan respons |
 | `src/modules/finance/` | Modul HMVC keuangan/dashboard: controller, model, view, dan halaman dashboard |
@@ -21,6 +22,7 @@ Acuan: [PRD Money-Charger SaaS](./prd-catatan-keuangan-whatsapp.md) dan [SRS](./
 | `src/modules/export/` | Modul HMVC unduh CSV |
 | `src/modules/health/` | Modul HMVC diagnosa kesiapan |
 | `src/modules/email/` | Modul HMVC penerima email payroll generik (`/api/email/inbound`) |
+| `src/modules/insight/` | Modul HMVC asisten tanya jawab keuangan (`/api/insight`) |
 | `src/lib/email.ts` | Heuristik ekstraksi nominal & deteksi "gaji/payroll" dari teks email |
 | `src/app/api/` | Adapter Next.js tipis yang meneruskan request ke controller modul |
 | `src/app/page.tsx` | Adapter halaman dashboard Next.js |
@@ -29,7 +31,7 @@ Acuan: [PRD Money-Charger SaaS](./prd-catatan-keuangan-whatsapp.md) dan [SRS](./
 | `src/lib/dashboard.ts` | View-model dashboard dari `State` + engine |
 | `src/lib/web-actions.ts` | Aksi web: simpan rencana, transaksi, pos, setup |
 | `db/schema.sql` | Skema tabel |
-| `tests/` | 130 tes, termasuk skenario AC-01 sampai AC-26, aksi web, piutang/utang, target tabungan, biaya admin, foto struk, dan controller HMVC |
+| `tests/` | 135 tes, termasuk skenario AC-01 sampai AC-26, aksi web, piutang/utang, target tabungan, biaya admin, foto struk, tren pengeluaran, konteks asisten, dan controller HMVC |
 
 ## Arsitektur aplikasi (HMVC internal)
 
@@ -58,6 +60,8 @@ Struktur ini **belum** menjadikan aplikasi multi-pelanggan: autentikasi, whiteli
 5. Key Groq yang sama juga dipakai untuk membaca **foto struk/screenshot transaksi** yang dikirim ke bot
    (model vision diatur lewat `GROQ_VISION_MODEL`, default `meta-llama/llama-4-scout-17b-16e-instruct`).
    Tanpa `GROQ_API_KEY`, foto dibalas permintaan catat manual seperti pesan teks lainnya.
+6. Tab **Asisten** di dashboard memakai key yang sama untuk tanya jawab keuangan (`GROQ_INSIGHT_MODEL`,
+   default mengikuti `GROQ_MODEL`). AI hanya menerima ringkasan agregat dashboard, bukan nomor telepon atau data mentah.
 
 ### 3. Meta WhatsApp Cloud API
 1. Buat aplikasi Meta dengan use case **Connect with customers through WhatsApp** dan buka **Langkah 1. Cobalah**.
@@ -217,6 +221,8 @@ Isi dashboard:
 - **Pos**: tambah pos (langsung masuk rencana aktif), ganti nama, tambah alias, nonaktifkan, dan setup awal sebelum gaji pertama.
 - **Piutang**: catat piutang (orang berutang ke kita) dan utang (kita berutang), bayar sebagian/lunas, atau batalkan.
 - **Target**: buat target tabungan (nama, nominal, target tanggal opsional), tambah tabungan sebagian demi sebagian, otomatis "Tercapai" saat terkumpul mencapai target.
+- **Tren pengeluaran**: grafik batang 14 hari terakhir di Ringkasan, lengkap dengan total, rata-rata, dan hari tertinggi.
+- **Asisten**: tanya jawab bebas tentang kondisi keuangan (pos paling boros, sisa uang, saran menabung) yang dijawab dari data dashboard, bukan tebakan.
 
 Perubahan dari web dan WhatsApp memakai database yang sama. Dashboard menyegarkan data otomatis setiap 5 detik dan saat tab kembali aktif/fokus, jadi transaksi dari WhatsApp muncul tanpa hard reload. Respons dashboard memakai `no-store` agar tidak tertahan cache browser/CDN. Semua API dashboard wajib login; `/api/health` tetap publik untuk diagnosa.
 

@@ -810,6 +810,120 @@ code {
   font-size: 0.85em;
 }
 
+.tren {
+  display: flex;
+  align-items: flex-end;
+  gap: 3px;
+  height: 110px;
+  margin-top: 14px;
+  padding-top: 6px;
+  border-bottom: 1px solid var(--garis);
+}
+
+.tren-kolom {
+  flex: 1;
+  height: 100%;
+  display: flex;
+  align-items: flex-end;
+}
+
+.tren-batang {
+  width: 100%;
+  min-height: 2px;
+  border-radius: 6px 6px 2px 2px;
+  background: var(--aksen);
+  transition: background 0.15s ease;
+}
+
+.tren-kolom:hover .tren-batang {
+  background: var(--aksen-kuat);
+}
+
+.tren-label {
+  display: flex;
+  gap: 3px;
+  margin: 4px 0 8px;
+  font-size: 0.6rem;
+  color: var(--muted);
+  text-align: center;
+}
+
+.tren-label span {
+  flex: 1;
+}
+
+.saran-chat {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.chip {
+  border: 1px solid var(--garis);
+  background: var(--aksen-lembut);
+  color: var(--teks);
+  border-radius: 999px;
+  padding: 8px 12px;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.chat {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 14px 0;
+}
+
+.chat-pesan {
+  max-width: 88%;
+  padding: 10px 13px;
+  border-radius: 16px;
+  font-size: 0.87rem;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.chat-pesan.user {
+  align-self: flex-end;
+  background: var(--aksen-kuat);
+  color: #fff8ea;
+  border-bottom-right-radius: 5px;
+}
+
+.chat-pesan.ai {
+  align-self: flex-start;
+  background: var(--bg);
+  border: 1px solid var(--garis);
+  border-bottom-left-radius: 5px;
+}
+
+.chat-form {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.chat-form input {
+  flex: 1;
+}
+
+.chat-form button {
+  border: 0;
+  border-radius: 12px;
+  padding: 11px 16px;
+  background: var(--aksen-kuat);
+  color: #fff8ea;
+  font-weight: 700;
+}
+
+.chat-form button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
 @media (max-width: 420px) {
   .app {
     padding-left: 12px;

@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactElement } 
 import type { DashboardData } from "@/lib/dashboard";
 
 type Pesan = { jenis: "ok" | "error"; teks: string };
-type Tab = "ringkasan" | "rencana" | "transaksi" | "pos" | "piutang" | "target";
+type Tab = "ringkasan" | "rencana" | "transaksi" | "pos" | "piutang" | "target" | "asisten";
 type StatusLive = "hidup" | "terputus";
 
 const INTERVAL_LIVE_MS = 5000;
@@ -79,6 +79,15 @@ function IkonTarget({ aktif }: { aktif: boolean }) {
       <circle cx="12" cy="12" r="8" />
       <circle cx="12" cy="12" r="4" />
       <circle cx="12" cy="12" r="0.6" fill="currentColor" stroke="none" />
+    </svg>
+  );
+}
+
+function IkonAsisten({ aktif }: { aktif: boolean }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={aktif ? 2.4 : 1.8}>
+      <path d="M4 5h16v11H9l-5 4V5z" strokeLinejoin="round" />
+      <path d="M8.5 10h.01M12 10h.01M15.5 10h.01" strokeLinecap="round" strokeWidth={2.2} />
     </svg>
   );
 }
@@ -288,6 +297,7 @@ export default function Dashboard({ awal }: { awal: DashboardData }) {
             ["pos", "Pos"],
             ["piutang", "Piutang"],
             ["target", "Target"],
+            ["asisten", "Asisten"],
           ] as [Tab, string][]
         ).map(([id, label]) => (
           <button
@@ -314,6 +324,7 @@ export default function Dashboard({ awal }: { awal: DashboardData }) {
         {tab === "pos" ? <Pos data={data} kirim={kirim} sibuk={sibuk} /> : null}
         {tab === "piutang" ? <Piutang data={data} kirim={kirim} sibuk={sibuk} /> : null}
         {tab === "target" ? <Target data={data} kirim={kirim} sibuk={sibuk} /> : null}
+        {tab === "asisten" ? <Asisten /> : null}
       </main>
 
       <nav className="bottom-nav" aria-label="Menu dashboard (mobile)">
@@ -325,6 +336,7 @@ export default function Dashboard({ awal }: { awal: DashboardData }) {
             ["pos", "Pos", IkonPos],
             ["piutang", "Piutang", IkonPiutang],
             ["target", "Target", IkonTarget],
+            ["asisten", "Asisten", IkonAsisten],
           ] as [Tab, string, (p: { aktif: boolean }) => ReactElement][]
         ).map(([id, label, Ikon]) => (
           <button
@@ -365,6 +377,10 @@ function Ringkasan({
   const r = data.ringkasan;
   const totalGrup = data.grup.reduce((s, g) => s + g.jatah, 0);
   const toggle = (id: number) => setBuka({ ...buka, [id]: !buka[id] });
+  const tren = data.tren ?? [];
+  const maksTren = Math.max(1, ...tren.map((t) => t.pengeluaran));
+  const totalTren = tren.reduce((s, t) => s + t.pengeluaran, 0);
+  const hariTren = tren.filter((t) => t.pengeluaran > 0).length;
 
   return (
     <div className="tumpuk">
@@ -402,6 +418,43 @@ function Ringkasan({
           <p className="angka">{rp(r.pengeluaranBulanIni)}</p>
           <p className="muted">Semua pengeluaran tercatat</p>
         </div>
+      </section>
+
+      <section className="kartu">
+        <div className="baris-antara">
+          <div>
+            <h2>Tren Pengeluaran</h2>
+            <p className="muted kecil">{tren.length} hari terakhir</p>
+          </div>
+          <div style={{ textAlign: "right" }}>
+            <p className="angka-kecil">{rp(totalTren)}</p>
+            <p className="muted kecil">
+              {hariTren} hari ada pengeluaran
+            </p>
+          </div>
+        </div>
+        {totalTren > 0 ? (
+          <>
+            <div className="tren" role="img" aria-label={`Pengeluaran ${tren.length} hari terakhir`}>
+              {tren.map((t) => (
+                <div className="tren-kolom" key={t.tanggal} title={`${t.tanggal}: ${rp(t.pengeluaran)}`}>
+                  <span
+                    className="tren-batang"
+                    style={{ height: `${Math.max(2, (t.pengeluaran / maksTren) * 100)}%` }}
+                  />
+                </div>
+              ))}
+            </div>
+            <div className="tren-label">
+              {tren.map((t, i) => (
+                <span key={t.tanggal}>{i % 2 === 0 ? t.tanggal.slice(8) : ""}</span>
+              ))}
+            </div>
+          </>
+        ) : (
+          <p className="muted kecil">Belum ada pengeluaran pada rentang ini.</p>
+        )}
+        <p className="muted kecil">Rata-rata {rp(totalTren / Math.max(1, tren.length))} per hari · tertinggi {rp(maksTren)}</p>
       </section>
 
       <section className="kartu">
@@ -547,6 +600,119 @@ function Ringkasan({
           </div>
         </section>
       ) : null}
+    </div>
+  );
+}
+
+type ChatPesan = { peran: "user" | "ai"; teks: string };
+
+const SARAN_TANYA = [
+  "Pos apa yang paling boros bulan ini?",
+  "Bagaimana cara menabung lebih banyak?",
+  "Ringkas kondisi keuanganku.",
+  "Sisa uangku cukup sampai gaji berikutnya?",
+];
+
+function Asisten() {
+  const [riwayat, setRiwayat] = useState<ChatPesan[]>([]);
+  const [teks, setTeks] = useState("");
+  const [sibuk, setSibuk] = useState(false);
+  const [galat, setGalat] = useState<string | null>(null);
+  const ujung = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    ujung.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+  }, [riwayat, sibuk]);
+
+  async function kirimTanya(pertanyaan: string) {
+    const isi = pertanyaan.trim();
+    if (!isi || sibuk) return;
+    setGalat(null);
+    setRiwayat((r) => [...r, { peran: "user", teks: isi }]);
+    setTeks("");
+    setSibuk(true);
+    try {
+      const res = await fetch("/api/insight", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pertanyaan: isi }),
+      });
+      if (res.status === 401) {
+        window.location.href = "/login";
+        return;
+      }
+      const j = (await res.json().catch(() => ({}))) as { ok?: boolean; jawaban?: string; error?: string };
+      if (!res.ok || !j.ok || !j.jawaban) {
+        setGalat(j.error ?? "Asisten gagal menjawab.");
+        return;
+      }
+      setRiwayat((r) => [...r, { peran: "ai", teks: j.jawaban! }]);
+    } catch {
+      setGalat("Tidak bisa menghubungi server.");
+    } finally {
+      setSibuk(false);
+    }
+  }
+
+  return (
+    <div className="tumpuk">
+      <section className="kartu">
+        <h2>Tanya Asisten</h2>
+        <p className="muted">
+          Jawaban memakai data keuangan di dashboard ini. Asisten tidak mengubah transaksi.
+        </p>
+
+        {riwayat.length === 0 ? (
+          <div className="saran-chat">
+            {SARAN_TANYA.map((s) => (
+              <button key={s} type="button" className="chip" onClick={() => void kirimTanya(s)}>
+                {s}
+              </button>
+            ))}
+          </div>
+        ) : null}
+
+        <div className="chat" aria-live="polite">
+          {riwayat.map((m, i) => (
+            <div key={i} className={`chat-pesan ${m.peran}`}>
+              {m.teks}
+            </div>
+          ))}
+          {sibuk ? <div className="chat-pesan ai muted">Sedang membaca data...</div> : null}
+          <div ref={ujung} />
+        </div>
+
+        {galat ? <p className="merah kecil">{galat}</p> : null}
+
+        <form
+          className="chat-form"
+          onSubmit={(e) => {
+            e.preventDefault();
+            void kirimTanya(teks);
+          }}
+        >
+          <input
+            value={teks}
+            onChange={(e) => setTeks(e.target.value)}
+            placeholder="Tulis pertanyaan tentang keuanganmu..."
+            maxLength={400}
+            disabled={sibuk}
+            aria-label="Pertanyaan untuk asisten"
+          />
+          <button type="submit" disabled={sibuk || teks.trim().length < 3}>
+            Kirim
+          </button>
+        </form>
+        <p className="muted kecil">
+          {riwayat.length ? (
+            <button type="button" className="tautan" onClick={() => setRiwayat([])}>
+              Bersihkan percakapan
+            </button>
+          ) : (
+            "Butuh GROQ_API_KEY agar asisten aktif."
+          )}
+        </p>
+      </section>
     </div>
   );
 }
