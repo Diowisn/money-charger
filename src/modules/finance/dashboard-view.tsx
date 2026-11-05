@@ -4,6 +4,7 @@ import { useCallback, useEffect, useId, useMemo, useRef, useState, type ReactEle
 import type { DashboardData, TxView } from "@/lib/dashboard";
 
 type Pesan = { jenis: "ok" | "error"; teks: string };
+type HasilScan = { nominal: number; subPos: string | null; tanggal: string | null; label: string | null };
 type Tab =
   | "ringkasan"
   | "rencana"
@@ -277,6 +278,10 @@ export default function Dashboard({ awal }: { awal: DashboardData }) {
   const [tema, setTema] = useState<Tema>("terang");
   const [nama, setNama] = useState("");
   const [tipeCatat, setTipeCatat] = useState<"in" | "out">("out");
+  const [menuTambah, setMenuTambah] = useState(false);
+  const [hasilScan, setHasilScan] = useState<HasilScan | null>(null);
+  const [scanSibuk, setScanSibuk] = useState(false);
+  const inputScanRef = useRef<HTMLInputElement>(null);
   const dataRef = useRef(awal);
   const sibukRef = useRef(false);
   const urutanRef = useRef(0);
@@ -407,6 +412,42 @@ export default function Dashboard({ awal }: { awal: DashboardData }) {
     navigasiKe("catat");
   }
 
+  async function scanStruk(file: File | undefined) {
+    if (!file) return;
+    setScanSibuk(true);
+    setPesan(null);
+    try {
+      const form = new FormData();
+      form.append("image", file);
+      const res = await fetch("/api/receipt", { method: "POST", body: form });
+      if (res.status === 401) {
+        window.location.href = "/login";
+        return;
+      }
+      const j = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string; data?: HasilScan };
+      if (!res.ok || !j.ok || !j.data) throw new Error(j.error ?? "Gagal membaca struk.");
+      setHasilScan(j.data);
+    } catch (error) {
+      setPesan({ jenis: "error", teks: error instanceof Error ? error.message : "Gagal membaca struk." });
+    } finally {
+      setScanSibuk(false);
+    }
+  }
+
+  async function simpanHasilScan() {
+    if (!hasilScan) return;
+    const pos = data.posSemua.find((item) => item.aktif && item.nama === hasilScan.subPos);
+    const berhasil = await kirim("/api/transactions", "POST", {
+      tipe: "out",
+      nominal: hasilScan.nominal,
+      tanggal: hasilScan.tanggal ?? new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Jakarta" }),
+      label: hasilScan.label,
+      subPostId: pos?.id ?? null,
+      biayaAdmin: 0,
+    });
+    if (berhasil) setHasilScan(null);
+  }
+
   function simpanNama(nilai: string) {
     const bersih = nilai.trim();
     setNama(bersih);
@@ -488,6 +529,33 @@ export default function Dashboard({ awal }: { awal: DashboardData }) {
           </div>
         ) : null}
 
+        {hasilScan ? (
+          <div className="scan-overlay" role="presentation">
+            <section className="scan-dialog" role="dialog" aria-modal="true" aria-labelledby="scan-title">
+              <h2 id="scan-title">Periksa hasil scan</h2>
+              <label>Nominal
+                <input type="number" min="1" step="1" value={hasilScan.nominal} onChange={(event) => setHasilScan({ ...hasilScan, nominal: Number(event.target.value) })} />
+              </label>
+              <label>Tanggal
+                <input type="date" value={hasilScan.tanggal ?? new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Jakarta" })} onChange={(event) => setHasilScan({ ...hasilScan, tanggal: event.target.value })} />
+              </label>
+              <label>Keterangan
+                <input type="text" maxLength={80} value={hasilScan.label ?? ""} onChange={(event) => setHasilScan({ ...hasilScan, label: event.target.value || null })} />
+              </label>
+              <label>Pos pengeluaran
+                <select value={hasilScan.subPos ?? ""} onChange={(event) => setHasilScan({ ...hasilScan, subPos: event.target.value || null })}>
+                  <option value="">Belum dipetakan</option>
+                  {data.posSemua.filter((pos) => pos.aktif).map((pos) => <option key={pos.id} value={pos.nama}>{pos.nama}</option>)}
+                </select>
+              </label>
+              <div className="scan-actions">
+                <button type="button" onClick={() => setHasilScan(null)}>Batal</button>
+                <button type="button" disabled={sibuk || hasilScan.nominal < 1} onClick={() => void simpanHasilScan()}>Simpan pengeluaran</button>
+              </div>
+            </section>
+          </div>
+        ) : null}
+        {scanSibuk ? <div className="toast" role="status">Membaca struk…</div> : null}
         <main className="konten">
           {tab === "ringkasan" ? (
             <Ringkasan data={data} nama={nama} navigasi={navigasiKe} catat={catat} />
@@ -523,12 +591,29 @@ export default function Dashboard({ awal }: { awal: DashboardData }) {
           {tab === "asisten" ? <Asisten /> : null}
         </main>
 
+        <input
+          ref={inputScanRef}
+          type="file"
+          accept="image/*"
+          capture="environment"
+          hidden
+          onChange={(event) => {
+            void scanStruk(event.target.files?.[0]);
+            event.target.value = "";
+          }}
+        />
+        {menuTambah ? (
+          <div className="fab-menu" role="group" aria-label="Tambah">
+            <button type="button" disabled={scanSibuk} onClick={() => { setMenuTambah(false); inputScanRef.current?.click(); }}>Scan struk</button>
+            <button type="button" onClick={() => { setMenuTambah(false); catat("out"); }}>Transaksi</button>
+          </div>
+        ) : null}
         <button
           type="button"
           className="fab-catat"
-          onClick={() => catat("out")}
-          aria-label="Catat transaksi"
-          title="Catat transaksi"
+          onClick={() => setMenuTambah((buka) => !buka)}
+          aria-label={menuTambah ? "Tutup menu tambah" : "Tambah"}
+          title="Tambah"
         >
           <IkonTambah aktif />
         </button>
@@ -637,7 +722,7 @@ function Ringkasan({
           onClick={() => navigasi("profil")}
           aria-label="Buka profil"
         >
-          {inisial}
+          <img src="/icon-192.png" alt="" width={48} height={48} />
         </button>
       </header>
 
@@ -853,7 +938,9 @@ function Profil({
   return (
     <div className="profil">
       <section className="profil-kartu">
-        <span className="profil-avatar">{inisial}</span>
+        <span className="profil-avatar">
+          <img src="/icon-192.png" alt="" width={62} height={62} />
+        </span>
         <div>
           <h2>{nama || "Pengguna Money-Charger"}</h2>
           <p className="muted kecil">Dashboard keuangan pribadi</p>
