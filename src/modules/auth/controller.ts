@@ -1,14 +1,10 @@
 import { aktorWeb, catatAudit } from "@/lib/audit";
 import { tolakJikaBelumLogin } from "@/lib/auth";
 import { batasi, ipDariRequest } from "@/lib/rate-limit";
-import { cabutSemuaSesi, masuk, sudahDikonfigurasi } from "./model";
+import { cabutSemuaSesi, daftar, masuk } from "./model";
 import { loginBerhasil, loginGagal, logoutBerhasil } from "./view";
 
 export async function login(req: Request) {
-  if (!sudahDikonfigurasi()) {
-    return loginGagal("DASHBOARD_PASSWORD belum diatur di server.", 503);
-  }
-
   const batas = batasi(`login:${ipDariRequest(req)}`, 5, 15 * 60_000);
   if (!batas.boleh) {
     return loginGagal(
@@ -17,16 +13,17 @@ export async function login(req: Request) {
     );
   }
 
-  let password = "";
+  let password = ""; let email = "";
   try {
-    const body = (await req.json()) as { password?: unknown };
+    const body = (await req.json()) as { password?: unknown; email?: unknown };
     password = typeof body?.password === "string" ? body.password : "";
+    email = typeof body?.email === "string" ? body.email.trim().toLowerCase() : "";
   } catch {
     password = "";
   }
 
   const ip = ipDariRequest(req);
-  const token = await masuk(password);
+  const token = await masuk(email, password);
   if (!token) {
     await catatAudit(aktorWeb(ip), "login_gagal");
     await new Promise((resolve) => setTimeout(resolve, 350));
@@ -34,6 +31,20 @@ export async function login(req: Request) {
   }
   await catatAudit(aktorWeb(ip), "login_berhasil");
   return loginBerhasil(token);
+}
+
+export async function register(req: Request) {
+  const batas = batasi(`register:${ipDariRequest(req)}`, 5, 15 * 60_000);
+  if (!batas.boleh) return loginGagal("Terlalu banyak percobaan. Coba lagi nanti.", 429);
+  try {
+    const body = await req.json() as { email?: unknown; password?: unknown };
+    const email = typeof body.email === "string" ? body.email.trim().toLowerCase() : "";
+    const password = typeof body.password === "string" ? body.password : "";
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || password.length < 12 || password.length > 1024) return loginGagal("Email tidak valid atau password kurang dari 12 karakter.", 400);
+    const token = await daftar(email, password);
+    if (!token) return loginGagal("Registrasi tidak tersedia.", 403);
+    return loginBerhasil(token);
+  } catch { return loginGagal("Gagal membuat akun.", 500); }
 }
 
 export async function logout(req: Request) {

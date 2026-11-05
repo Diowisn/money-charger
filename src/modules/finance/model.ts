@@ -24,31 +24,31 @@ import {
 } from "@/lib/web-actions";
 import { AksiError } from "@/lib/web-actions";
 
-export async function muatDashboard() {
-  const state = await new PgRepo().load();
+export async function muatDashboard(userId: string) {
+  const state = await new PgRepo(undefined, undefined, userId).load();
   return bangunDashboard(state, wibDate(Date.now()));
 }
 
-export async function simpanRencanaFinance(items: ItemRencana[], sekarang: boolean) {
-  const hasil = await simpanRencana(new PgRepo(), wibDate(Date.now()), items, sekarang);
+export async function simpanRencanaFinance(items: ItemRencana[], sekarang: boolean, userId: string) {
+  const hasil = await simpanRencana(new PgRepo(undefined, undefined, userId), wibDate(Date.now()), items, sekarang);
   await catatAudit("web", "rencana_diubah", { sekarang });
   return hasil;
 }
 
-export async function tambahTransaksiFinance(input: InputTransaksi) {
-  const hasil = await tambahTransaksi(new PgRepo(), wibDate(Date.now()), input);
+export async function tambahTransaksiFinance(input: InputTransaksi, userId: string) {
+  const hasil = await tambahTransaksi(new PgRepo(undefined, undefined, userId), wibDate(Date.now()), input);
   await catatAudit("web", "transaksi_ditambah", { tipe: input.tipe, id: hasil.id });
   return hasil;
 }
 
-export async function batalkanTransaksiFinance(id: number) {
-  const hasil = await batalkanTransaksi(new PgRepo(), id);
+export async function batalkanTransaksiFinance(id: number, userId: string) {
+  const hasil = await batalkanTransaksi(new PgRepo(undefined, undefined, userId), id);
   await catatAudit("web", "transaksi_dibatalkan", { id });
   return hasil;
 }
 
-export async function kelolaPos(body: Record<string, unknown>) {
-  const repo = new PgRepo();
+export async function kelolaPos(body: Record<string, unknown>, userId: string) {
+  const repo = new PgRepo(undefined, undefined, userId);
   const id = Number(body.id);
 
   switch (String(body.aksi ?? "")) {
@@ -77,30 +77,30 @@ export async function simpanSetupFinance(body: {
   saldoAwal: number;
   tabunganAwal: number;
   investasiAwal: number;
-}) {
-  return simpanSetup(new PgRepo(), wibDate(Date.now()), body);
+}, userId: string) {
+  return simpanSetup(new PgRepo(undefined, undefined, userId), wibDate(Date.now()), body);
 }
 
-export async function tambahDebtFinance(input: InputDebt) {
-  return tambahDebt(new PgRepo(), wibDate(Date.now()), input);
+export async function tambahDebtFinance(input: InputDebt, userId: string) {
+  return tambahDebt(new PgRepo(undefined, undefined, userId), wibDate(Date.now()), input);
 }
 
-export async function bayarDebtFinance(id: number, nominal?: number | null) {
-  return bayarDebt(new PgRepo(), id, nominal);
+export async function bayarDebtFinance(id: number, nominal: number | null | undefined, userId: string) {
+  return bayarDebt(new PgRepo(undefined, undefined, userId), id, nominal);
 }
 
-export async function batalkanDebtFinance(id: number) {
-  return batalkanDebt(new PgRepo(), id);
+export async function batalkanDebtFinance(id: number, userId: string) {
+  return batalkanDebt(new PgRepo(undefined, undefined, userId), id);
 }
 
-export async function tambahGoalFinance(input: InputGoal) {
-  return tambahGoal(new PgRepo(), wibDate(Date.now()), input);
+export async function tambahGoalFinance(input: InputGoal, userId: string) {
+  return tambahGoal(new PgRepo(undefined, undefined, userId), wibDate(Date.now()), input);
 }
 
-export async function nabungGoalFinance(id: number, nominal: number) {
-  return nabungGoal(new PgRepo(), id, nominal);
+export async function nabungGoalFinance(id: number, nominal: number, userId: string) {
+  return nabungGoal(new PgRepo(undefined, undefined, userId), id, nominal);
 }
 
-export async function batalkanGoalFinance(id: number) {
-  return batalkanGoal(new PgRepo(), id);
+export async function batalkanGoalFinance(id: number, userId: string) {
+  return batalkanGoal(new PgRepo(undefined, undefined, userId), id);
 }

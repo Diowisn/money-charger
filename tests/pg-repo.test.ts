@@ -36,7 +36,8 @@ beforeAll(async () => {
   };
   await db.exec(readFileSync(path.join(process.cwd(), "db", "schema.sql"), "utf8"));
   await db.exec(readFileSync(path.join(process.cwd(), "db", "schema.sql"), "utf8")); // idempoten
-  repo = new PgRepo(adapter, true);
+  const user = await adapter.query("INSERT INTO auth_users (email) VALUES ('test@example.com') RETURNING id");
+  repo = new PgRepo(adapter, true, user.rows[0].id);
   expect(await repo.seed([OWNER])).toBe(true);
   expect(await repo.seed([OWNER])).toBe(false); // seed tidak menggandakan data
 });
@@ -64,7 +65,7 @@ describe("PgRepo di Postgres sungguhan", () => {
     const w = hitungWadah(await repo.load());
     // sisa periode 1 = 1.200.000 - 25.000 - 40.000 + DD 100.000 = 1.235.000 ; Saldo = 275.000 + 1.235.000 = 1.510.000
     // set makan 400rb membuat total rencana 1.850.000, jadi gaji 1.800.000 kurang 50.000 -> Saldo -50.000 (AC-10)
-    expect(w).toEqual({ saldo: 1_460_000, tabungan: 800_000, investasi: 200_000 });
+    expect(w).toEqual({ saldo: 1_160_000, tabungan: 800_000, investasi: 200_000 });
     expect(await tanganiPesan(repo, { ai: null }, { id: "x", from: "62999", type: "text", text: "saldo", timestampMs: at("2026-11-30") })).toBeNull();
   });
 

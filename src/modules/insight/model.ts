@@ -7,7 +7,7 @@ export interface HasilInsight {
   pertanyaan: string;
 }
 
-export async function tanyaInsight(input: unknown): Promise<HasilInsight> {
+export async function tanyaInsight(input: unknown, userId: string): Promise<HasilInsight> {
   const v = validasiPertanyaan(input);
   if (!v.ok) throw new AksiError(v.error);
 
@@ -16,7 +16,7 @@ export async function tanyaInsight(input: unknown): Promise<HasilInsight> {
     throw new AksiError("Asisten AI belum aktif. Isi GROQ_API_KEY untuk memakai fitur ini.");
   }
 
-  const data = await muatDashboard();
+  const data = await muatDashboard(userId);
   const konteks = susunKonteksInsight(data);
   const jawaban = await client.tanya(v.teks, konteks);
   if (!jawaban) {

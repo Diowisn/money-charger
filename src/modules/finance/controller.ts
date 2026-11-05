@@ -1,5 +1,5 @@
 import type { NextRequest } from "next/server";
-import { tolakJikaBelumLogin } from "@/lib/auth";
+import { tolakJikaBelumLogin, userIdDariRequest } from "@/lib/auth";
 import { AksiError } from "@/lib/web-actions";
 import {
   batalkanDebtFinance,
@@ -20,8 +20,10 @@ import { bacaBody, dashboard, galat, ok } from "./view";
 export async function getDashboard(req: NextRequest) {
   const tolak = await tolakJikaBelumLogin(req);
   if (tolak) return tolak;
+  const userId = await userIdDariRequest(req);
+  if (!userId) return Response.json({ ok: false, error: "unauthorized" }, { status: 401 });
   try {
-    return dashboard(await muatDashboard());
+    return dashboard(await muatDashboard(userId));
   } catch (e) {
     console.error(e);
     return Response.json({ ok: false, error: "Gagal memuat data." }, { status: 500 });
@@ -31,11 +33,13 @@ export async function getDashboard(req: NextRequest) {
 export async function postPlan(req: NextRequest) {
   const tolak = await tolakJikaBelumLogin(req);
   if (tolak) return tolak;
+  const userId = await userIdDariRequest(req);
+  if (!userId) return Response.json({ ok: false, error: "unauthorized" }, { status: 401 });
   try {
     const body = await bacaBody(req);
     const items = Array.isArray(body.items) ? body.items : [];
     if (!items.length) throw new AksiError("Rencana kosong.");
-    return ok(await simpanRencanaFinance(items as Parameters<typeof simpanRencanaFinance>[0], body.sekarang === true));
+    return ok(await simpanRencanaFinance(items as Parameters<typeof simpanRencanaFinance>[0], body.sekarang === true, userId));
   } catch (e) {
     return galat(e);
   }
@@ -44,9 +48,11 @@ export async function postPlan(req: NextRequest) {
 export async function postTransaction(req: NextRequest) {
   const tolak = await tolakJikaBelumLogin(req);
   if (tolak) return tolak;
+  const userId = await userIdDariRequest(req);
+  if (!userId) return Response.json({ ok: false, error: "unauthorized" }, { status: 401 });
   try {
     const body = await bacaBody(req);
-    return ok(await tambahTransaksiFinance(body as unknown as Parameters<typeof tambahTransaksiFinance>[0]));
+    return ok(await tambahTransaksiFinance(body as unknown as Parameters<typeof tambahTransaksiFinance>[0], userId));
   } catch (e) {
     return galat(e);
   }
@@ -55,9 +61,11 @@ export async function postTransaction(req: NextRequest) {
 export async function deleteTransaction(req: NextRequest) {
   const tolak = await tolakJikaBelumLogin(req);
   if (tolak) return tolak;
+  const userId = await userIdDariRequest(req);
+  if (!userId) return Response.json({ ok: false, error: "unauthorized" }, { status: 401 });
   try {
     const body = await bacaBody(req);
-    const pesan = await batalkanTransaksiFinance(Number(body.id));
+    const pesan = await batalkanTransaksiFinance(Number(body.id), userId);
     return ok({ pesan });
   } catch (e) {
     return galat(e);
@@ -67,9 +75,11 @@ export async function deleteTransaction(req: NextRequest) {
 export async function postPosition(req: NextRequest) {
   const tolak = await tolakJikaBelumLogin(req);
   if (tolak) return tolak;
+  const userId = await userIdDariRequest(req);
+  if (!userId) return Response.json({ ok: false, error: "unauthorized" }, { status: 401 });
   try {
     const body = await bacaBody(req);
-    const hasil = await kelolaPos(body);
+    const hasil = await kelolaPos(body, userId);
     return hasil ? ok(hasil) : ok();
   } catch (e) {
     return galat(e);
@@ -79,19 +89,21 @@ export async function postPosition(req: NextRequest) {
 export async function postDebt(req: NextRequest) {
   const tolak = await tolakJikaBelumLogin(req);
   if (tolak) return tolak;
+  const userId = await userIdDariRequest(req);
+  if (!userId) return Response.json({ ok: false, error: "unauthorized" }, { status: 401 });
   try {
     const body = await bacaBody(req);
     const aksi = String(body.aksi ?? "");
     if (aksi === "tambah") {
-      const hasil = await tambahDebtFinance(body as unknown as Parameters<typeof tambahDebtFinance>[0]);
+      const hasil = await tambahDebtFinance(body as unknown as Parameters<typeof tambahDebtFinance>[0], userId);
       return ok(hasil);
     }
     if (aksi === "bayar") {
       const nominal = body.nominal === undefined || body.nominal === null || body.nominal === "" ? null : Number(body.nominal);
-      return ok(await bayarDebtFinance(Number(body.id), nominal));
+      return ok(await bayarDebtFinance(Number(body.id), nominal, userId));
     }
     if (aksi === "batal") {
-      await batalkanDebtFinance(Number(body.id));
+      await batalkanDebtFinance(Number(body.id), userId);
       return ok();
     }
     throw new AksiError("Aksi piutang/utang tidak dikenal.");
@@ -103,18 +115,20 @@ export async function postDebt(req: NextRequest) {
 export async function postGoal(req: NextRequest) {
   const tolak = await tolakJikaBelumLogin(req);
   if (tolak) return tolak;
+  const userId = await userIdDariRequest(req);
+  if (!userId) return Response.json({ ok: false, error: "unauthorized" }, { status: 401 });
   try {
     const body = await bacaBody(req);
     const aksi = String(body.aksi ?? "");
     if (aksi === "tambah") {
-      const hasil = await tambahGoalFinance(body as unknown as Parameters<typeof tambahGoalFinance>[0]);
+      const hasil = await tambahGoalFinance(body as unknown as Parameters<typeof tambahGoalFinance>[0], userId);
       return ok(hasil);
     }
     if (aksi === "nabung") {
-      return ok(await nabungGoalFinance(Number(body.id), Number(body.nominal)));
+      return ok(await nabungGoalFinance(Number(body.id), Number(body.nominal), userId));
     }
     if (aksi === "batal") {
-      await batalkanGoalFinance(Number(body.id));
+      await batalkanGoalFinance(Number(body.id), userId);
       return ok();
     }
     throw new AksiError("Aksi target tabungan tidak dikenal.");
@@ -126,6 +140,8 @@ export async function postGoal(req: NextRequest) {
 export async function postSetup(req: NextRequest) {
   const tolak = await tolakJikaBelumLogin(req);
   if (tolak) return tolak;
+  const userId = await userIdDariRequest(req);
+  if (!userId) return Response.json({ ok: false, error: "unauthorized" }, { status: 401 });
   try {
     const body = await bacaBody(req);
     await simpanSetupFinance({
@@ -133,7 +149,7 @@ export async function postSetup(req: NextRequest) {
       saldoAwal: Number(body.saldoAwal ?? 0),
       tabunganAwal: Number(body.tabunganAwal ?? 0),
       investasiAwal: Number(body.investasiAwal ?? 0),
-    });
+    }, userId);
     return ok();
   } catch (e) {
     return galat(e);

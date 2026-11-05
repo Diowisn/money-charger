@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { authDikonfigurasi, sesiValid } from "@/lib/auth";
+import { configured } from "@/modules/auth/oauth";
 import LoginForm from "./login-form";
 
 export const dynamic = "force-dynamic";
@@ -12,8 +13,8 @@ export default async function LoginPage() {
         <img className="auth-logo" src="/icon-192.png" alt="" width={64} height={64} />
         <p className="eyebrow">Money-Charger</p>
         <h1>Masuk</h1>
-        <p className="muted">Dashboard pribadi keuangan. Masukkan password untuk melanjutkan.</p>
-        <LoginForm dikonfigurasi={authDikonfigurasi()} />
+        <p className="muted">Dashboard pribadi keuangan.</p>
+        <LoginForm registerFirst={await authDikonfigurasi()} googleEnabled={configured("google")} facebookEnabled={configured("facebook")} />
       </div>
     </main>
   );

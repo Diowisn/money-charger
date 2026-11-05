@@ -1,5 +1,5 @@
 import { redirect } from "next/navigation";
-import { sesiValid } from "@/lib/auth";
+import { sesiValid, userIdDariSesi } from "@/lib/auth";
 import DashboardView from "./dashboard-view";
 import { muatDashboard } from "./model";
 
@@ -7,7 +7,9 @@ export async function dashboardPage() {
   if (!(await sesiValid())) redirect("/login");
 
   try {
-    return <DashboardView awal={await muatDashboard()} />;
+    const userId = await userIdDariSesi();
+    if (!userId) redirect("/login");
+    return <DashboardView awal={await muatDashboard(userId)} />;
   } catch (e) {
     console.error(e);
     return (

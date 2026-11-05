@@ -1,4 +1,12 @@
-import { createHmac, timingSafeEqual } from "node:crypto";
+import { createHash, randomBytes, scrypt as scryptCallback, timingSafeEqual } from "node:crypto";
+import { promisify } from "node:util";
+
+const scrypt = promisify(scryptCallback);
+export const hashToken = (token: string) => createHash("sha256").update(token).digest("hex");
+export async function hashPassword(password: string) { const salt = randomBytes(16).toString("hex"); const key = await scrypt(password, salt, 64) as Buffer; return `${salt}:${key.toString("hex")}`; }
+export async function verifyPassword(password: string, stored: string) { const [salt, hex] = stored.split(":"); if (!salt || !hex) return false; const actual = await scrypt(password, salt, 64) as Buffer; const expected = Buffer.from(hex, "hex"); return actual.length === expected.length && timingSafeEqual(actual, expected); }
+export async function createSession(userId: string) { const token = randomBytes(32).toString("base64url"); await getPool().query("INSERT INTO auth_sessions (token_hash,user_id,expires_at) VALUES ($1,$2,now()+ interval '30 days')", [hashToken(token), userId]); return token; }
+async function userForToken(token?: string) { if (!token || !process.env.DATABASE_URL) return null; const r = await getPool().query("SELECT user_id FROM auth_sessions WHERE token_hash=$1 AND expires_at>now()", [hashToken(token)]); return r.rows[0]?.user_id as string | undefined ?? null; }
 import { cookies } from "next/headers";
 import type { NextRequest } from "next/server";
 import { getPool } from "./pg-repo";
@@ -6,63 +14,28 @@ import { getPool } from "./pg-repo";
 export const AUTH_COOKIE = "mc_auth";
 const UMUR_COOKIE = 60 * 60 * 24 * 30;
 
-function rahasia(): string | null {
-  const s = process.env.AUTH_SECRET?.trim() || process.env.DASHBOARD_PASSWORD?.trim();
-  return s || null;
+export async function authDikonfigurasi(): Promise<boolean> {
+  if (!process.env.DATABASE_URL) return false;
+  try { return Number((await getPool().query("SELECT COUNT(*)::int AS n FROM auth_users")).rows[0]?.n ?? 0) === 0; }
+  catch { return false; }
 }
 
-export function authDikonfigurasi(): boolean {
-  return Boolean(process.env.DASHBOARD_PASSWORD?.trim());
-}
-
-async function epochSesi(): Promise<string | null> {
-  if (!process.env.DATABASE_URL) return "0";
-  try {
-    const r = await getPool().query("SELECT nilai FROM config WHERE kunci = 'session_epoch'");
-    return String(r.rows[0]?.nilai ?? "0");
-  } catch {
-    return null;
-  }
-}
-
-export function buatToken(epoch: string): string | null {
-  const s = rahasia();
-  if (!s) return null;
-  const tanda = createHmac("sha256", s).update(`money-charger-web-v1:${epoch}`).digest("hex");
-  return `${epoch}.${tanda}`;
-}
-
-export function cocokkanPassword(masuk: string): boolean {
-  const benar = process.env.DASHBOARD_PASSWORD?.trim();
-  if (!benar) return false;
-  const a = Buffer.from(createHmac("sha256", "money-charger-pw").update(masuk).digest("hex"), "hex");
-  const b = Buffer.from(createHmac("sha256", "money-charger-pw").update(benar).digest("hex"), "hex");
-  return a.length === b.length && timingSafeEqual(a, b);
-}
-
-async function cocokkanToken(nilai: string | undefined): Promise<boolean> {
-  if (!nilai) return false;
-  const epoch = await epochSesi();
-  if (epoch === null) return false;
-  const t = buatToken(epoch);
-  if (!t) return false;
-  const a = Buffer.from(nilai, "utf8");
-  const b = Buffer.from(t, "utf8");
-  return a.length === b.length && timingSafeEqual(a, b);
-}
-
-export async function buatTokenSesi(): Promise<string | null> {
-  const epoch = await epochSesi();
-  return epoch === null ? null : buatToken(epoch);
+export async function userIdDariRequest(req: NextRequest): Promise<string | null> {
+  return userForToken(req.cookies.get(AUTH_COOKIE)?.value);
 }
 
 export async function sesiValid(): Promise<boolean> {
   const c = await cookies();
-  return cocokkanToken(c.get(AUTH_COOKIE)?.value);
+  return Boolean(await userForToken(c.get(AUTH_COOKIE)?.value));
+}
+
+export async function userIdDariSesi(): Promise<string | null> {
+  const c = await cookies();
+  return userForToken(c.get(AUTH_COOKIE)?.value);
 }
 
 export async function sesiValidDariRequest(req: NextRequest): Promise<boolean> {
-  return cocokkanToken(req.cookies.get(AUTH_COOKIE)?.value);
+  return Boolean(await userIdDariRequest(req));
 }
 
 export function opsiCookie() {
