@@ -2,6 +2,7 @@ import { catatAudit } from "@/lib/audit";
 import { bangunDashboard } from "@/lib/dashboard";
 import { wibDate } from "@/lib/parse/date";
 import { PgRepo } from "@/lib/pg-repo";
+import { ambilProfil } from "@/modules/profile/model";
 import {
   batalkanDebt,
   batalkanGoal,
@@ -25,8 +26,11 @@ import {
 import { AksiError } from "@/lib/web-actions";
 
 export async function muatDashboard(userId: string) {
-  const state = await new PgRepo(undefined, undefined, userId).load();
-  return bangunDashboard(state, wibDate(Date.now()));
+  const [state, profil] = await Promise.all([
+    new PgRepo(undefined, undefined, userId).load(),
+    ambilProfil(userId),
+  ]);
+  return { ...bangunDashboard(state, wibDate(Date.now())), profil: profil ?? undefined };
 }
 
 export async function simpanRencanaFinance(items: ItemRencana[], sekarang: boolean, userId: string) {

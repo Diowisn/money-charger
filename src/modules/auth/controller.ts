@@ -1,5 +1,5 @@
 import { aktorWeb, catatAudit } from "@/lib/audit";
-import { tolakJikaBelumLogin } from "@/lib/auth";
+import { tolakJikaBelumLogin, userIdDariRequest } from "@/lib/auth";
 import { batasi, ipDariRequest } from "@/lib/rate-limit";
 import { cabutSemuaSesi, daftar, masuk } from "./model";
 import { loginBerhasil, loginGagal, logoutBerhasil } from "./view";
@@ -55,8 +55,10 @@ export async function logout(req: Request) {
 export async function logoutSemua(req: import("next/server").NextRequest) {
   const tolak = await tolakJikaBelumLogin(req);
   if (tolak) return tolak;
+  const userId = await userIdDariRequest(req);
+  if (!userId) return loginGagal("Sesi habis. Silakan login ulang.", 401);
   try {
-    await cabutSemuaSesi();
+    await cabutSemuaSesi(userId);
     await catatAudit(aktorWeb(ipDariRequest(req)), "logout_semua_sesi");
     return logoutBerhasil();
   } catch {

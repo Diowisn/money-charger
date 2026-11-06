@@ -154,6 +154,14 @@ export interface State {
   goals: SavingGoal[];
 }
 
+export interface ProfilAkun {
+  nama: string | null;
+  email: string;
+  avatar: string | null;
+  punyaPassword: boolean;
+  providers: string[];
+}
+
 export interface Pending {
   id: number;
   jenis: string;

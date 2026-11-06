@@ -1,7 +1,7 @@
-import { afterEach, describe, expect, it } from "vitest";
-import { login } from "@/modules/auth/controller";
+import { describe, expect, it } from "vitest";
 import { getDashboard } from "@/modules/finance/controller";
 import { dashboard } from "@/modules/finance/view";
+import { deleteProfil, getProfil, patchProfil } from "@/modules/profile/controller";
 import { NextRequest } from "next/server";
 
 
@@ -12,6 +12,20 @@ describe("controller HMVC", () => {
 
     expect(res.status).toBe(401);
     await expect(res.json()).resolves.toMatchObject({ ok: false });
+  });
+
+  it("API profil menolak semua metode tanpa sesi", async () => {
+    const url = "https://app.example/api/profile";
+    const responses = await Promise.all([
+      getProfil(new NextRequest(url)),
+      patchProfil(new NextRequest(url, { method: "PATCH", body: "{}" })),
+      deleteProfil(new NextRequest(url, { method: "DELETE", body: "{}" })),
+    ]);
+
+    for (const res of responses) {
+      expect(res.status).toBe(401);
+      await expect(res.json()).resolves.toMatchObject({ ok: false });
+    }
   });
 
   it("respons dashboard selalu tanpa cache", () => {

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, type FormEvent } from "react";
+import { TautanTombol, Tombol } from "@/components/tombol";
 
 export default function LoginForm({ registerFirst, googleEnabled, facebookEnabled, oauthError }: { registerFirst: boolean; googleEnabled: boolean; facebookEnabled: boolean; oauthError?: boolean }) {
   const [register, setRegister] = useState(registerFirst);
@@ -68,14 +69,28 @@ export default function LoginForm({ registerFirst, googleEnabled, facebookEnable
         />
       </label>
       {error ? <p className="error" id="login-error" role="alert">{error}</p> : null}
-      <button type="submit" className="utama lebar" disabled={sibuk || !password}>
+      <Tombol type="submit" lebar ukuran="besar" disabled={sibuk || !email || !password}>
         {sibuk ? "Memeriksa..." : register ? "Buat akun" : "Masuk"}
-      </button>
-      {!registerFirst ? <button type="button" className="lebar" onClick={() => setRegister(!register)}>{register ? "Sudah punya akun? Masuk" : "Daftar akun baru"}</button> : null}
-      {googleEnabled || facebookEnabled ? <div className="form">
-        {googleEnabled ? <a className="lebar" href="/api/auth/oauth/google">Masuk dengan Google</a> : null}
-        {facebookEnabled ? <a className="lebar" href="/api/auth/oauth/facebook">Masuk dengan Facebook</a> : null}
-      </div> : null}
+      </Tombol>
+      {!registerFirst ? (
+        <Tombol type="button" varian="ghost" lebar onClick={() => setRegister(!register)}>
+          {register ? "Sudah punya akun? Masuk" : "Daftar akun baru"}
+        </Tombol>
+      ) : null}
+      {googleEnabled || facebookEnabled ? (
+        <div className="form">
+          {googleEnabled ? (
+            <TautanTombol varian="ghost" lebar href="/api/auth/oauth/google">
+              Masuk dengan Google
+            </TautanTombol>
+          ) : null}
+          {facebookEnabled ? (
+            <TautanTombol varian="ghost" lebar href="/api/auth/oauth/facebook">
+              Masuk dengan Facebook
+            </TautanTombol>
+          ) : null}
+        </div>
+      ) : null}
     </form>
   );
 }

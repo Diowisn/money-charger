@@ -11,7 +11,7 @@ import {
   totalPlan,
 } from "./engine";
 import { addDays, diffDays } from "./parse/date";
-import { TURUNAN, type State, type Tx, type TxTipe, type Wadah } from "./types";
+import { TURUNAN, type ProfilAkun, type State, type Tx, type TxTipe, type Wadah } from "./types";
 
 export interface PosView {
   id: number;
@@ -83,6 +83,7 @@ export interface TrenHari {
 
 export interface DashboardData {
   hariIni: string;
+  profil?: ProfilAkun;
   periode: {
     aktif: boolean;
     mulai: string | null;

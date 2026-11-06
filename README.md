@@ -24,6 +24,7 @@ Acuan: [PRD Money-Charger SaaS](./prd-catatan-keuangan-whatsapp.md) dan [SRS](./
 | `src/modules/whatsapp/` | Modul HMVC webhook: controller, model, worker antrean, dan respons |
 | `src/modules/finance/` | Modul HMVC keuangan/dashboard: controller, model, view, dan halaman dashboard |
 | `src/modules/auth/` | Modul HMVC autentikasi dashboard |
+| `src/modules/profile/` | Modul HMVC profil akun: nama, email, foto, password, hapus akun |
 | `src/modules/export/` | Modul HMVC unduh CSV |
 | `src/modules/health/` | Modul HMVC diagnosa kesiapan |
 | `src/modules/outbox/` | Endpoint terjaga untuk memproses ulang balasan WhatsApp tertunda |
@@ -258,7 +259,7 @@ Isi dashboard:
 Perubahan dari web dan WhatsApp memakai database yang sama. Dashboard menyegarkan data otomatis setiap 5 detik dan saat tab kembali aktif/fokus, jadi transaksi dari WhatsApp muncul tanpa hard reload. Respons dashboard memakai `no-store` agar tidak tertahan cache browser/CDN. Semua API dashboard wajib login; `/api/health` hanya
 memberi status ringkas tanpa `HEALTH_TOKEN`.
 
-Saat deploy, jalankan `npm run db:setup` untuk menerapkan skema akun, lalu daftar akun pertama lewat `/login`. Daftarkan callback OAuth `<origin>/api/auth/oauth/google/callback` dan `<origin>/api/auth/oauth/facebook/callback` di konsol provider.
+Saat deploy, jalankan `npm run db:setup` untuk menerapkan skema akun, lalu daftar akun pertama lewat `/login`. Daftarkan callback OAuth `<origin>/api/auth/oauth/google/callback` dan `<origin>/api/auth/oauth/facebook/callback` di konsol provider. Profil akun (nama, email, foto, password, hapus akun) dikelola dari tab Profil dashboard.
 
 ## Perintah chat
 

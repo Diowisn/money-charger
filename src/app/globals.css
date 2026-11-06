@@ -676,7 +676,8 @@ button {
   align-items: start;
 }
 
-.dua-kolom > .lebar {
+.dua-kolom > .lebar,
+.dua-kolom > .tombol-lebar {
   grid-column: 1 / -1;
 }
 
@@ -684,7 +685,8 @@ button {
   align-content: start;
 }
 
-.dua-kolom .form > .lebar {
+.dua-kolom .form > .lebar,
+.dua-kolom .form > .tombol-lebar {
   grid-column: 1 / -1;
 }
 
@@ -1055,6 +1057,7 @@ input[type="range"] {
 }
 
 .form-transaksi-grid > .lebar,
+.form-transaksi-grid > .tombol-lebar,
 .form-transaksi-grid > .segmented {
   grid-column: 1 / -1;
 }
@@ -2295,9 +2298,16 @@ body {
 
 .header-avatar {
   border: 0;
+  overflow: hidden;
   background: linear-gradient(140deg, var(--hero-bg), var(--aksen));
   color: #fff;
   font-size: 0.82rem;
+}
+
+.header-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
 }
 
 .beranda,
@@ -2651,6 +2661,18 @@ body {
   object-fit: cover;
 }
 
+.profil-avatar.kecil {
+  width: 48px;
+  height: 48px;
+}
+
+.profil-foto-baris {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
 .profil-kartu h2 {
   margin: 0 0 2px;
   font-size: 1.05rem;
@@ -2899,4 +2921,126 @@ body {
   .dialog-kartu {
     animation: none;
   }
+}
+
+/* ---------- Komponen tombol ---------- */
+
+.tombol {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 10px 16px;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 700;
+  line-height: 1.15;
+  text-align: center;
+  text-decoration: none;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease, transform 0.08s ease;
+}
+
+.tombol:active:not(:disabled) {
+  transform: scale(0.985);
+}
+
+.tombol:focus-visible {
+  outline: 3px solid var(--aksen);
+  outline-offset: 2px;
+}
+
+.tombol:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.tombol-utama {
+  background: var(--tombol-bg);
+  color: var(--tombol-teks);
+  box-shadow: 0 8px 18px color-mix(in srgb, var(--tombol-bg) 22%, transparent);
+}
+
+.tombol-utama:hover:not(:disabled) {
+  background: var(--aksen-kuat);
+}
+
+.tombol-sekunder {
+  background: var(--tombol-lembut);
+  color: var(--tombol-lembut-teks);
+  border-color: color-mix(in srgb, var(--aksen) 20%, transparent);
+}
+
+.tombol-sekunder:hover:not(:disabled) {
+  background: var(--aksen-lembut);
+  border-color: var(--aksen);
+}
+
+.tombol-ghost {
+  background: var(--kartu);
+  color: var(--teks);
+  border-color: var(--garis);
+}
+
+.tombol-ghost:hover:not(:disabled) {
+  background: var(--kartu-2);
+  border-color: var(--aksen);
+}
+
+.tombol-bahaya {
+  background: var(--merah-lembut);
+  color: var(--merah);
+  border-color: color-mix(in srgb, var(--merah) 24%, transparent);
+}
+
+.tombol-bahaya:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--merah-lembut) 70%, var(--merah) 8%);
+}
+
+.tombol-tautan {
+  min-height: auto;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  color: var(--hijau);
+  font-size: inherit;
+}
+
+.tombol-tautan:hover:not(:disabled) {
+  color: var(--aksen-kuat);
+  text-decoration: underline;
+}
+
+.tombol-kecil {
+  min-height: 34px;
+  padding: 7px 11px;
+  border-radius: 9px;
+  font-size: 0.74rem;
+}
+
+.tombol-besar {
+  min-height: 50px;
+  padding: 12px 20px;
+  border-radius: 14px;
+  font-size: 0.92rem;
+}
+
+.tombol-lebar {
+  width: 100%;
+}
+
+.tombol-ikon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+}
+
+.tombol-ikon svg {
+  width: 18px;
+  height: 18px;
 }

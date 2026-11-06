@@ -39,6 +39,6 @@ export async function masuk(email: string, password: string): Promise<string | n
   return createSession(r.rows[0].id);
 }
 
-export async function cabutSemuaSesi(): Promise<void> {
-  await getPool().query("DELETE FROM auth_sessions");
+export async function cabutSemuaSesi(userId: string): Promise<void> {
+  await getPool().query("DELETE FROM auth_sessions WHERE user_id = $1", [userId]);
 }

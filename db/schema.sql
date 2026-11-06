@@ -5,8 +5,12 @@ CREATE TABLE IF NOT EXISTS auth_users (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   email TEXT NOT NULL UNIQUE,
   password_hash TEXT,
+  nama TEXT,
+  avatar TEXT,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+ALTER TABLE auth_users ADD COLUMN IF NOT EXISTS nama TEXT;
+ALTER TABLE auth_users ADD COLUMN IF NOT EXISTS avatar TEXT;
 
 CREATE TABLE IF NOT EXISTS allowed_numbers (
   id         SERIAL PRIMARY KEY,
