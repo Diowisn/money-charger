@@ -1603,21 +1603,21 @@ function Transaksi({
 
         <div className="filter-riwayat">
           <button type="button" className="utama" onClick={() => {
-            const kolom = ["ID", "Tanggal", "Jenis", "Kategori", "Catatan", "Nominal", "Biaya admin", "Wadah asal", "Wadah tujuan", "Status"];
+            const kolom = ["ID", "Tanggal", "Jenis", "Kategori", "Catatan", "Nominal (Rp)", "Biaya admin (Rp)", "Wadah asal", "Wadah tujuan", "Status"];
             const sel = (nilai: string | number | null) => {
-              let teks = String(nilai ?? "");
-              if (/^[=+@\-\t\r]/.test(teks)) teks = `'${teks}`;
-              return /[",\n]/.test(teks) ? `"${teks.replace(/"/g, '""')}"` : teks;
+              let teks = String(nilai ?? "").replace(/[\t\r\n]+/g, " ");
+              if (/^[-=+@]/.test(teks)) teks = `'${teks}`;
+              return teks;
             };
-            const baris = data.transaksi.map((t) => [t.id, t.tanggal, NAMA_TIPE[t.tipe] ?? t.tipe, t.subPost, t.label, t.nominal, t.biayaAdmin, t.wadahAsal, t.wadahTujuan, t.status].map(sel).join(","));
-            const url = URL.createObjectURL(new Blob(["\uFEFF", [kolom.map(sel).join(","), ...baris].join("\r\n")], { type: "text/csv;charset=utf-8" }));
+            const baris = data.transaksi.map((t) => [t.id, t.tanggal, NAMA_TIPE[t.tipe] ?? t.tipe, t.subPost, t.label, t.nominal, t.biayaAdmin, t.wadahAsal, t.wadahTujuan, t.status].map(sel).join("\t"));
+            const url = URL.createObjectURL(new Blob(["\uFEFF", [kolom.map(sel).join("\t"), ...baris].join("\r\n")], { type: "text/tab-separated-values;charset=utf-8" }));
             const tautan = document.createElement("a");
             tautan.href = url;
-            tautan.download = "money-charger-transaksi.csv";
+            tautan.download = "money-charger-transaksi.tsv";
             tautan.click();
             URL.revokeObjectURL(url);
-          }}>Ekspor semua transaksi (CSV)</button>
-          <span className="muted kecil">Bisa dibuka di Excel atau Google Sheets; mencakup semua bulan dan transaksi batal.</span>
+          }}>Ekspor semua transaksi (Excel/TSV)</button>
+          <span className="muted kecil">Kolom langsung terpisah saat dibuka di Excel; mencakup semua bulan dan transaksi batal.</span>
         </div>
         <div className="filter-riwayat">
           <label className="filter-jenis">
