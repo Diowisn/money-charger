@@ -4,7 +4,7 @@
 const CONFIG = {
   WEBHOOK_URL: 'https://GANTI-DOMAIN-ANDA.vercel.app/api/email/inbound',
   SECRET: 'GANTI_DENGAN_EMAIL_INBOUND_SECRET',
-  QUERY: 'from:banksi.co.id newer_than:7d in:anywhere (subject:QRIS OR subject:Pembayaran OR subject:"INCOMING TRANSACTION")',
+  QUERY: '(from:bankbsi.co.id OR from:noreply-cms@bankbsi.co.id OR from:nonereply.byondbybsi@bankbsi.co.id) newer_than:1d in:anywhere (subject:QRIS OR subject:Pembayaran OR subject:"INCOMING TRANSACTION")',
 };
 
 function prosesEmailBsi() {
@@ -52,18 +52,32 @@ function prosesEmailBsi() {
   Logger.log('Selesai. Email diproses: ' + diproses);
 }
 
-// Jalankan ini untuk melihat email BSI yang ada dan apakah QUERY cocok.
+// Jalankan ini untuk melihat akun Gmail aktif dan query mana yang menemukan email.
 function debugEmailBsi() {
-  const semua = GmailApp.search('from:banksi.co.id newer_than:7d in:anywhere', 0, 20);
-  Logger.log('Semua email BSI (7 hari): ' + semua.length + ' thread');
-  for (const thread of semua) {
-    for (const msg of thread.getMessages()) {
-      Logger.log('BSI: ' + msg.getDate() + ' | unread=' + msg.isUnread() + ' | ' + msg.getFrom() + ' | ' + msg.getSubject());
+  Logger.log('Akun Gmail aktif: ' + Session.getActiveUser().getEmail());
+
+  const daftarQuery = [
+    'from:noreply-cms@bankbsi.co.id newer_than:7d in:anywhere',
+    'from:nonereply.byondbybsi@bankbsi.co.id newer_than:7d in:anywhere',
+    'from:bankbsi.co.id newer_than:7d in:anywhere',
+    'from:bankbsi newer_than:7d in:anywhere',
+    'subject:"INCOMING TRANSACTION" newer_than:7d in:anywhere',
+    'subject:QRIS newer_than:7d in:anywhere',
+    'newer_than:7d in:anywhere',
+  ];
+
+  for (const q of daftarQuery) {
+    const hasil = GmailApp.search(q, 0, 5);
+    Logger.log('QUERY [' + q + '] -> ' + hasil.length + ' thread');
+    for (const thread of hasil) {
+      for (const msg of thread.getMessages().slice(-3)) {
+        Logger.log('  ' + msg.getDate() + ' | ' + msg.getFrom() + ' | ' + msg.getSubject());
+      }
     }
   }
 
   const cocok = GmailApp.search(CONFIG.QUERY, 0, 20);
-  Logger.log('Cocok QUERY: ' + cocok.length + ' thread');
+  Logger.log('Cocok QUERY utama: ' + cocok.length + ' thread');
   for (const thread of cocok) {
     for (const msg of thread.getMessages()) {
       Logger.log('COCOK: ' + msg.getDate() + ' | unread=' + msg.isUnread() + ' | ' + msg.getSubject());
@@ -77,7 +91,7 @@ function tesKoneksi() {
     method: 'post',
     contentType: 'application/json',
     headers: { 'X-Email-Secret': CONFIG.SECRET },
-    payload: JSON.stringify({ from: 'tes@banksi.co.id' }),
+    payload: JSON.stringify({ from: 'tes@bankbsi.co.id' }),
     muteHttpExceptions: true,
   });
   Logger.log('HTTP ' + res.getResponseCode() + ': ' + res.getContentText());

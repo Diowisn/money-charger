@@ -211,10 +211,10 @@ Ganti nomor pribadi: ubah `ALLOWED_NUMBERS`, jalankan `npm run db:setup` lagi.
 Arah dideteksi dari subjek/isi email. Email yang arahnya tidak dikenali dilewati, bukan dicatat asal-asalan.
 
 1. Isi `EMAIL_INBOUND_SECRET` dengan string acak panjang di `.env.local` dan di Vercel, lalu redeploy.
-   Opsional: isi `EMAIL_ALLOWED_SENDERS=banksi.co.id` agar hanya email dari domain itu yang diterima.
+   Opsional: isi `EMAIL_ALLOWED_SENDERS=bankbsi.co.id` agar hanya email dari domain itu yang diterima.
 2. Jembatan termudah untuk Gmail: buka `script.google.com`, buat project baru, tempel isi
    [`scripts/gmail-bsi.gs`](./scripts/gmail-bsi.gs), ganti `WEBHOOK_URL` dan `SECRET`, lalu jalankan
-   `pasangTrigger` sekali dan izinkan akses Gmail. Script memeriksa email BSI 7 hari terakhir tiap 5 menit dan
+   `pasangTrigger` sekali dan izinkan akses Gmail. Script memeriksa email BSI 24 jam terakhir tiap 5 menit dan
    meneruskannya ke webhook; email yang sudah pernah dikirim dilewati oleh idempotensi server. Untuk diagnosa,
    jalankan `debugEmailBsi` (lihat email yang cocok) atau `tesKoneksi` (HTTP 400 berarti secret benar).
    Alternatif: Resend Inbound, Cloudflare Email Workers, Mailgun Routes, atau Zapier/Make.
@@ -223,7 +223,7 @@ Arah dideteksi dari subjek/isi email. Email yang arahnya tidak dikenali dilewati
    ```json
    {
      "id": "id-unik-email-ini",
-     "from": "noreply-crm@banksi.co.id",
+     "from": "noreply-cms@bankbsi.co.id",
      "subject": "INCOMING TRANSACTION NOTIFICATION",
      "text": "Nominal\n1,800,000.00\nJenis Transaksi\nPayroll",
      "tanggal": "2026-10-31",
