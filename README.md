@@ -32,8 +32,8 @@ Acuan: [PRD Money-Charger SaaS](./prd-catatan-keuangan-whatsapp.md) dan [SRS](./
 | `src/lib/email.ts` | Heuristik ekstraksi nominal & deteksi "gaji/payroll" dari teks email |
 | `src/app/api/` | Adapter Next.js tipis yang meneruskan request ke controller modul |
 | `src/app/page.tsx` | Adapter halaman dashboard Next.js |
-| `src/app/login/` | Halaman login password |
-| `src/lib/auth.ts` | Sesi cookie HMAC (`DASHBOARD_PASSWORD` + `AUTH_SECRET`) dengan epoch pencabutan semua sesi |
+| `src/app/login/` | Halaman masuk, daftar akun, dan tombol Google/Facebook |
+| `src/lib/auth.ts` | Sesi akun berbasis cookie acak yang disimpan sebagai hash di database |
 | `src/lib/dashboard.ts` | View-model dashboard dari `State` + engine |
 | `src/lib/web-actions.ts` | Aksi web: simpan rencana, transaksi, pos, setup |
 | `db/schema.sql` | Skema tabel |
@@ -82,7 +82,7 @@ Struktur ini **belum** menjadikan aplikasi multi-pelanggan: autentikasi, whiteli
 
 ### 4. Isi environment
 Salin `.env.example` ke `.env.local` dan isi. `ALLOWED_NUMBERS` adalah nomor pribadi Anda, format `62812...` tanpa plus.
-Isi `DASHBOARD_PASSWORD` dengan password kuat untuk halaman web. `AUTH_SECRET` opsional; bila kosong, cookie ditandatangani dengan password tersebut. Tanpa `DASHBOARD_PASSWORD`, halaman web menolak login tetapi bot WhatsApp tetap berjalan.
+Isi `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET` dan `FACEBOOK_APP_ID`/`FACEBOOK_APP_SECRET` untuk mengaktifkan tombol login provider. Untuk Facebook boleh memakai `META_APP_ID`/`WA_APP_SECRET` bila memakai aplikasi Meta yang sama. Callback OAuth memakai origin request; `AUTH_CALLBACK_BASE_URL` hanya diperlukan untuk memaksa origin tertentu.
 Untuk percobaan lokal, isi variabel WhatsApp berikut sesuai API Setup Meta: `WA_PHONE_NUMBER_ID`, `WA_ACCESS_TOKEN`, `WA_APP_SECRET`. Buat sendiri nilai acak untuk `WA_VERIFY_TOKEN`; gunakan nilai yang sama saat mendaftarkan webhook. Versi Graph API bawaan adalah `v25.0`; samakan dengan versi yang ditampilkan Meta.
 
 ```bash
@@ -122,8 +122,10 @@ Contoh berikut hanya format pengisian. Ganti semua nilai bertanda `GANTI_...` de
 | `GROQ_MODEL` | `openai/gpt-oss-20b` |
 | `GROQ_FALLBACK_MODELS` | opsional; model cadangan Groq dipisahkan koma (error model/server, bukan 429) |
 | `CRON_SECRET` | secret untuk `POST /api/cron/outbox` |
-| `DASHBOARD_PASSWORD` | password kuat untuk login dashboard web |
-| `AUTH_SECRET` | opsional; string acak panjang untuk menandatangani cookie sesi |
+| `GOOGLE_CLIENT_ID` | Client ID OAuth Google |
+| `GOOGLE_CLIENT_SECRET` | Client Secret OAuth Google |
+| `FACEBOOK_APP_ID` | App ID Facebook Login (opsional bila memakai `META_APP_ID`) |
+| `FACEBOOK_APP_SECRET` | App Secret Facebook Login (opsional bila memakai `WA_APP_SECRET`) |
 | `HEALTH_TOKEN` | opsional; bila diisi, detail `/api/health` hanya bisa dibuka dengan header `X-Health-Token` atau `Authorization: Bearer <nilai ini>` |
 
 Di halaman Webhooks Meta, gunakan:
@@ -212,8 +214,10 @@ Arah dideteksi dari subjek/isi email. Email yang arahnya tidak dikenali dilewati
    Opsional: isi `EMAIL_ALLOWED_SENDERS=banksi.co.id` agar hanya email dari domain itu yang diterima.
 2. Jembatan termudah untuk Gmail: buka `script.google.com`, buat project baru, tempel isi
    [`scripts/gmail-bsi.gs`](./scripts/gmail-bsi.gs), ganti `WEBHOOK_URL` dan `SECRET`, lalu jalankan
-   `pasangTrigger` sekali dan izinkan akses Gmail. Script memeriksa email BSI belum dibaca tiap 5 menit dan
-   meneruskannya ke webhook. Alternatif: Resend Inbound, Cloudflare Email Workers, Mailgun Routes, atau Zapier/Make.
+   `pasangTrigger` sekali dan izinkan akses Gmail. Script memeriksa email BSI 7 hari terakhir tiap 5 menit dan
+   meneruskannya ke webhook; email yang sudah pernah dikirim dilewati oleh idempotensi server. Untuk diagnosa,
+   jalankan `debugEmailBsi` (lihat email yang cocok) atau `tesKoneksi` (HTTP 400 berarti secret benar).
+   Alternatif: Resend Inbound, Cloudflare Email Workers, Mailgun Routes, atau Zapier/Make.
 3. Body JSON yang dikenali:
 
    ```json
@@ -238,7 +242,7 @@ Arah dideteksi dari subjek/isi email. Email yang arahnya tidak dikenali dilewati
 
 ## Dashboard web
 
-Buka `https://<domain-vercel-anda>/login` lalu masukkan `DASHBOARD_PASSWORD`. Untuk lokal: `npm run dev`, buka `http://localhost:3000`, dan lihat nilai `DASHBOARD_PASSWORD` di `.env.local`.
+Buka `https://<domain-vercel-anda>/login`, pilih **Daftar akun baru**, lalu isi email dan password minimal 12 karakter. Akun pertama otomatis memiliki seluruh data lama. Login berikutnya memakai email/password atau tombol Google/Facebook yang sudah dikonfigurasi. Untuk lokal: `npm run dev`, buka `http://localhost:3000`, lalu daftar akun pertama.
 
 Isi dashboard:
 
@@ -254,7 +258,7 @@ Isi dashboard:
 Perubahan dari web dan WhatsApp memakai database yang sama. Dashboard menyegarkan data otomatis setiap 5 detik dan saat tab kembali aktif/fokus, jadi transaksi dari WhatsApp muncul tanpa hard reload. Respons dashboard memakai `no-store` agar tidak tertahan cache browser/CDN. Semua API dashboard wajib login; `/api/health` hanya
 memberi status ringkas tanpa `HEALTH_TOKEN`.
 
-Saat deploy, tambahkan `DASHBOARD_PASSWORD` (dan `AUTH_SECRET` bila dipakai) di Vercel, lalu redeploy. Tanpa itu halaman login akan menampilkan pesan bahwa password belum diatur.
+Saat deploy, jalankan `npm run db:setup` untuk menerapkan skema akun, lalu daftar akun pertama lewat `/login`. Daftarkan callback OAuth `<origin>/api/auth/oauth/google/callback` dan `<origin>/api/auth/oauth/facebook/callback` di konsol provider.
 
 ## Perintah chat
 

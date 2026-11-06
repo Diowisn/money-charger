@@ -2,12 +2,12 @@
 
 import { useState, type FormEvent } from "react";
 
-export default function LoginForm({ registerFirst, googleEnabled, facebookEnabled }: { registerFirst: boolean; googleEnabled: boolean; facebookEnabled: boolean }) {
+export default function LoginForm({ registerFirst, googleEnabled, facebookEnabled, oauthError }: { registerFirst: boolean; googleEnabled: boolean; facebookEnabled: boolean; oauthError?: boolean }) {
   const [register, setRegister] = useState(registerFirst);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [sibuk, setSibuk] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(oauthError ? "Login Google/Facebook gagal. Coba lagi atau masukkan email dan password." : null);
 
   async function masuk(e: FormEvent) {
     e.preventDefault();
@@ -71,7 +71,7 @@ export default function LoginForm({ registerFirst, googleEnabled, facebookEnable
       <button type="submit" className="utama lebar" disabled={sibuk || !password}>
         {sibuk ? "Memeriksa..." : register ? "Buat akun" : "Masuk"}
       </button>
-      {!registerFirst ? <button type="button" className="lebar" onClick={() => setRegister(!register)}>{register ? "Sudah punya akun? Masuk" : "Buat akun pertama"}</button> : null}
+      {!registerFirst ? <button type="button" className="lebar" onClick={() => setRegister(!register)}>{register ? "Sudah punya akun? Masuk" : "Daftar akun baru"}</button> : null}
       {googleEnabled || facebookEnabled ? <div className="form">
         {googleEnabled ? <a className="lebar" href="/api/auth/oauth/google">Masuk dengan Google</a> : null}
         {facebookEnabled ? <a className="lebar" href="/api/auth/oauth/facebook">Masuk dengan Facebook</a> : null}

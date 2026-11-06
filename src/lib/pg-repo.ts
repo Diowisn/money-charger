@@ -337,36 +337,58 @@ export class PgRepo implements Repo {
     return (r.rowCount ?? 0) > 0;
   }
 
-  /** Dipakai script db:setup. Hanya mengisi bila belum ada data. */
+  /** Dipakai script db:setup. Melengkapi data bawaan yang belum ada, atomik. */
   async seed(allowedNumbers: string[]) {
     for (const wa of allowedNumbers) {
       await this.db.query("INSERT INTO allowed_numbers (wa_number) VALUES ($1) ON CONFLICT DO NOTHING", [wa]);
     }
-    const userId = this.financeUser();
-    const existing = await this.db.query("SELECT COUNT(*)::int AS n FROM groups WHERE user_id IS NOT DISTINCT FROM $1", [userId]);
-    if (existing.rows[0].n > 0) return false;
+    return this.transaction(async (repo) => {
+      const db = repo as PgRepo;
+      const userId = db.financeUser();
+      const active = await db.db.query(
+        "SELECT 1 FROM plan_versions WHERE user_id IS NOT DISTINCT FROM $1 AND status = 'aktif' LIMIT 1",
+        [userId],
+      );
+      if ((active.rowCount ?? 0) > 0) return false;
 
-    const grupId = new Map<string, number>();
-    for (const [i, nama] of SEED_GRUP.entries()) {
-      const r = await this.db.query("INSERT INTO groups (user_id, nama, urutan) VALUES ($1,$2,$3) RETURNING id", [userId, nama, i + 1]);
-      grupId.set(nama, r.rows[0].id);
-    }
-    const items: PlanItem[] = [];
-    let jajanId: number | null = null;
-    for (const s of SEED_SUBPOS) {
-      const id = await this.addSubPost(grupId.get(s.grup)!, s.nama);
-      for (const a of s.alias) await this.addAlias(id, a);
-      items.push({ tipe: "sub_pos", subPostId: id, nominal: s.jatah });
-      if (s.nama === SEED_NAMA_JAJAN) jajanId = id;
-    }
-    items.push({ tipe: "dd", subPostId: null, nominal: SEED_DD });
-    items.push({ tipe: "tabungan", subPostId: null, nominal: SEED_TABUNGAN });
-    items.push({ tipe: "investasi", subPostId: null, nominal: SEED_INVESTASI });
-    await this.createPlanVersion("Draft 1", "aktif", items);
-    for (const [k, v] of Object.entries(SEED_CONFIG_DEFAULT)) {
-      await this.db.query("INSERT INTO config (user_id, kunci, nilai) VALUES ($1,$2,$3) ON CONFLICT DO NOTHING", [userId, k, v]);
-    }
-    if (jajanId) await this.setConfig("bonus_subpos_id", String(jajanId));
-    return true;
+      const grupId = new Map<string, number>();
+      for (const [i, nama] of SEED_GRUP.entries()) {
+        const inserted = await db.db.query(
+          `INSERT INTO groups (user_id, nama, urutan)
+           SELECT $1, $2, $3
+           WHERE NOT EXISTS (SELECT 1 FROM groups WHERE user_id IS NOT DISTINCT FROM $1 AND nama = $2)
+           RETURNING id`,
+          [userId, nama, i + 1],
+        );
+        const id =
+          inserted.rows[0]?.id ??
+          (await db.db.query("SELECT id FROM groups WHERE user_id IS NOT DISTINCT FROM $1 AND nama = $2 LIMIT 1", [userId, nama])).rows[0].id;
+        grupId.set(nama, id);
+      }
+      const items: PlanItem[] = [];
+      let jajanId: number | null = null;
+      for (const s of SEED_SUBPOS) {
+        const existing = await db.db.query(
+          "SELECT id FROM sub_posts WHERE user_id IS NOT DISTINCT FROM $1 AND nama = $2 LIMIT 1",
+          [userId, s.nama],
+        );
+        const id = existing.rows[0]?.id ?? (await db.addSubPost(grupId.get(s.grup)!, s.nama));
+        if (existing.rows[0]) {
+          await db.db.query("UPDATE sub_posts SET group_id = $2 WHERE id = $1 AND user_id IS NOT DISTINCT FROM $3", [id, grupId.get(s.grup)!, userId]);
+        }
+        for (const a of s.alias) await db.addAlias(id, a);
+        items.push({ tipe: "sub_pos", subPostId: id, nominal: s.jatah });
+        if (s.nama === SEED_NAMA_JAJAN) jajanId = id;
+      }
+      items.push({ tipe: "dd", subPostId: null, nominal: SEED_DD });
+      items.push({ tipe: "tabungan", subPostId: null, nominal: SEED_TABUNGAN });
+      items.push({ tipe: "investasi", subPostId: null, nominal: SEED_INVESTASI });
+      await db.createPlanVersion("Draft 1", "aktif", items);
+      for (const [k, v] of Object.entries(SEED_CONFIG_DEFAULT)) {
+        await db.db.query("INSERT INTO config (user_id, kunci, nilai) VALUES ($1,$2,$3) ON CONFLICT DO NOTHING", [userId, k, v]);
+      }
+      if (jajanId) await db.setConfig("bonus_subpos_id", String(jajanId));
+      return true;
+    });
   }
 }

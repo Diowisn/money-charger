@@ -19,11 +19,12 @@ export async function terimaEmail(req: NextRequest) {
     return emailGagal("Body harus JSON.", 400);
   }
 
+  const teks = typeof body.text === "string" && body.text.trim() ? body.text : undefined;
   const input: EmailMasuk = {
     id: String(body.id ?? body.messageId ?? ""),
     dari: typeof body.from === "string" ? body.from : undefined,
     subjek: typeof body.subject === "string" ? body.subject : undefined,
-    teks: typeof body.text === "string" ? body.text : typeof body.html === "string" ? body.html : undefined,
+    teks: teks ?? (typeof body.html === "string" ? body.html : undefined),
     nominal: typeof body.nominal === "number" ? body.nominal : undefined,
     tanggal: typeof body.tanggal === "string" ? body.tanggal : undefined,
   };

@@ -5,8 +5,9 @@ import LoginForm from "./login-form";
 
 export const dynamic = "force-dynamic";
 
-export default async function LoginPage() {
+export default async function LoginPage({ searchParams }: { searchParams: Promise<{ error?: string }> }) {
   if (await sesiValid()) redirect("/");
+  const query = await searchParams;
   return (
     <main className="auth">
       <div className="auth-kartu">
@@ -14,7 +15,7 @@ export default async function LoginPage() {
         <p className="eyebrow">Money-Charger</p>
         <h1>Masuk</h1>
         <p className="muted">Dashboard pribadi keuangan.</p>
-        <LoginForm registerFirst={await authDikonfigurasi()} googleEnabled={configured("google")} facebookEnabled={configured("facebook")} />
+        <LoginForm registerFirst={await authDikonfigurasi()} googleEnabled={configured("google")} facebookEnabled={configured("facebook")} oauthError={query.error === "oauth"} />
       </div>
     </main>
   );

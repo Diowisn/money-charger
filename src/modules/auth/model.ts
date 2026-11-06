@@ -1,6 +1,6 @@
 import { randomBytes } from "node:crypto";
 import { createSession, hashPassword, hashToken, verifyPassword } from "@/lib/auth";
-import { getPool } from "@/lib/pg-repo";
+import { getPool, PgRepo } from "@/lib/pg-repo";
 
 export async function jumlahPengguna(): Promise<number> {
   const r = await getPool().query("SELECT COUNT(*)::int AS n FROM auth_users");
@@ -12,16 +12,22 @@ export async function daftar(email: string, password: string): Promise<string | 
   try {
     await client.query("BEGIN");
     await client.query("SELECT pg_advisory_xact_lock(72418302)");
+    const existing = await client.query("SELECT 1 FROM auth_users WHERE email = $1", [email]);
+    if (existing.rowCount) { await client.query("ROLLBACK"); return null; }
     const count = await client.query("SELECT COUNT(*)::int AS n FROM auth_users");
-    if (count.rows[0].n) { await client.query("ROLLBACK"); return null; }
+    const firstUser = count.rows[0].n === 0;
     const hash = await hashPassword(password);
     const user = await client.query<{ id: string }>("INSERT INTO auth_users (email,password_hash) VALUES ($1,$2) RETURNING id", [email, hash]);
     const userId = user.rows[0].id;
-    for (const table of ["groups", "sub_posts", "aliases", "plan_versions", "plan_items", "transactions", "debts", "saving_goals", "config"]) {
-      await client.query(`UPDATE ${table} SET user_id = $1 WHERE user_id IS NULL`, [userId]);
+    if (firstUser) {
+      for (const table of ["groups", "sub_posts", "aliases", "plan_versions", "plan_items", "transactions", "debts", "saving_goals", "config"]) {
+        await client.query(`UPDATE ${table} SET user_id = $1 WHERE user_id IS NULL`, [userId]);
+      }
+    } else {
+      await new PgRepo(client, true, userId).seed([]);
     }
     const token = randomBytes(32).toString("base64url");
-    await client.query("INSERT INTO auth_sessions (token_hash,user_id,expires_at) VALUES ($1,$2,now()+interval '30 days')", [hashToken(token), user.rows[0].id]);
+    await client.query("INSERT INTO auth_sessions (token_hash,user_id,expires_at) VALUES ($1,$2,now()+interval '30 days')", [hashToken(token), userId]);
     await client.query("COMMIT");
     return token;
   } catch (e) { await client.query("ROLLBACK"); throw e; } finally { client.release(); }

@@ -8,14 +8,20 @@ const SEMUA_VARS = [
   "ALLOWED_NUMBERS",
   "APP_BASE_URL",
   "GROQ_API_KEY",
-  "DASHBOARD_PASSWORD",
-  "AUTH_SECRET",
+  "GOOGLE_CLIENT_ID",
+  "GOOGLE_CLIENT_SECRET",
+  "FACEBOOK_APP_ID",
+  "FACEBOOK_APP_SECRET",
+  "AUTH_CALLBACK_BASE_URL",
   "HEALTH_TOKEN",
   "EMAIL_INBOUND_SECRET",
   "CRON_SECRET",
 ] as const;
 
 const TABEL = [
+  "auth_users",
+  "auth_sessions",
+  "auth_identities",
   "allowed_numbers",
   "groups",
   "sub_posts",
@@ -59,7 +65,8 @@ export async function periksaKesiapan() {
   for (const k of WA_VARS) if (!env[k]) peringatan.push(`${k} belum diisi.`);
   if (!env.ALLOWED_NUMBERS) peringatan.push("ALLOWED_NUMBERS kosong (hanya dipakai saat db:setup).");
   if (!env.APP_BASE_URL) peringatan.push("APP_BASE_URL kosong; perintah ekspor tidak bisa membuat tautan.");
-  if (!env.DASHBOARD_PASSWORD) peringatan.push("DASHBOARD_PASSWORD kosong; dashboard web menolak login.");
+  if (!env.GOOGLE_CLIENT_ID || !env.GOOGLE_CLIENT_SECRET) peringatan.push("Kredensial Google OAuth belum lengkap; tombol Google tidak tampil.");
+  if (!((process.env.FACEBOOK_APP_ID || process.env.META_APP_ID) && (process.env.FACEBOOK_APP_SECRET || process.env.WA_APP_SECRET))) peringatan.push("Kredensial Facebook Login belum lengkap; tombol Facebook tidak tampil.");
   if (!env.HEALTH_TOKEN) peringatan.push("HEALTH_TOKEN kosong; endpoint /api/health hanya menampilkan status ringkas.");
   if (!env.EMAIL_INBOUND_SECRET) peringatan.push("EMAIL_INBOUND_SECRET kosong; webhook email menolak semua permintaan.");
   if (!env.CRON_SECRET) peringatan.push("CRON_SECRET kosong; retry terjadwal outbox belum aktif.");

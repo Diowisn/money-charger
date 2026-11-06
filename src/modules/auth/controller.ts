@@ -42,7 +42,7 @@ export async function register(req: Request) {
     const password = typeof body.password === "string" ? body.password : "";
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || password.length < 12 || password.length > 1024) return loginGagal("Email tidak valid atau password kurang dari 12 karakter.", 400);
     const token = await daftar(email, password);
-    if (!token) return loginGagal("Registrasi tidak tersedia.", 403);
+    if (!token) return loginGagal("Email tersebut sudah terdaftar. Masuk dengan akun itu.", 409);
     return loginBerhasil(token);
   } catch { return loginGagal("Gagal membuat akun.", 500); }
 }
