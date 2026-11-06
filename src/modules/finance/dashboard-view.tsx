@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useId, useMemo, useRef, useState, type ReactElement } from "react";
 import type { DashboardData, TxView } from "@/lib/dashboard";
+import { unduhXlsx } from "@/lib/xlsx";
 
 type Pesan = { jenis: "ok" | "error"; teks: string };
 type Konfirmasi = { teks: string; judul: string; selesai: (nilai: boolean) => void };
@@ -1602,22 +1603,10 @@ function Transaksi({
         </div>
 
         <div className="filter-riwayat">
-          <button type="button" className="utama" onClick={() => {
-            const kolom = ["ID", "Tanggal", "Jenis", "Kategori", "Catatan", "Nominal (Rp)", "Biaya admin (Rp)", "Wadah asal", "Wadah tujuan", "Status"];
-            const sel = (nilai: string | number | null) => {
-              let teks = String(nilai ?? "").replace(/[\t\r\n]+/g, " ");
-              if (/^[-=+@]/.test(teks)) teks = `'${teks}`;
-              return teks;
-            };
-            const baris = data.transaksi.map((t) => [t.id, t.tanggal, NAMA_TIPE[t.tipe] ?? t.tipe, t.subPost, t.label, t.nominal, t.biayaAdmin, t.wadahAsal, t.wadahTujuan, t.status].map(sel).join("\t"));
-            const url = URL.createObjectURL(new Blob(["\uFEFF", [kolom.map(sel).join("\t"), ...baris].join("\r\n")], { type: "text/tab-separated-values;charset=utf-8" }));
-            const tautan = document.createElement("a");
-            tautan.href = url;
-            tautan.download = "money-charger-transaksi.tsv";
-            tautan.click();
-            URL.revokeObjectURL(url);
-          }}>Ekspor semua transaksi (Excel/TSV)</button>
-          <span className="muted kecil">Kolom langsung terpisah saat dibuka di Excel; mencakup semua bulan dan transaksi batal.</span>
+          <button type="button" className="utama" onClick={() => void unduhXlsx(data.transaksi, NAMA_TIPE)}>
+            Ekspor rekap (.xlsx)
+          </button>
+          <span className="muted kecil">Satu sheet per bulan, plus ringkasan, kategori, dan transaksi dibatalkan.</span>
         </div>
         <div className="filter-riwayat">
           <label className="filter-jenis">
