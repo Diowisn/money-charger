@@ -117,6 +117,9 @@ ALTER TABLE plan_items ADD COLUMN IF NOT EXISTS user_id UUID REFERENCES auth_use
 ALTER TABLE transactions ADD COLUMN IF NOT EXISTS user_id UUID REFERENCES auth_users(id) ON DELETE CASCADE;
 ALTER TABLE debts ADD COLUMN IF NOT EXISTS user_id UUID REFERENCES auth_users(id) ON DELETE CASCADE;
 ALTER TABLE saving_goals ADD COLUMN IF NOT EXISTS user_id UUID REFERENCES auth_users(id) ON DELETE CASCADE;
+ALTER TABLE groups DROP CONSTRAINT IF EXISTS groups_nama_key;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_groups_user_nama ON groups (user_id, nama) WHERE user_id IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_groups_legacy_nama ON groups (nama) WHERE user_id IS NULL;
 CREATE INDEX IF NOT EXISTS idx_groups_user_id ON groups (user_id);
 CREATE INDEX IF NOT EXISTS idx_sub_posts_user_id ON sub_posts (user_id);
 CREATE INDEX IF NOT EXISTS idx_aliases_user_id ON aliases (user_id);
@@ -124,6 +127,8 @@ CREATE INDEX IF NOT EXISTS idx_plan_versions_user_id ON plan_versions (user_id);
 CREATE INDEX IF NOT EXISTS idx_plan_items_user_id ON plan_items (user_id);
 CREATE INDEX IF NOT EXISTS idx_debts_user_id ON debts (user_id);
 CREATE INDEX IF NOT EXISTS idx_saving_goals_user_id ON saving_goals (user_id);
+ALTER TABLE sub_posts DROP CONSTRAINT IF EXISTS sub_posts_nama_key;
+ALTER TABLE aliases DROP CONSTRAINT IF EXISTS aliases_alias_key;
 CREATE UNIQUE INDEX IF NOT EXISTS idx_sub_posts_user_nama ON sub_posts (user_id, nama) WHERE user_id IS NOT NULL;
 CREATE UNIQUE INDEX IF NOT EXISTS idx_sub_posts_legacy_nama ON sub_posts (nama) WHERE user_id IS NULL;
 CREATE UNIQUE INDEX IF NOT EXISTS idx_aliases_legacy_alias ON aliases (alias) WHERE user_id IS NULL;
