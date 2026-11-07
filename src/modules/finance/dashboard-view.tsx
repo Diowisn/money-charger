@@ -15,6 +15,10 @@ type Tab =
   | "riwayat"
   | "rekap"
   | "profil"
+  | "ubah-profil"
+  | "password"
+  | "keamanan"
+  | "hapus-akun"
   | "pos"
   | "piutang"
   | "target"
@@ -122,6 +126,34 @@ function IkonProfil({ aktif }: { aktif: boolean }) {
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={aktif ? 2.4 : 1.8}>
       <circle cx="12" cy="8" r="4" />
       <path d="M4 21a8 8 0 0 1 16 0" strokeLinecap="round" />
+    </svg>
+  );
+}
+
+function IkonKunci({ aktif }: { aktif: boolean }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={aktif ? 2.4 : 1.8}>
+      <rect x="4" y="10" width="16" height="11" rx="2" />
+      <path d="M8 10V7a4 4 0 0 1 8 0v3" strokeLinecap="round" />
+      <circle cx="12" cy="15.5" r="1.4" fill="currentColor" stroke="none" />
+    </svg>
+  );
+}
+
+function IkonPerisai({ aktif }: { aktif: boolean }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={aktif ? 2.4 : 1.8}>
+      <path d="M12 3l8 3v6c0 4.5-3 7.5-8 9-5-1.5-8-4.5-8-9V6l8-3z" strokeLinejoin="round" />
+      <path d="M9 12l2 2 4-4" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function IkonHapus({ aktif }: { aktif: boolean }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={aktif ? 2.4 : 1.8}>
+      <path d="M4 7h16M9 7V5h6v2M6 7l1 13h10l1-13" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M10 11v5M14 11v5" strokeLinecap="round" />
     </svg>
   );
 }
@@ -241,9 +273,18 @@ const MENU_SAMPING: [Tab, string, (p: { aktif: boolean }) => ReactElement][] = [
   ["rekap", "Rekap", IkonRekap],
   ["catat", "Catat transaksi", IkonTambah],
   ["rencana", "Rencana bulanan", IkonRencana],
-  ["profil", "Profil", IkonProfil],
   ...MENU_LAIN,
 ];
+
+const MENU_IDENTITAS: [Tab, string, (p: { aktif: boolean }) => ReactElement][] = [
+  ["profil", "Identitas diri", IkonProfil],
+  ["ubah-profil", "Ubah profil", IkonProfil],
+  ["password", "Ganti password", IkonKunci],
+  ["keamanan", "Keamanan", IkonPerisai],
+  ["hapus-akun", "Hapus akun", IkonHapus],
+];
+
+const TAB_IDENTITAS = new Set<Tab>(["profil", "ubah-profil", "password", "keamanan", "hapus-akun"]);
 
 const JUDUL_TAB: Record<Tab, string> = {
   ringkasan: "Beranda",
@@ -251,7 +292,11 @@ const JUDUL_TAB: Record<Tab, string> = {
   catat: "Transaksi",
   riwayat: "Transaksi",
   rekap: "Rekap",
-  profil: "Profil",
+  profil: "Identitas diri",
+  "ubah-profil": "Ubah profil",
+  password: "Ganti password",
+  keamanan: "Keamanan",
+  "hapus-akun": "Hapus akun",
   pos: "Pos pengeluaran",
   piutang: "Piutang & utang",
   target: "Target tabungan",
@@ -499,6 +544,19 @@ export default function Dashboard({ awal }: { awal: DashboardData }) {
               <span>{label}</span>
             </button>
           ))}
+          <p className="sidebar-label jarak">IDENTITAS DIRI</p>
+          {MENU_IDENTITAS.map(([id, label, Ikon]) => (
+            <button
+              key={id}
+              type="button"
+              className={tab === id ? "sidebar-link aktif" : "sidebar-link"}
+              aria-current={tab === id ? "page" : undefined}
+              onClick={() => navigasiKe(id)}
+            >
+              <Ikon aktif={tab === id} />
+              <span>{label}</span>
+            </button>
+          ))}
         </nav>
         <div className="sidebar-status">
           <span className={`status-live ${statusLive}`} role="status" aria-live="polite">
@@ -514,8 +572,8 @@ export default function Dashboard({ awal }: { awal: DashboardData }) {
             <button
               className="header-back"
               type="button"
-              onClick={() => navigasiKe("ringkasan")}
-              aria-label="Kembali ke beranda"
+              onClick={() => navigasiKe(tab === "profil" ? "ringkasan" : TAB_IDENTITAS.has(tab) ? "profil" : "ringkasan")}
+              aria-label={tab === "profil" ? "Kembali ke beranda" : TAB_IDENTITAS.has(tab) ? "Kembali ke identitas diri" : "Kembali ke beranda"}
             >
               ←
             </button>
@@ -612,8 +670,9 @@ export default function Dashboard({ awal }: { awal: DashboardData }) {
             />
           ) : null}
           {tab === "rekap" ? <Rekap data={data} navigasi={navigasiKe} /> : null}
-          {tab === "profil" ? (
+          {tab === "profil" || tab === "ubah-profil" || tab === "password" || tab === "keamanan" || tab === "hapus-akun" ? (
             <Profil
+              bagian={tab}
               data={data}
               nama={nama}
               kirim={kirim}
@@ -675,8 +734,8 @@ export default function Dashboard({ awal }: { awal: DashboardData }) {
             <button
               key={id}
               type="button"
-              className={`nav-item${tab === id ? " aktif" : ""}`}
-              aria-current={tab === id ? "page" : undefined}
+              className={`nav-item${tab === id || (id === "profil" && TAB_IDENTITAS.has(tab)) ? " aktif" : ""}`}
+              aria-current={tab === id || (id === "profil" && TAB_IDENTITAS.has(tab)) ? "page" : undefined}
               onClick={() => {
                 navigasiKe(id);
               }}
@@ -984,6 +1043,7 @@ async function fileKeAvatar(file: File): Promise<string> {
 }
 
 function Profil({
+  bagian,
   data,
   nama,
   kirim,
@@ -995,6 +1055,7 @@ function Profil({
   keluar,
   keluarSemua,
 }: {
+  bagian: Tab;
   data: DashboardData;
   nama: string;
   kirim: (url: string, method: string, body?: unknown) => Promise<boolean>;
@@ -1144,151 +1205,191 @@ function Profil({
         </div>
       </section>
 
-      <section className="kartu profil-bagian">
-        <h2>Ubah profil</h2>
-        <div className="form">
-          <div className="profil-foto-baris">
-            <span className="profil-avatar kecil">
-              <img src={avatarTampil || "/icon-192.png"} alt="" width={48} height={48} />
-            </span>
-            <div className="baris-tombol">
-              <Tombol varian="sekunder" ukuran="kecil" onClick={() => fotoRef.current?.click()} disabled={sibukProfil}>
-                Ganti foto
-              </Tombol>
-              {avatarTampil ? (
-                <Tombol varian="tautan" onClick={() => { setAvatarDraf(null); setAvatarTampil(null); }}>
-                  Hapus foto
-                </Tombol>
-              ) : null}
+      {bagian === "profil" ? (
+        <>
+          <section className="kartu profil-bagian">
+            <h2>Identitas diri</h2>
+            <p className="muted kecil">Kelola data akun dan keamanan login.</p>
+            <div className="profil-menu">
+              <button type="button" onClick={() => navigasi("ubah-profil")}>
+                <IkonProfil aktif={false} />
+                <span>Ubah profil</span>
+              </button>
+              <button type="button" onClick={() => navigasi("password")}>
+                <IkonKunci aktif={false} />
+                <span>{profil?.punyaPassword ? "Ganti password" : "Buat password"}</span>
+              </button>
+              <button type="button" onClick={() => navigasi("keamanan")}>
+                <IkonPerisai aktif={false} />
+                <span>Keamanan</span>
+              </button>
+              <button type="button" onClick={() => navigasi("hapus-akun")}>
+                <IkonHapus aktif={false} />
+                <span>Hapus akun</span>
+              </button>
             </div>
-            <input
-              ref={fotoRef}
-              type="file"
-              accept="image/jpeg,image/png,image/webp"
-              hidden
-              onChange={(event) => {
-                void pilihFoto(event.target.files?.[0]);
-                event.target.value = "";
-              }}
-            />
-          </div>
-          <label>
-            Nama panggilan
-            <input value={drafNama} onChange={(e) => setDrafNama(e.target.value)} placeholder="Nama kamu" maxLength={60} />
-          </label>
-          <label>
-            Email
-            <input type="email" value={drafEmail} onChange={(e) => setDrafEmail(e.target.value)} maxLength={254} />
-          </label>
-          {galatProfil ? <p className="error" role="alert">{galatProfil}</p> : null}
-          <Tombol lebar onClick={() => void simpanProfil()} disabled={sibukProfil}>
-            {sibukProfil ? "Menyimpan..." : "Simpan profil"}
-          </Tombol>
-        </div>
-      </section>
+          </section>
 
-      <section className="kartu profil-bagian">
-        <h2>{profil?.punyaPassword ? "Ganti password" : "Buat password"}</h2>
-        <p className="muted kecil">Minimal 12 karakter. Password dipakai untuk login email.</p>
-        <div className="form">
-          {profil?.punyaPassword ? (
+          <section className="kartu profil-bagian">
+            <div className="baris-antara">
+              <div>
+                <h2>Tampilan</h2>
+                <p className="muted kecil">Mode {tema === "gelap" ? "gelap" : "terang"} aktif</p>
+              </div>
+              <Tombol varian="sekunder" ukuran="kecil" onClick={() => setTema(tema === "gelap" ? "terang" : "gelap")}>
+                {tema === "gelap" ? "Mode terang" : "Mode gelap"}
+              </Tombol>
+            </div>
+          </section>
+
+          <section className="kartu profil-bagian">
+            <h2>Menu lainnya</h2>
+            <div className="profil-menu">
+              <button type="button" onClick={() => navigasi("rencana")}>
+                <IkonRencana aktif={false} />
+                <span>Rencana bulanan</span>
+              </button>
+              <button type="button" onClick={() => navigasi("pos")}>
+                <IkonPos aktif={false} />
+                <span>Pos pengeluaran</span>
+              </button>
+              <button type="button" onClick={() => navigasi("piutang")}>
+                <IkonPiutang aktif={false} />
+                <span>Piutang &amp; utang</span>
+              </button>
+              <button type="button" onClick={() => navigasi("target")}>
+                <IkonTarget aktif={false} />
+                <span>Target tabungan</span>
+              </button>
+              <button type="button" onClick={() => navigasi("asisten")}>
+                <IkonAsisten aktif={false} />
+                <span>Asisten keuangan</span>
+              </button>
+              <button type="button" onClick={() => navigasi("rekap")}>
+                <IkonRekap aktif={false} />
+                <span>Rekap keuangan</span>
+              </button>
+            </div>
+          </section>
+        </>
+      ) : null}
+
+      {bagian === "ubah-profil" ? (
+        <section className="kartu profil-bagian">
+          <h2>Ubah profil</h2>
+          <div className="form">
+            <div className="profil-foto-baris">
+              <span className="profil-avatar kecil">
+                <img src={avatarTampil || "/icon-192.png"} alt="" width={48} height={48} />
+              </span>
+              <div className="baris-tombol">
+                <Tombol varian="sekunder" ukuran="kecil" onClick={() => fotoRef.current?.click()} disabled={sibukProfil}>
+                  Ganti foto
+                </Tombol>
+                {avatarTampil ? (
+                  <Tombol varian="tautan" onClick={() => { setAvatarDraf(null); setAvatarTampil(null); }}>
+                    Hapus foto
+                  </Tombol>
+                ) : null}
+              </div>
+              <input
+                ref={fotoRef}
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                hidden
+                onChange={(event) => {
+                  void pilihFoto(event.target.files?.[0]);
+                  event.target.value = "";
+                }}
+              />
+            </div>
             <label>
-              Password lama
-              <input type="password" autoComplete="current-password" value={passwordLama} onChange={(e) => setPasswordLama(e.target.value)} maxLength={1024} />
+              Nama panggilan
+              <input value={drafNama} onChange={(e) => setDrafNama(e.target.value)} placeholder="Nama kamu" maxLength={60} />
             </label>
-          ) : null}
-          <label>
-            Password baru
-            <input type="password" autoComplete="new-password" value={passwordBaru} onChange={(e) => setPasswordBaru(e.target.value)} minLength={12} maxLength={1024} />
-          </label>
-          <label>
-            Ulangi password baru
-            <input type="password" autoComplete="new-password" value={passwordUlang} onChange={(e) => setPasswordUlang(e.target.value)} minLength={12} maxLength={1024} />
-          </label>
-          <Tombol varian="sekunder" lebar onClick={() => void ubahPassword()} disabled={sibukProfil}>
-            {profil?.punyaPassword ? "Ganti password" : "Aktifkan login password"}
-          </Tombol>
-        </div>
-      </section>
-
-      <section className="kartu profil-bagian">
-        <div className="baris-antara">
-          <div>
-            <h2>Tampilan</h2>
-            <p className="muted kecil">Mode {tema === "gelap" ? "gelap" : "terang"} aktif</p>
-          </div>
-          <Tombol varian="sekunder" ukuran="kecil" onClick={() => setTema(tema === "gelap" ? "terang" : "gelap")}>
-            {tema === "gelap" ? "Mode terang" : "Mode gelap"}
-          </Tombol>
-        </div>
-      </section>
-
-      <section className="kartu profil-bagian">
-        <h2>Menu lainnya</h2>
-        <div className="profil-menu">
-          <button type="button" onClick={() => navigasi("rencana")}>
-            <IkonRencana aktif={false} />
-            <span>Rencana bulanan</span>
-          </button>
-          <button type="button" onClick={() => navigasi("pos")}>
-            <IkonPos aktif={false} />
-            <span>Pos pengeluaran</span>
-          </button>
-          <button type="button" onClick={() => navigasi("piutang")}>
-            <IkonPiutang aktif={false} />
-            <span>Piutang &amp; utang</span>
-          </button>
-          <button type="button" onClick={() => navigasi("target")}>
-            <IkonTarget aktif={false} />
-            <span>Target tabungan</span>
-          </button>
-          <button type="button" onClick={() => navigasi("asisten")}>
-            <IkonAsisten aktif={false} />
-            <span>Asisten keuangan</span>
-          </button>
-          <button type="button" onClick={() => navigasi("rekap")}>
-            <IkonRekap aktif={false} />
-            <span>Rekap keuangan</span>
-          </button>
-        </div>
-      </section>
-
-      <section className="kartu profil-bagian">
-        <h2>Keamanan</h2>
-        <p className="muted kecil">
-          {data.periode.aktif ? `Periode aktif sejak ${data.periode.mulai ?? "-"}` : `Data dimulai ${data.hariIni}`}
-        </p>
-        <div className="baris-tombol">
-          <Tombol varian="sekunder" onClick={() => void keluar()}>
-            Keluar
-          </Tombol>
-          <Tombol varian="bahaya" onClick={() => void keluarSemua()}>
-            Keluar semua perangkat
-          </Tombol>
-        </div>
-      </section>
-
-      <section className="kartu profil-bagian bahaya">
-        <h2>Hapus akun</h2>
-        <p className="muted kecil">
-          Tindakan permanen. Semua data keuangan milik akun ini ikut terhapus.
-        </p>
-        <div className="form">
-          <label>
-            Ketik email akun
-            <input type="email" value={emailHapus} onChange={(e) => setEmailHapus(e.target.value)} placeholder={profil?.email ?? ""} />
-          </label>
-          {profil?.punyaPassword ? (
             <label>
-              Password
-              <input type="password" autoComplete="current-password" value={passwordHapus} onChange={(e) => setPasswordHapus(e.target.value)} />
+              Email
+              <input type="email" value={drafEmail} onChange={(e) => setDrafEmail(e.target.value)} maxLength={254} />
             </label>
-          ) : null}
-          <Tombol varian="bahaya" lebar onClick={() => void hapusProfil()} disabled={sibukProfil}>
-            Hapus akun permanen
-          </Tombol>
-        </div>
-      </section>
+            {galatProfil ? <p className="error" role="alert">{galatProfil}</p> : null}
+            <Tombol lebar onClick={() => void simpanProfil()} disabled={sibukProfil}>
+              {sibukProfil ? "Menyimpan..." : "Simpan profil"}
+            </Tombol>
+          </div>
+        </section>
+      ) : null}
+
+      {bagian === "password" ? (
+        <section className="kartu profil-bagian">
+          <h2>{profil?.punyaPassword ? "Ganti password" : "Buat password"}</h2>
+          <p className="muted kecil">Minimal 12 karakter. Password dipakai untuk login email.</p>
+          <div className="form">
+            {profil?.punyaPassword ? (
+              <label>
+                Password lama
+                <input type="password" autoComplete="current-password" value={passwordLama} onChange={(e) => setPasswordLama(e.target.value)} maxLength={1024} />
+              </label>
+            ) : null}
+            <label>
+              Password baru
+              <input type="password" autoComplete="new-password" value={passwordBaru} onChange={(e) => setPasswordBaru(e.target.value)} minLength={12} maxLength={1024} />
+            </label>
+            <label>
+              Ulangi password baru
+              <input type="password" autoComplete="new-password" value={passwordUlang} onChange={(e) => setPasswordUlang(e.target.value)} minLength={12} maxLength={1024} />
+            </label>
+            {galatProfil ? <p className="error" role="alert">{galatProfil}</p> : null}
+            <Tombol varian="sekunder" lebar onClick={() => void ubahPassword()} disabled={sibukProfil}>
+              {profil?.punyaPassword ? "Ganti password" : "Aktifkan login password"}
+            </Tombol>
+          </div>
+        </section>
+      ) : null}
+
+      {bagian === "keamanan" ? (
+        <section className="kartu profil-bagian">
+          <h2>Keamanan</h2>
+          <p className="muted kecil">
+            {data.periode.aktif ? `Periode aktif sejak ${data.periode.mulai ?? "-"}` : `Data dimulai ${data.hariIni}`}
+          </p>
+          <p className="muted kecil">
+            {profil?.providers.length ? `Terhubung: ${profil.providers.join(", ")}` : "Login email dan password"}
+          </p>
+          <div className="baris-tombol">
+            <Tombol varian="sekunder" onClick={() => void keluar()}>
+              Keluar
+            </Tombol>
+            <Tombol varian="bahaya" onClick={() => void keluarSemua()}>
+              Keluar semua perangkat
+            </Tombol>
+          </div>
+        </section>
+      ) : null}
+
+      {bagian === "hapus-akun" ? (
+        <section className="kartu profil-bagian bahaya">
+          <h2>Hapus akun</h2>
+          <p className="muted kecil">
+            Tindakan permanen. Semua data keuangan milik akun ini ikut terhapus.
+          </p>
+          <div className="form">
+            <label>
+              Ketik email akun
+              <input type="email" value={emailHapus} onChange={(e) => setEmailHapus(e.target.value)} placeholder={profil?.email ?? ""} />
+            </label>
+            {profil?.punyaPassword ? (
+              <label>
+                Password
+                <input type="password" autoComplete="current-password" value={passwordHapus} onChange={(e) => setPasswordHapus(e.target.value)} />
+              </label>
+            ) : null}
+            {galatProfil ? <p className="error" role="alert">{galatProfil}</p> : null}
+            <Tombol varian="bahaya" lebar onClick={() => void hapusProfil()} disabled={sibukProfil}>
+              Hapus akun permanen
+            </Tombol>
+          </div>
+        </section>
+      ) : null}
     </div>
   );
 }

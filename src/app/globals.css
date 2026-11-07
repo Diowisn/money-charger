@@ -175,6 +175,10 @@ button {
   letter-spacing: 0.13em;
 }
 
+.sidebar-label.jarak {
+  margin-top: 20px;
+}
+
 .sidebar-link {
   display: flex;
   align-items: center;
