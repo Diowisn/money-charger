@@ -12,6 +12,8 @@ export interface EmailMasuk {
   dari?: string;
   subjek?: string;
   teks?: string;
+  /** Email kotak masuk penerima; dipakai mencocokkan transaksi ke akun yang login/terdaftar. */
+  akun?: string;
   /** Nominal rupiah bila penyedia email sudah mengekstraknya; lebih akurat dari parser teks. */
   nominal?: number;
   /** Tanggal transaksi 'YYYY-MM-DD' bila penyedia mengirimkannya (mis. tanggal email). */
@@ -60,7 +62,10 @@ export async function prosesEmailMasuk(input: EmailMasuk): Promise<HasilEmail> {
     return { dicatat: false, pesan: "Pengirim email tidak ada di EMAIL_ALLOWED_SENDERS; dilewati." };
   }
 
-  const repo = new PgRepo();
+  const pemilik = new PgRepo();
+  const userId = (await pemilik.userIdByEmail(input.akun)) ?? (await pemilik.firstUserId());
+  if (!userId) throw new EmailAksiError("Belum ada akun; email tidak bisa dicatat.");
+  const repo = new PgRepo(undefined, undefined, userId);
   const hariIni = wibDate(Date.now());
   const teksGabung = `${input.subjek ?? ""}\n${input.teks ?? ""}`;
   const arah = arahEmail(input.subjek ?? "", input.teks ?? "");

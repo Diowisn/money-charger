@@ -10,12 +10,13 @@ export async function prosesAntreanInbound(
   batas = 10,
 ): Promise<{ diproses: number; selesai: number; gagal: number }> {
   const jobs = await klaimInbound(batas);
+  const userId = await new PgRepo().firstUserId();
   let selesai = 0;
   let gagal = 0;
 
   for (const job of jobs) {
     try {
-      const hasil = await tanganiPesan(new PgRepo(), buatDeps(), job.payload);
+      const hasil = await tanganiPesan(new PgRepo(undefined, undefined, userId), buatDeps(), job.payload);
       if (hasil) {
         await catatAudit(`wa:${maskNomor(job.payload.from)}`, "pesan_diproses", {
           jenis: job.payload.type,

@@ -65,6 +65,19 @@ export class PgRepo implements Repo {
     return this.requireUserId();
   }
 
+  /** Akun pertama pemilik data lama. Dipakai job tanpa sesi (email/WhatsApp) agar transaksi tidak tersimpan tanpa user_id. */
+  async firstUserId(): Promise<string | null> {
+    const r = await this.db.query("SELECT id FROM auth_users ORDER BY created_at, id LIMIT 1");
+    return r.rows[0]?.id ?? null;
+  }
+
+  /** Mencocokkan email kotak masuk dengan akun terdaftar (tidak peka huruf besar/kecil). */
+  async userIdByEmail(email: string | undefined): Promise<string | null> {
+    const alamat = email?.trim().toLowerCase();
+    if (!alamat) return null;
+    const r = await this.db.query("SELECT id FROM auth_users WHERE lower(email) = $1 LIMIT 1", [alamat]);
+    return r.rows[0]?.id ?? null;
+  }
 
   async load(): Promise<State> {
     const userId = this.financeUser();

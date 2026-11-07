@@ -9,7 +9,9 @@ const CONFIG = {
 
 function prosesEmailBsi() {
   const threads = GmailApp.search(CONFIG.QUERY, 0, 20);
+  const akun = Session.getEffectiveUser().getEmail();
   Logger.log('Query: ' + CONFIG.QUERY);
+  Logger.log('Akun Gmail: ' + akun);
   Logger.log('Thread ditemukan: ' + threads.length);
   let diproses = 0;
 
@@ -24,6 +26,7 @@ function prosesEmailBsi() {
         from: msg.getFrom(),
         subject: msg.getSubject(),
         text: teks && teks.trim() ? teks : html,
+        akun,
         tanggal: Utilities.formatDate(msg.getDate(), 'Asia/Jakarta', 'yyyy-MM-dd'),
       };
 

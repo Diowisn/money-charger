@@ -11,6 +11,7 @@ import { PgRepo } from "@/lib/pg-repo";
 const OWNER = "628111";
 let db: PGlite;
 let repo: PgRepo;
+let ownerId: string;
 let adapter: { query: (text: string, params?: unknown[]) => Promise<{ rows: any[]; rowCount: number | null }> };
 let n = 0;
 const at = (iso: string) => {
@@ -37,7 +38,8 @@ beforeAll(async () => {
   await db.exec(readFileSync(path.join(process.cwd(), "db", "schema.sql"), "utf8"));
   await db.exec(readFileSync(path.join(process.cwd(), "db", "schema.sql"), "utf8")); // idempoten
   const user = await adapter.query("INSERT INTO auth_users (email) VALUES ('test@example.com') RETURNING id");
-  repo = new PgRepo(adapter, true, user.rows[0].id);
+  ownerId = user.rows[0].id;
+  repo = new PgRepo(adapter, true, ownerId);
   expect(await repo.seed([OWNER])).toBe(true);
   expect(await repo.seed([OWNER])).toBe(false); // seed tidak menggandakan data
 });
@@ -48,6 +50,13 @@ describe("PgRepo di Postgres sungguhan", () => {
     expect(s.subPosts).toHaveLength(6);
     expect(s.plans[0].items.reduce((a, i) => a + i.nominal, 0)).toBe(1_800_000);
     expect(s.config.bonusSubPostId).not.toBeNull();
+  });
+
+  it("job tanpa sesi memakai email akun atau akun pertama sebagai pemilik", async () => {
+    const repo = new PgRepo(adapter);
+    expect(await repo.firstUserId()).toBe(ownerId);
+    expect(await repo.userIdByEmail("TEST@EXAMPLE.COM")).toBe(ownerId);
+    expect(await repo.userIdByEmail("lain@example.com")).toBeNull();
   });
 
   it("alur lengkap: setup, gaji, out, bonus, duplikat, whitelist, penutupan periode", async () => {

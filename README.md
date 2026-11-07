@@ -227,12 +227,15 @@ Arah dideteksi dari subjek/isi email. Email yang arahnya tidak dikenali dilewati
      "from": "noreply-cms@bankbsi.co.id",
      "subject": "INCOMING TRANSACTION NOTIFICATION",
      "text": "Nominal\n1,800,000.00\nJenis Transaksi\nPayroll",
+     "akun": "email-akun-anda@gmail.com",
      "tanggal": "2026-10-31",
      "nominal": 1800000
    }
    ```
 
    - `id` wajib dan harus unik per email (dipakai untuk mencegah pencatatan ganda bila penyedia mengirim ulang).
+   - `akun` opsional: email kotak masuk penerima. Bila cocok dengan email akun yang terdaftar/login, transaksi masuk ke akun itu.
+     Script Gmail mengisinya otomatis. Bila tidak cocok, transaksi memakai akun pertama.
    - `nominal` opsional. Bila kosong, server membaca label `Nominal`/`Nominal Transaksi`/`Total`, lalu angka `Rp`,
      lalu angka bergrup; mendukung `Rp 25.925,00` maupun `1,800,000.00`.
    - `tanggal` opsional (`YYYY-MM-DD`). Bila kosong, server mencoba membaca tanggal dari isi email
