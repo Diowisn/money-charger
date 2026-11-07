@@ -6,13 +6,15 @@ import { AksiError } from "@/lib/web-actions";
 type BarisProfil = {
   email: string;
   nama: string | null;
+  telepon: string | null;
+  tanggal_lahir: string | null;
   avatar: string | null;
   punya_password: boolean;
 };
 
 async function bacaProfil(userId: string): Promise<ProfilAkun | null> {
   const hasil = await getPool().query<BarisProfil>(
-    "SELECT email, nama, avatar, password_hash IS NOT NULL AS punya_password FROM auth_users WHERE id = $1",
+    "SELECT email, nama, telepon, tanggal_lahir, avatar, password_hash IS NOT NULL AS punya_password FROM auth_users WHERE id = $1",
     [userId],
   );
   const row = hasil.rows[0];
@@ -24,6 +26,8 @@ async function bacaProfil(userId: string): Promise<ProfilAkun | null> {
   return {
     nama: row.nama,
     email: row.email,
+    telepon: row.telepon,
+    tanggalLahir: row.tanggal_lahir,
     avatar: row.avatar,
     punyaPassword: row.punya_password,
     providers: identities.rows.map((item) => item.provider),
@@ -36,7 +40,7 @@ export async function ambilProfil(userId: string): Promise<ProfilAkun | null> {
 
 export async function ubahProfil(
   userId: string,
-  patch: { nama?: string; email?: string; avatar?: string | null },
+  patch: { nama?: string; email?: string; telepon?: string | null; tanggalLahir?: string | null; avatar?: string | null },
 ): Promise<ProfilAkun | null> {
   if (patch.email) {
     const bentrok = await getPool().query("SELECT 1 FROM auth_users WHERE email = $1 AND id <> $2", [patch.email, userId]);
@@ -46,7 +50,9 @@ export async function ubahProfil(
     `UPDATE auth_users
      SET nama = CASE WHEN $2::boolean THEN $3 ELSE nama END,
          email = CASE WHEN $4::boolean THEN $5 ELSE email END,
-         avatar = CASE WHEN $6::boolean THEN $7 ELSE avatar END
+         telepon = CASE WHEN $6::boolean THEN $7 ELSE telepon END,
+         tanggal_lahir = CASE WHEN $8::boolean THEN $9::date ELSE tanggal_lahir END,
+         avatar = CASE WHEN $10::boolean THEN $11 ELSE avatar END
      WHERE id = $1`,
     [
       userId,
@@ -54,6 +60,10 @@ export async function ubahProfil(
       patch.nama ?? null,
       patch.email !== undefined,
       patch.email ?? null,
+      patch.telepon !== undefined,
+      patch.telepon ?? null,
+      patch.tanggalLahir !== undefined,
+      patch.tanggalLahir ?? null,
       patch.avatar !== undefined,
       patch.avatar ?? null,
     ],

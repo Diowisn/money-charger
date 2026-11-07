@@ -152,6 +152,7 @@ export interface InputTransaksi {
   wadahAsal?: Wadah | string | null;
   wadahTujuan?: Wadah | string | null;
   paksa?: boolean;
+  detail?: Record<string, string | number | null> | null;
 }
 
 export async function tambahTransaksi(
@@ -177,7 +178,7 @@ export async function tambahTransaksi(
         subPostId = sub.id;
       }
       const id = await tx.insertTx(
-        buatTx({ tipe: "out", nominal, biayaAdmin, subPostId, tanggal, label, sumber: "kaku" }),
+        buatTx({ tipe: "out", nominal, biayaAdmin, subPostId, tanggal, label, detail: input.detail ?? null, sumber: "kaku" }),
       );
       return { id };
     }
@@ -185,7 +186,7 @@ export async function tambahTransaksi(
     if (input.tipe === "in") {
       const tujuan = wadahSah(input.wadah, "saldo");
       const id = await tx.insertTx(
-        buatTx({ tipe: "in", nominal, wadahTujuan: tujuan, tanggal, label, sumber: "kaku" }),
+        buatTx({ tipe: "in", nominal, wadahTujuan: tujuan, tanggal, label, detail: input.detail ?? null, sumber: "kaku" }),
       );
       return { id };
     }
@@ -199,7 +200,7 @@ export async function tambahTransaksi(
         throw new AksiError(`Isi ${dari} hanya Rp${w[dari].toLocaleString("id-ID")}, kurang dari nominal.`);
       }
       const id = await tx.insertTx(
-        buatTx({ tipe: input.tipe, nominal, wadahAsal: dari, wadahTujuan: ke, tanggal, label }),
+        buatTx({ tipe: input.tipe, nominal, wadahAsal: dari, wadahTujuan: ke, tanggal, label, detail: input.detail ?? null }),
       );
       return { id };
     }
@@ -225,7 +226,7 @@ export async function tambahTransaksi(
       const tab = nominalItem(plan, "tabungan");
       const inv = nominalItem(plan, "investasi");
       const gid = await tx.insertTx(
-        buatTx({ tipe: "gaji", nominal, tanggal, planVersionId: plan.id, label }),
+        buatTx({ tipe: "gaji", nominal, tanggal, planVersionId: plan.id, label, detail: input.detail ?? null }),
       );
       if (tab > 0) {
         await tx.insertTx(buatTx({ tipe: "alokasi_gaji", nominal: tab, wadahTujuan: "tabungan", tanggal, indukId: gid }));

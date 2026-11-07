@@ -1,5 +1,5 @@
 import { catatAudit } from "@/lib/audit";
-import { arahEmail, ekstrakNominalEmail, ekstrakTanggalEmail, labelEmail } from "@/lib/email";
+import { arahEmail, ekstrakDetailEmail, ekstrakNominalEmail, ekstrakTanggalEmail, labelEmail } from "@/lib/email";
 import { rahasiaCocok as cocokRahasia } from "@/lib/secret";
 import { wibDate } from "@/lib/parse/date";
 import { PgRepo } from "@/lib/pg-repo";
@@ -70,6 +70,7 @@ export async function prosesEmailMasuk(input: EmailMasuk): Promise<HasilEmail> {
   const teksGabung = `${input.subjek ?? ""}\n${input.teks ?? ""}`;
   const arah = arahEmail(input.subjek ?? "", input.teks ?? "");
   const tanggal = tanggalIsoSah(input.tanggal, hariIni) ?? ekstrakTanggalEmail(teksGabung, hariIni) ?? hariIni;
+  const detail = ekstrakDetailEmail(teksGabung);
 
   const hasil = await repo.transaction(async (tx) => {
     const idInbound = `email:${input.id}`;
@@ -82,13 +83,15 @@ export async function prosesEmailMasuk(input: EmailMasuk): Promise<HasilEmail> {
       return { dicatat: false, pesan: "Arah transaksi tidak dikenali (masuk/keluar); tidak ada yang dicatat." };
     }
 
-    const nominal = input.nominal && input.nominal > 0 ? Math.round(input.nominal) : ekstrakNominalEmail(teksGabung);
+    const nominal =
+      detail.total ??
+      (input.nominal && input.nominal > 0 ? Math.round(input.nominal) : ekstrakNominalEmail(teksGabung));
     if (!nominal) {
       await tx.setInboundResult(idInbound, "nominal_tidak_ditemukan");
       return { dicatat: false, pesan: "Nominal tidak ditemukan di email; tidak ada yang dicatat." };
     }
 
-    const label = labelEmail(input.subjek ?? "", input.teks ?? "", arah) ?? (input.subjek ?? "Email masuk").slice(0, 120);
+    const label = detail.merchant ?? labelEmail(input.subjek ?? "", input.teks ?? "", arah) ?? (input.subjek ?? "Email masuk").slice(0, 120);
 
     try {
       if (arah === "keluar") {
@@ -97,6 +100,7 @@ export async function prosesEmailMasuk(input: EmailMasuk): Promise<HasilEmail> {
           nominal,
           tanggal,
           label,
+          detail,
         });
         await tx.setInboundResult(idInbound, `out:${hasil.id}`);
         return { dicatat: true, pesan: `Pengeluaran Rp${nominal.toLocaleString("id-ID")} dicatat otomatis dari email "${label}".` };
@@ -108,6 +112,7 @@ export async function prosesEmailMasuk(input: EmailMasuk): Promise<HasilEmail> {
           nominal,
           tanggal,
           label,
+          detail,
           paksa: true,
         });
         await tx.setInboundResult(idInbound, `gaji:${hasil.id}`);
@@ -119,6 +124,7 @@ export async function prosesEmailMasuk(input: EmailMasuk): Promise<HasilEmail> {
         nominal,
         tanggal,
         label,
+        detail,
         wadah: "saldo",
       });
       await tx.setInboundResult(idInbound, `in:${hasil.id}`);

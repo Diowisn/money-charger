@@ -54,3 +54,11 @@ export async function tolakJikaBelumLogin(req: NextRequest): Promise<Response | 
   }
   return null;
 }
+
+export function normalisasiNomorWa(nomor: string): string {
+  const digit = nomor.replace(/\D/g, "");
+  if (!digit) return "";
+  if (digit.startsWith("0")) return `62${digit.slice(1)}`;
+  if (digit.startsWith("8")) return `62${digit}`;
+  return digit;
+}

@@ -127,6 +127,8 @@ Contoh berikut hanya format pengisian. Ganti semua nilai bertanda `GANTI_...` de
 | `GOOGLE_CLIENT_SECRET` | Client Secret OAuth Google |
 | `FACEBOOK_APP_ID` | App ID Facebook Login (opsional bila memakai `META_APP_ID`) |
 | `FACEBOOK_APP_SECRET` | App Secret Facebook Login (opsional bila memakai `WA_APP_SECRET`) |
+| `RESEND_API_KEY` | API key Resend untuk kirim tautan reset password |
+| `EMAIL_FROM` | Pengirim email terverifikasi, mis. `Money-Charger <reset@domain.com>`; tanpa ini reset dikirim lewat WhatsApp nomor akun |
 | `HEALTH_TOKEN` | opsional; bila diisi, detail `/api/health` hanya bisa dibuka dengan header `X-Health-Token` atau `Authorization: Bearer <nilai ini>` |
 
 Di halaman Webhooks Meta, gunakan:

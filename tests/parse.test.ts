@@ -5,7 +5,7 @@ import { extractDate, wibDate } from "@/lib/parse/date";
 import { rp, splitPesan } from "@/lib/format";
 import { validasiAi } from "@/lib/ai";
 import { validasiStruk } from "@/lib/ai-vision";
-import { arahEmail, ekstrakNominalEmail, ekstrakTanggalEmail, kemungkinanGaji, labelEmail } from "@/lib/email";
+import { arahEmail, ekstrakDetailEmail, ekstrakNominalEmail, ekstrakTanggalEmail, kemungkinanGaji, labelEmail } from "@/lib/email";
 
 const v = (t: string) => {
   const r = parseAmount(t);
@@ -185,6 +185,42 @@ describe("validasi struk/foto (vision AI)", () => {
     const r = validasiStruk({ intent: "out", amount_text: "10rb", tanggal_text: "entah kapan" }, nama, today);
     expect(r).toMatchObject({ ok: true, hasil: { tanggal: null } });
   });
+  it("membaca detail struk: toko, alamat, pajak, dibayar, kembalian", () => {
+    const r = validasiStruk(
+      {
+        intent: "out",
+        amount_text: "Rp1.175.000",
+        sub_pos: "Jajan / Kopi / Self-Reward",
+        tanggal_text: "05/12/2015",
+        toko: "SATE REMBIGE",
+        alamat: "Kotabaru Selatan - Martapura",
+        kontak: "081280755365",
+        konsumen: "SDN 06 MARTAPURA",
+        kasir: "Yuni",
+        kategori: "Makanan & Minuman",
+        pajak_text: "Rp106.818",
+        dibayar_text: "Rp1.200.000",
+        kembalian_text: "Rp132.000",
+      },
+      nama,
+      "2026-11-05",
+    );
+    expect(r).toMatchObject({
+      ok: true,
+      hasil: {
+        nominal: 1_175_000,
+        toko: "SATE REMBIGE",
+        alamat: "Kotabaru Selatan - Martapura",
+        kontak: "081280755365",
+        konsumen: "SDN 06 MARTAPURA",
+        kasir: "Yuni",
+        kategori: "Makanan & Minuman",
+        pajak: 106_818,
+        dibayar: 1_200_000,
+        kembalian: 132_000,
+      },
+    });
+  });
 });
 
 describe("parser email masuk (payroll)", () => {
@@ -229,5 +265,39 @@ describe("parser email masuk (payroll)", () => {
     expect(ekstrakTanggalEmail("Tanggal 31-OKT-26 21:16", "2026-11-05")).toBe("2026-10-31");
     expect(ekstrakTanggalEmail("5 November 2026 20.41", "2026-11-05")).toBe("2026-11-05");
     expect(ekstrakTanggalEmail("tanpa tanggal", "2026-11-05")).toBeNull();
+  });
+
+  it("memakai total akhir bila email BSI memuat biaya admin", () => {
+    const teks = [
+      "Nominal Transaksi Rp 100.000,00",
+      "Biaya Admin Rp 2.500,00",
+      "Nama Merchant",
+      "Toko Contoh",
+    ].join("\n");
+    expect(ekstrakNominalEmail(teks)).toBe(102_500);
+    expect(ekstrakDetailEmail(teks)).toMatchObject({
+      nominal: 100_000,
+      biayaAdmin: 2_500,
+      total: 102_500,
+      merchant: "Toko Contoh",
+    });
+  });
+
+  it("baris Total menang atas nominal + biaya transfer", () => {
+    const teks = [
+      "Nominal Transaksi Rp 100.000,00",
+      "Biaya Transfer Rp 5.000,00",
+      "Total Rp 105.000,00",
+      "Lokasi Merchant",
+      "Kotabaru",
+      "RRN 123456789",
+    ].join("\n");
+    expect(ekstrakNominalEmail(teks)).toBe(105_000);
+    expect(ekstrakDetailEmail(teks)).toMatchObject({
+      biayaAdmin: 5_000,
+      total: 105_000,
+      lokasi: "Kotabaru",
+      rrn: "123456789",
+    });
   });
 });

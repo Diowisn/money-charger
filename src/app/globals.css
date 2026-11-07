@@ -2138,6 +2138,98 @@ select:disabled {
 }
 .scan-actions { display: flex; justify-content: flex-end; gap: 10px; }
 
+.scan-result { gap: 0; }
+.scan-result-title {
+  margin: 0 0 14px;
+  color: var(--hijau);
+  font-size: 1.35rem;
+  text-align: center;
+}
+.scan-preview {
+  padding: 14px 16px;
+  border: 1px solid var(--garis);
+  border-radius: 14px;
+  background: var(--kartu-2);
+}
+.scan-preview-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 10px;
+  color: var(--hijau);
+  font-weight: 700;
+}
+.scan-preview-label span {
+  display: inline-block;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--hijau);
+  box-shadow: inset 0 0 0 3px var(--kartu-2);
+}
+.daftar-info { display: grid; gap: 8px; margin: 0; }
+.baris-info {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr);
+  gap: 12px;
+  align-items: baseline;
+}
+.baris-info dt { color: var(--muted); font-size: 0.86rem; }
+.baris-info dd {
+  margin: 0;
+  font-size: 0.9rem;
+  font-weight: 600;
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+.scan-divider { height: 1px; margin: 14px 0; background: var(--garis); }
+.scan-form { display: grid; gap: 10px; }
+.scan-form label { display: grid; gap: 5px; color: var(--muted); font-size: 0.82rem; }
+.scan-form input,
+.scan-form select {
+  width: 100%;
+  min-height: 40px;
+  padding: 8px 10px;
+  border: 1px solid var(--garis);
+  border-radius: 9px;
+  background: var(--kartu);
+  color: var(--teks);
+}
+.scan-result .scan-actions { margin-top: 16px; }
+.scan-result .scan-actions button {
+  border-color: var(--hijau);
+  border-radius: 8px;
+  background: var(--kartu);
+  color: var(--hijau);
+  box-shadow: none;
+  font-weight: 700;
+}
+.detail-kartu { max-height: min(90vh, 720px); overflow: auto; }
+.detail-kepala {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+.detail-kepala h2 { margin: 0; }
+.detail-subjudul {
+  margin: 16px 0 8px;
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.detail-kartu .daftar-info {
+  padding: 14px;
+  border: 1px solid var(--garis);
+  border-radius: 14px;
+  background: var(--kartu-2);
+}
+.item-transaksi[role="button"] { cursor: pointer; }
+.item-transaksi[role="button"]:hover { background: var(--kartu-2); }
+
 
 .riwayat-stats {
   display: grid;
@@ -3047,4 +3139,296 @@ body {
 .tombol-ikon svg {
   width: 18px;
   height: 18px;
+}
+
+/* ---------- Halaman masuk / daftar ---------- */
+
+.auth2 {
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  padding: 24px 16px;
+  background: radial-gradient(circle at 50% 0%, #f8fbff 0%, transparent 55%), var(--bg);
+}
+
+[data-theme="dark"] .auth2 {
+  background: radial-gradient(circle at 50% 0%, #16334a 0%, transparent 55%), var(--bg);
+}
+
+.auth2-kartu {
+  width: 100%;
+  max-width: 420px;
+  overflow: hidden;
+  border: 1px solid var(--garis);
+  border-radius: 28px;
+  background: var(--kartu);
+  box-shadow: var(--bayang-kuat);
+}
+
+.auth2-hero {
+  position: relative;
+  padding: 34px 24px 58px;
+  text-align: center;
+  color: var(--hero-teks);
+  background: linear-gradient(150deg, var(--hero-bg), var(--aksen-kuat) 58%, var(--aksen));
+}
+
+.auth2-hero::after {
+  content: "";
+  position: absolute;
+  left: -12%;
+  right: -12%;
+  bottom: -30px;
+  height: 64px;
+  border-radius: 50%;
+  background: var(--kartu);
+}
+
+.auth2-logo {
+  display: inline-grid;
+  place-items: center;
+  width: 88px;
+  height: 88px;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.auth2-logo img {
+  border-radius: 20px;
+}
+
+.auth2-hero h1 {
+  margin: 14px 0 4px;
+  font-size: 1.45rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.auth2-hero p {
+  margin: 0;
+  color: var(--hero-muted);
+  font-size: 0.82rem;
+}
+
+.auth2-kembali {
+  position: absolute;
+  top: 14px;
+  left: 14px;
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  padding: 0;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.12);
+  color: var(--hero-teks);
+}
+
+.auth2-kembali svg {
+  width: 20px;
+  height: 20px;
+}
+
+.auth2-isi {
+  display: grid;
+  gap: 12px;
+  padding: 24px;
+}
+
+.auth2-isi label {
+  display: grid;
+  gap: 6px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--teks);
+}
+
+.auth2-pisah {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 4px 0;
+  color: var(--muted);
+  font-size: 0.74rem;
+  font-weight: 600;
+  text-align: center;
+}
+
+.auth2-pisah::before,
+.auth2-pisah::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--garis);
+}
+
+.auth2-oauth {
+  display: grid;
+  gap: 8px;
+}
+
+.auth2-oauth .tombol {
+  justify-content: center;
+  background: var(--kartu-2);
+}
+
+.auth2-oauth .tombol-ikon svg {
+  width: 19px;
+  height: 19px;
+  display: block;
+}
+
+.auth2-alt {
+  margin: 2px 0;
+  color: var(--muted);
+  font-size: 0.8rem;
+  text-align: center;
+}
+
+.auth2-alt .tautan {
+  font-size: inherit;
+}
+
+.auth2-sandi {
+  position: relative;
+  display: block;
+}
+
+.auth2-sandi input {
+  padding-right: 48px;
+}
+
+.auth2-lihat {
+  position: absolute;
+  top: 50%;
+  right: 8px;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--muted);
+  transform: translateY(-50%);
+}
+
+.auth2-lihat svg {
+  width: 20px;
+  height: 20px;
+}
+
+/* ---------- Profil ---------- */
+
+.profil-head {
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+  padding: 22px 18px;
+  border: 1px solid var(--garis);
+  border-radius: 22px;
+  background: var(--kartu);
+  box-shadow: var(--bayang);
+  text-align: center;
+}
+
+.profil-head h2 {
+  margin: 6px 0 0;
+  font-size: 1.15rem;
+}
+
+.profil-head .muted {
+  margin: 0;
+  font-size: 0.82rem;
+}
+
+.profil-head .tombol {
+  margin-top: 8px;
+  min-height: 38px;
+  padding: 7px 20px;
+  font-size: 0.8rem;
+}
+
+.profil-avatar.besar {
+  width: 96px;
+  height: 96px;
+  border: 3px solid var(--kartu);
+  box-shadow: 0 0 0 1px var(--garis), var(--bayang);
+}
+
+.profil-avatar.besar img {
+  border-radius: 50%;
+}
+
+.profil-daftar {
+  display: grid;
+  padding: 2px 16px;
+  border: 1px solid var(--garis);
+  border-radius: 20px;
+  background: var(--kartu);
+  box-shadow: var(--bayang);
+}
+
+.profil-daftar button {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 14px 0;
+  border: 0;
+  border-bottom: 1px solid var(--garis);
+  background: transparent;
+  color: var(--teks);
+  font-size: 0.86rem;
+  font-weight: 600;
+  text-align: left;
+}
+
+.profil-daftar button:last-child {
+  border-bottom: 0;
+}
+
+.profil-daftar button > svg:first-child {
+  width: 21px;
+  height: 21px;
+  flex: 0 0 auto;
+  color: var(--aksen-kuat);
+}
+
+.profil-daftar button > svg:last-of-type {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 auto;
+  margin-left: auto;
+  color: var(--muted);
+}
+
+.profil-daftar button.keluar {
+  color: var(--merah);
+}
+
+.profil-daftar button.keluar > svg:first-child {
+  color: var(--merah);
+}
+
+.profil-subjudul {
+  margin: 10px 0 0;
+  font-size: 0.95rem;
+}
+
+@media (max-width: 420px) {
+  .auth2-kartu {
+    border-radius: 24px;
+  }
+
+  .auth2-hero {
+    padding: 30px 20px 52px;
+  }
+
+  .auth2-isi {
+    padding: 20px;
+  }
 }

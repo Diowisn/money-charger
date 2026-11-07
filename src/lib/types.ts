@@ -31,6 +31,8 @@ export interface Tx {
   wadahTujuan: Wadah | null;
   tanggal: string; // YYYY-MM-DD (WIB)
   label: string | null;
+  /** Detail tambahan dari sumber (mis. merchant, lokasi, RRN, biaya admin dari email BSI). */
+  detail: Record<string, string | number | null> | null;
   sumber: "kaku" | "ai";
   status: "berlaku" | "batal";
   penggantiDari: number | null;
@@ -51,6 +53,7 @@ export function buatTx(
     wadahAsal: null,
     wadahTujuan: null,
     label: null,
+    detail: null,
     sumber: "kaku",
     penggantiDari: null,
     indukId: null,
@@ -157,6 +160,8 @@ export interface State {
 export interface ProfilAkun {
   nama: string | null;
   email: string;
+  telepon: string | null;
+  tanggalLahir: string | null;
   avatar: string | null;
   punyaPassword: boolean;
   providers: string[];

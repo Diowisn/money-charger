@@ -11,6 +11,8 @@ CREATE TABLE IF NOT EXISTS auth_users (
 );
 ALTER TABLE auth_users ADD COLUMN IF NOT EXISTS nama TEXT;
 ALTER TABLE auth_users ADD COLUMN IF NOT EXISTS avatar TEXT;
+ALTER TABLE auth_users ADD COLUMN IF NOT EXISTS telepon TEXT;
+ALTER TABLE auth_users ADD COLUMN IF NOT EXISTS tanggal_lahir DATE;
 
 CREATE TABLE IF NOT EXISTS allowed_numbers (
   id         SERIAL PRIMARY KEY,
@@ -72,6 +74,7 @@ CREATE TABLE IF NOT EXISTS transactions (
   wadah_tujuan        TEXT CHECK (wadah_tujuan IN ('saldo','tabungan','investasi')),
   tanggal             DATE NOT NULL,                        -- tanggal bisnis (WIB)
   label               TEXT,
+  detail              JSONB NOT NULL DEFAULT '{}'::jsonb,    -- detail sumber (merchant, lokasi, RRN, biaya admin, dll)
   sumber              TEXT NOT NULL DEFAULT 'kaku' CHECK (sumber IN ('kaku','ai')),
   status              TEXT NOT NULL DEFAULT 'berlaku' CHECK (status IN ('berlaku','batal')),
   pengganti_dari      BIGINT,
@@ -83,6 +86,7 @@ CREATE TABLE IF NOT EXISTS transactions (
 CREATE INDEX IF NOT EXISTS idx_tx_tanggal ON transactions (tanggal);
 CREATE INDEX IF NOT EXISTS idx_tx_induk ON transactions (induk_id);
 ALTER TABLE transactions ADD COLUMN IF NOT EXISTS biaya_admin BIGINT NOT NULL DEFAULT 0 CHECK (biaya_admin >= 0);
+ALTER TABLE transactions ADD COLUMN IF NOT EXISTS detail JSONB NOT NULL DEFAULT '{}'::jsonb;
 
 CREATE TABLE IF NOT EXISTS debts (
   id            BIGSERIAL PRIMARY KEY,
@@ -225,3 +229,13 @@ CREATE TABLE IF NOT EXISTS integrations (
   diperbarui_pada TIMESTAMPTZ NOT NULL DEFAULT now(),
   UNIQUE (jenis, nama)
 );
+
+CREATE TABLE IF NOT EXISTS password_reset_tokens (
+  token_hash  TEXT PRIMARY KEY,
+  user_id     UUID NOT NULL REFERENCES auth_users(id) ON DELETE CASCADE,
+  expires_at  TIMESTAMPTZ NOT NULL,
+  used_at     TIMESTAMPTZ,
+  created_at  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_reset_tokens_user ON password_reset_tokens (user_id);
+CREATE INDEX IF NOT EXISTS idx_reset_tokens_expires ON password_reset_tokens (expires_at);

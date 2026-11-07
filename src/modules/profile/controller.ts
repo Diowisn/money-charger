@@ -30,7 +30,7 @@ export async function patchProfil(req: NextRequest) {
   if (id instanceof Response) return id;
   try {
     const body = await bacaBody(req);
-    const patch: { nama?: string; email?: string; avatar?: string | null } = {};
+    const patch: { nama?: string; email?: string; telepon?: string | null; tanggalLahir?: string | null; avatar?: string | null } = {};
 
     if (body.nama !== undefined) {
       const nama = String(body.nama).trim();
@@ -41,6 +41,28 @@ export async function patchProfil(req: NextRequest) {
       const email = String(body.email).trim().toLowerCase();
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 254) throw new AksiError("Alamat email tidak valid.");
       patch.email = email;
+    }
+    if (body.telepon !== undefined) {
+      const raw = String(body.telepon ?? "").trim();
+      if (!raw) {
+        patch.telepon = null;
+      } else {
+        if (!/^\+?[0-9][0-9\s-]{6,19}$/.test(raw)) throw new AksiError("Nomor telepon tidak valid.");
+        patch.telepon = raw;
+      }
+    }
+    if (body.tanggalLahir !== undefined) {
+      const raw = String(body.tanggalLahir ?? "").trim();
+      if (!raw) {
+        patch.tanggalLahir = null;
+      } else {
+        const hariIni = new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Jakarta" });
+        const tanggal = new Date(`${raw}T00:00:00Z`);
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(raw) || Number.isNaN(tanggal.getTime()) || tanggal.toISOString().slice(0, 10) !== raw || raw > hariIni) {
+          throw new AksiError("Tanggal lahir tidak valid.");
+        }
+        patch.tanggalLahir = raw;
+      }
     }
     if (body.avatar !== undefined) {
       if (body.avatar === null || body.avatar === "") {

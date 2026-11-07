@@ -1,13 +1,27 @@
 "use client";
 
-import { useCallback, useEffect, useId, useMemo, useRef, useState, type ReactElement } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState, type ReactElement, type ReactNode } from "react";
 import { Tombol } from "@/components/tombol";
 import type { DashboardData, TxView } from "@/lib/dashboard";
 import { unduhXlsx } from "@/lib/xlsx";
 
 type Pesan = { jenis: "ok" | "error"; teks: string };
 type Konfirmasi = { teks: string; judul: string; selesai: (nilai: boolean) => void };
-type HasilScan = { nominal: number; subPos: string | null; tanggal: string | null; label: string | null };
+type HasilScan = {
+  nominal: number;
+  subPos: string | null;
+  tanggal: string | null;
+  label: string | null;
+  toko: string | null;
+  alamat: string | null;
+  kontak: string | null;
+  konsumen: string | null;
+  kasir: string | null;
+  kategori: string | null;
+  pajak: number | null;
+  dibayar: number | null;
+  kembalian: number | null;
+};
 type Tab =
   | "ringkasan"
   | "rencana"
@@ -16,9 +30,6 @@ type Tab =
   | "rekap"
   | "profil"
   | "ubah-profil"
-  | "password"
-  | "keamanan"
-  | "hapus-akun"
   | "pos"
   | "piutang"
   | "target"
@@ -41,6 +52,40 @@ const NAMA_TIPE: Record<string, string> = {
 };
 
 const rp = (n: number) => `Rp${Math.round(n).toLocaleString("id-ID")}`;
+const rpOpsional = (n: number | null) => (n === null ? "—" : rp(n));
+
+const LABEL_DETAIL: Record<string, string> = {
+  merchant: "Merchant",
+  lokasi: "Lokasi",
+  kontak: "Kontak",
+  konsumen: "Konsumen",
+  kasir: "Kasir",
+  jenisTransaksi: "Jenis transaksi",
+  rrn: "RRN",
+  terminal: "Terminal",
+  noTransaksi: "No. transaksi",
+  referensi: "Referensi",
+  nominal: "Nominal",
+  biayaAdmin: "Biaya admin",
+  total: "Total",
+  pajak: "Pajak",
+  dibayar: "Dibayar",
+  kembalian: "Kembalian",
+  toko: "Toko",
+  alamat: "Alamat",
+  kategori: "Kategori",
+};
+
+const KUNCI_UANG_DETAIL = new Set(["nominal", "biayaAdmin", "total", "pajak", "dibayar", "kembalian"]);
+
+function BarisInfo({ label, nilai }: { label: string; nilai: ReactNode }) {
+  return (
+    <div className="baris-info">
+      <dt>{label}</dt>
+      <dd>{nilai ?? "—"}</dd>
+    </div>
+  );
+}
 
 function IkonRingkasan({ aktif }: { aktif: boolean }) {
   return (
@@ -140,11 +185,20 @@ function IkonKunci({ aktif }: { aktif: boolean }) {
   );
 }
 
-function IkonPerisai({ aktif }: { aktif: boolean }) {
+function IkonPanah() {
   return (
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={aktif ? 2.4 : 1.8}>
-      <path d="M12 3l8 3v6c0 4.5-3 7.5-8 9-5-1.5-8-4.5-8-9V6l8-3z" strokeLinejoin="round" />
-      <path d="M9 12l2 2 4-4" strokeLinecap="round" strokeLinejoin="round" />
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
+      <path d="M9 5l7 7-7 7" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+function IkonMata({ buka }: { buka: boolean }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
+      <path d="M2.5 12s3.5-6 9.5-6 9.5 6 9.5 6-3.5 6-9.5 6-9.5-6-9.5-6z" strokeLinecap="round" strokeLinejoin="round" />
+      <circle cx="12" cy="12" r="2.6" />
+      {buka ? <path d="M4 20 20 4" strokeLinecap="round" /> : null}
     </svg>
   );
 }
@@ -277,14 +331,11 @@ const MENU_SAMPING: [Tab, string, (p: { aktif: boolean }) => ReactElement][] = [
 ];
 
 const MENU_IDENTITAS: [Tab, string, (p: { aktif: boolean }) => ReactElement][] = [
-  ["profil", "Identitas diri", IkonProfil],
-  ["ubah-profil", "Ubah profil", IkonProfil],
-  ["password", "Ganti password", IkonKunci],
-  ["keamanan", "Keamanan", IkonPerisai],
-  ["hapus-akun", "Hapus akun", IkonHapus],
+  ["profil", "Profil saya", IkonProfil],
+  ["ubah-profil", "Edit profil", IkonProfil],
 ];
 
-const TAB_IDENTITAS = new Set<Tab>(["profil", "ubah-profil", "password", "keamanan", "hapus-akun"]);
+const TAB_IDENTITAS = new Set<Tab>(["profil", "ubah-profil"]);
 
 const JUDUL_TAB: Record<Tab, string> = {
   ringkasan: "Beranda",
@@ -292,11 +343,8 @@ const JUDUL_TAB: Record<Tab, string> = {
   catat: "Transaksi",
   riwayat: "Transaksi",
   rekap: "Rekap",
-  profil: "Identitas diri",
-  "ubah-profil": "Ubah profil",
-  password: "Ganti password",
-  keamanan: "Keamanan",
-  "hapus-akun": "Hapus akun",
+  profil: "Profil saya",
+  "ubah-profil": "Edit profil",
   pos: "Pos pengeluaran",
   piutang: "Piutang & utang",
   target: "Target tabungan",
@@ -334,9 +382,12 @@ export default function Dashboard({ awal }: { awal: DashboardData }) {
   const [tipeCatat, setTipeCatat] = useState<"in" | "out">("out");
   const [menuTambah, setMenuTambah] = useState(false);
   const [hasilScan, setHasilScan] = useState<HasilScan | null>(null);
+  const [editScan, setEditScan] = useState(false);
+  const [detailTx, setDetailTx] = useState<TxView | null>(null);
   const [scanSibuk, setScanSibuk] = useState(false);
   const [konfirmasi, setKonfirmasi] = useState<Konfirmasi | null>(null);
   const inputScanRef = useRef<HTMLInputElement>(null);
+  const inputUploadRef = useRef<HTMLInputElement>(null);
   const dataRef = useRef(awal);
   const sibukRef = useRef(false);
   const urutanRef = useRef(0);
@@ -488,6 +539,7 @@ export default function Dashboard({ awal }: { awal: DashboardData }) {
       }
       const j = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string; data?: HasilScan };
       if (!res.ok || !j.ok || !j.data) throw new Error(j.error ?? "Gagal membaca struk.");
+      setEditScan(false);
       setHasilScan(j.data);
     } catch (error) {
       setPesan({ jenis: "error", teks: error instanceof Error ? error.message : "Gagal membaca struk." });
@@ -503,11 +555,25 @@ export default function Dashboard({ awal }: { awal: DashboardData }) {
       tipe: "out",
       nominal: hasilScan.nominal,
       tanggal: hasilScan.tanggal ?? new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Jakarta" }),
-      label: hasilScan.label,
+      label: hasilScan.toko ?? hasilScan.label,
       subPostId: pos?.id ?? null,
       biayaAdmin: 0,
+      detail: {
+        toko: hasilScan.toko,
+        alamat: hasilScan.alamat,
+        kontak: hasilScan.kontak,
+        konsumen: hasilScan.konsumen,
+        kasir: hasilScan.kasir,
+        kategori: hasilScan.kategori,
+        pajak: hasilScan.pajak,
+        dibayar: hasilScan.dibayar,
+        kembalian: hasilScan.kembalian,
+      },
     });
-    if (berhasil) setHasilScan(null);
+    if (berhasil) {
+      setHasilScan(null);
+      setEditScan(false);
+    }
   }
 
   const jamTerakhir = terakhir
@@ -517,6 +583,9 @@ export default function Dashboard({ awal }: { awal: DashboardData }) {
         second: "2-digit",
       })
     : null;
+  const detailEntries = detailTx
+    ? Object.entries(detailTx.detail ?? {}).filter(([, nilai]) => nilai !== null && nilai !== "")
+    : [];
   return (
     <div className="app">
       <aside className="sidebar">
@@ -604,27 +673,84 @@ export default function Dashboard({ awal }: { awal: DashboardData }) {
 
         {hasilScan ? (
           <div className="scan-overlay" role="presentation">
-            <section className="scan-dialog" role="dialog" aria-modal="true" aria-labelledby="scan-title">
-              <h2 id="scan-title">Periksa hasil scan</h2>
-              <label>Nominal
-                <input type="number" min="1" step="1" value={hasilScan.nominal} onChange={(event) => setHasilScan({ ...hasilScan, nominal: Number(event.target.value) })} />
-              </label>
-              <label>Tanggal
-                <input type="date" value={hasilScan.tanggal ?? new Date().toLocaleDateString("en-CA", { timeZone: "Asia/Jakarta" })} onChange={(event) => setHasilScan({ ...hasilScan, tanggal: event.target.value })} />
-              </label>
-              <label>Keterangan
-                <input type="text" maxLength={80} value={hasilScan.label ?? ""} onChange={(event) => setHasilScan({ ...hasilScan, label: event.target.value || null })} />
-              </label>
-              <label>Pos pengeluaran
-                <select value={hasilScan.subPos ?? ""} onChange={(event) => setHasilScan({ ...hasilScan, subPos: event.target.value || null })}>
-                  <option value="">Belum dipetakan</option>
-                  {data.posSemua.filter((pos) => pos.aktif).map((pos) => <option key={pos.id} value={pos.nama}>{pos.nama}</option>)}
-                </select>
-              </label>
+            <section className="scan-dialog scan-result" role="dialog" aria-modal="true" aria-labelledby="scan-title">
+              <h2 id="scan-title" className="scan-result-title">Scan Result</h2>
+              <div className="scan-preview">
+                <p className="scan-preview-label"><span aria-hidden="true" /> Preview</p>
+                {editScan ? (
+                  <div className="scan-form">
+                    <label>Toko
+                      <input type="text" maxLength={80} value={hasilScan.toko ?? ""} onChange={(event) => setHasilScan({ ...hasilScan, toko: event.target.value || null })} />
+                    </label>
+                    <label>Alamat
+                      <input type="text" maxLength={120} value={hasilScan.alamat ?? ""} onChange={(event) => setHasilScan({ ...hasilScan, alamat: event.target.value || null })} />
+                    </label>
+                    <label>Kontak
+                      <input type="text" maxLength={40} value={hasilScan.kontak ?? ""} onChange={(event) => setHasilScan({ ...hasilScan, kontak: event.target.value || null })} />
+                    </label>
+                    <label>Konsumen
+                      <input type="text" maxLength={80} value={hasilScan.konsumen ?? ""} onChange={(event) => setHasilScan({ ...hasilScan, konsumen: event.target.value || null })} />
+                    </label>
+                    <label>Tanggal
+                      <input type="date" value={hasilScan.tanggal ?? data.hariIni} onChange={(event) => setHasilScan({ ...hasilScan, tanggal: event.target.value || null })} />
+                    </label>
+                    <label>Kasir
+                      <input type="text" maxLength={60} value={hasilScan.kasir ?? ""} onChange={(event) => setHasilScan({ ...hasilScan, kasir: event.target.value || null })} />
+                    </label>
+                  </div>
+                ) : (
+                  <dl className="daftar-info">
+                    <BarisInfo label="Toko" nilai={hasilScan.toko ?? hasilScan.label} />
+                    <BarisInfo label="Alamat" nilai={hasilScan.alamat} />
+                    <BarisInfo label="Kontak" nilai={hasilScan.kontak} />
+                    <BarisInfo label="Konsumen" nilai={hasilScan.konsumen} />
+                    <BarisInfo label="Tanggal" nilai={tanggalPendek(hasilScan.tanggal ?? data.hariIni)} />
+                    <BarisInfo label="Kasir" nilai={hasilScan.kasir} />
+                  </dl>
+                )}
+              </div>
+
+              <div className="scan-divider" />
+
+              {editScan ? (
+                <div className="scan-form">
+                  <label>Total biaya
+                    <input type="number" min="1" step="1" inputMode="numeric" value={hasilScan.nominal} onChange={(event) => setHasilScan({ ...hasilScan, nominal: Number(event.target.value) })} />
+                  </label>
+                  <label>Pajak
+                    <input type="number" min="0" step="1" inputMode="numeric" value={hasilScan.pajak ?? ""} onChange={(event) => setHasilScan({ ...hasilScan, pajak: event.target.value === "" ? null : Number(event.target.value) })} />
+                  </label>
+                  <label>Dibayar
+                    <input type="number" min="0" step="1" inputMode="numeric" value={hasilScan.dibayar ?? ""} onChange={(event) => setHasilScan({ ...hasilScan, dibayar: event.target.value === "" ? null : Number(event.target.value) })} />
+                  </label>
+                  <label>Kembalian
+                    <input type="number" min="0" step="1" inputMode="numeric" value={hasilScan.kembalian ?? ""} onChange={(event) => setHasilScan({ ...hasilScan, kembalian: event.target.value === "" ? null : Number(event.target.value) })} />
+                  </label>
+                  <label>Kategori
+                    <select value={hasilScan.subPos ?? ""} onChange={(event) => setHasilScan({ ...hasilScan, subPos: event.target.value || null })}>
+                      <option value="">Belum dipetakan</option>
+                      {data.posSemua.filter((pos) => pos.aktif).map((pos) => <option key={pos.id} value={pos.nama}>{pos.nama}</option>)}
+                    </select>
+                  </label>
+                </div>
+              ) : (
+                <dl className="daftar-info">
+                  <BarisInfo label="Total Biaya" nilai={<b>{rp(hasilScan.nominal)}</b>} />
+                  <BarisInfo label="Pajak" nilai={rpOpsional(hasilScan.pajak)} />
+                  <BarisInfo label="Dibayar" nilai={rpOpsional(hasilScan.dibayar)} />
+                  <BarisInfo label="Kembalian" nilai={rpOpsional(hasilScan.kembalian)} />
+                  <BarisInfo label="Kategori" nilai={hasilScan.subPos ?? hasilScan.kategori} />
+                </dl>
+              )}
+
               <div className="scan-actions">
-                <Tombol varian="sekunder" onClick={() => setHasilScan(null)}>Batal</Tombol>
+                {editScan ? (
+                  <Tombol varian="sekunder" onClick={() => setEditScan(false)}>Batal</Tombol>
+                ) : (
+                  <Tombol varian="sekunder" onClick={() => setEditScan(true)}>Edit</Tombol>
+                )}
                 <Tombol disabled={sibuk || hasilScan.nominal < 1} onClick={() => void simpanHasilScan()}>
-                  Simpan pengeluaran
+                  Simpan
                 </Tombol>
               </div>
             </section>
@@ -653,6 +779,53 @@ export default function Dashboard({ awal }: { awal: DashboardData }) {
           </div>
         ) : null}
 
+        {detailTx ? (
+          <div
+            className="dialog-overlay"
+            onMouseDown={(event) => {
+              if (event.target === event.currentTarget) setDetailTx(null);
+            }}
+          >
+            <section className="dialog-kartu detail-kartu" role="dialog" aria-modal="true" aria-labelledby="detail-judul">
+              <div className="detail-kepala">
+                <h2 id="detail-judul">{detailTx.subPost ?? detailTx.label ?? NAMA_TIPE[detailTx.tipe] ?? "Transaksi"}</h2>
+                <span className="badge">{NAMA_TIPE[detailTx.tipe] ?? detailTx.tipe}</span>
+              </div>
+              <dl className="daftar-info">
+                <BarisInfo label="Tanggal" nilai={tanggalPendek(detailTx.tanggal)} />
+                <BarisInfo label="Nominal" nilai={rp(detailTx.nominal)} />
+                {detailTx.biayaAdmin > 0 ? <BarisInfo label="Biaya admin" nilai={rp(detailTx.biayaAdmin)} /> : null}
+                <BarisInfo
+                  label="Total"
+                  nilai={<b>{rp(detailTx.tipe === "out" ? detailTx.nominal + detailTx.biayaAdmin : detailTx.nominal)}</b>}
+                />
+                <BarisInfo label="Pos" nilai={detailTx.subPost} />
+                <BarisInfo label="Catatan" nilai={detailTx.label} />
+                {detailTx.wadahAsal ? <BarisInfo label="Wadah asal" nilai={detailTx.wadahAsal} /> : null}
+                {detailTx.wadahTujuan ? <BarisInfo label="Wadah tujuan" nilai={detailTx.wadahTujuan} /> : null}
+                <BarisInfo label="Status" nilai={detailTx.status === "batal" ? "Dibatalkan" : "Berlaku"} />
+              </dl>
+              {detailEntries.length ? (
+                <>
+                  <p className="detail-subjudul">Detail sumber</p>
+                  <dl className="daftar-info">
+                    {detailEntries.map(([kunci, nilai]) => (
+                      <BarisInfo
+                        key={kunci}
+                        label={LABEL_DETAIL[kunci] ?? kunci}
+                        nilai={KUNCI_UANG_DETAIL.has(kunci) && typeof nilai === "number" ? rp(nilai) : String(nilai)}
+                      />
+                    ))}
+                  </dl>
+                </>
+              ) : null}
+              <div className="dialog-aksi">
+                <Tombol varian="sekunder" onClick={() => setDetailTx(null)}>Tutup</Tombol>
+              </div>
+            </section>
+          </div>
+        ) : null}
+
         <main className="konten">
           {tab === "ringkasan" ? (
             <Ringkasan data={data} nama={nama} navigasi={navigasiKe} catat={catat} />
@@ -667,10 +840,11 @@ export default function Dashboard({ awal }: { awal: DashboardData }) {
               tipeAwal={tipeCatat}
               navigasi={navigasiKe}
               mintaKonfirmasi={mintaKonfirmasi}
+              bukaDetail={setDetailTx}
             />
           ) : null}
           {tab === "rekap" ? <Rekap data={data} navigasi={navigasiKe} /> : null}
-          {tab === "profil" || tab === "ubah-profil" || tab === "password" || tab === "keamanan" || tab === "hapus-akun" ? (
+          {tab === "profil" || tab === "ubah-profil" ? (
             <Profil
               bagian={tab}
               data={data}
@@ -702,10 +876,23 @@ export default function Dashboard({ awal }: { awal: DashboardData }) {
             event.target.value = "";
           }}
         />
+        <input
+          ref={inputUploadRef}
+          type="file"
+          accept="image/*"
+          hidden
+          onChange={(event) => {
+            void scanStruk(event.target.files?.[0]);
+            event.target.value = "";
+          }}
+        />
         {menuTambah ? (
           <div className="fab-menu" role="group" aria-label="Tambah">
             <Tombol varian="ghost" disabled={scanSibuk} onClick={() => { setMenuTambah(false); inputScanRef.current?.click(); }}>
               Scan struk
+            </Tombol>
+            <Tombol varian="ghost" disabled={scanSibuk} onClick={() => { setMenuTambah(false); inputUploadRef.current?.click(); }}>
+              Upload struk
             </Tombol>
             <Tombol varian="ghost" onClick={() => { setMenuTambah(false); catat("out"); }}>
               Transaksi
@@ -1071,6 +1258,8 @@ function Profil({
   const namaTampil = profil?.nama?.trim() || nama || "Pengguna Money-Charger";
   const [drafNama, setDrafNama] = useState(profil?.nama ?? nama);
   const [drafEmail, setDrafEmail] = useState(profil?.email ?? "");
+  const [drafTelepon, setDrafTelepon] = useState(profil?.telepon ?? "");
+  const [drafTanggalLahir, setDrafTanggalLahir] = useState(profil?.tanggalLahir ?? "");
   const [avatarDraf, setAvatarDraf] = useState<string | null | undefined>(undefined);
   const [avatarTampil, setAvatarTampil] = useState<string | null>(profil?.avatar ?? null);
   const [sibukProfil, setSibukProfil] = useState(false);
@@ -1085,9 +1274,11 @@ function Profil({
   useEffect(() => {
     setDrafNama(profil?.nama ?? nama);
     setDrafEmail(profil?.email ?? "");
+    setDrafTelepon(profil?.telepon ?? "");
+    setDrafTanggalLahir(profil?.tanggalLahir ?? "");
     setAvatarTampil(profil?.avatar ?? null);
     setAvatarDraf(undefined);
-  }, [profil?.nama, profil?.email, profil?.avatar, nama]);
+  }, [profil?.nama, profil?.email, profil?.telepon, profil?.tanggalLahir, profil?.avatar, nama]);
 
   async function pilihFoto(file: File | undefined) {
     if (!file) return;
@@ -1115,35 +1306,37 @@ function Profil({
       setGalatProfil("Alamat email tidak valid.");
       return;
     }
+    const gantiSandi = Boolean(passwordLama || passwordBaru || passwordUlang);
+    if (gantiSandi) {
+      if (profil?.punyaPassword && !passwordLama) {
+        setGalatProfil("Masukkan password lama.");
+        return;
+      }
+      if (passwordBaru.length < 12) {
+        setGalatProfil("Password baru minimal 12 karakter.");
+        return;
+      }
+      if (passwordBaru !== passwordUlang) {
+        setGalatProfil("Konfirmasi password tidak sama.");
+        return;
+      }
+    }
     setGalatProfil(null);
     setSibukProfil(true);
-    const body: Record<string, unknown> = { nama: namaBaru, email };
+    const body: Record<string, unknown> = {
+      nama: namaBaru,
+      email,
+      telepon: drafTelepon.trim(),
+      tanggalLahir: drafTanggalLahir,
+    };
     if (avatarDraf !== undefined) body.avatar = avatarDraf;
+    if (gantiSandi) {
+      body.currentPassword = passwordLama;
+      body.newPassword = passwordBaru;
+    }
     const berhasil = await kirim("/api/profile", "PATCH", body);
-    if (berhasil) setAvatarDraf(undefined);
-    setSibukProfil(false);
-  }
-
-  async function ubahPassword() {
-    if (profil?.punyaPassword && !passwordLama) {
-      setGalatProfil("Masukkan password lama.");
-      return;
-    }
-    if (passwordBaru.length < 12) {
-      setGalatProfil("Password baru minimal 12 karakter.");
-      return;
-    }
-    if (passwordBaru !== passwordUlang) {
-      setGalatProfil("Konfirmasi password tidak sama.");
-      return;
-    }
-    setGalatProfil(null);
-    setSibukProfil(true);
-    const berhasil = await kirim("/api/profile", "PATCH", {
-      currentPassword: passwordLama,
-      newPassword: passwordBaru,
-    });
     if (berhasil) {
+      setAvatarDraf(undefined);
       setPasswordLama("");
       setPasswordBaru("");
       setPasswordUlang("");
@@ -1187,186 +1380,148 @@ function Profil({
     }
   }
 
+  async function hapusCache() {
+    if (!(await mintaKonfirmasi("Hapus cache?", "Data cache dan berkas offline akan dihapus, lalu halaman dimuat ulang."))) return;
+    try {
+      if ("caches" in window) {
+        const kunci = await caches.keys();
+        await Promise.all(kunci.map((k) => caches.delete(k)));
+      }
+    } catch {
+      // Cache storage bisa diblokir; reload tetap dilakukan.
+    }
+    window.location.reload();
+  }
+
   return (
     <div className="profil">
-      <section className="profil-kartu">
-        <span className="profil-avatar">
-          <img src={avatarTampil || "/icon-192.png"} alt="" width={62} height={62} />
-        </span>
-        <div>
-          <h2>{namaTampil}</h2>
-          <p className="muted kecil">{profil?.email ?? "Memuat akun..."}</p>
-          <p className="muted kecil">
-            {profil?.providers.length ? `Terhubung: ${profil.providers.join(", ")}` : "Login email dan password"}
-          </p>
-          <span className={`status-live ${statusLive}`}>
-            <i /> {statusLive === "hidup" ? "Tersinkron" : "Koneksi terputus"}
-          </span>
-        </div>
-      </section>
-
       {bagian === "profil" ? (
         <>
-          <section className="kartu profil-bagian">
-            <h2>Identitas diri</h2>
-            <p className="muted kecil">Kelola data akun dan keamanan login.</p>
-            <div className="profil-menu">
-              <button type="button" onClick={() => navigasi("ubah-profil")}>
-                <IkonProfil aktif={false} />
-                <span>Ubah profil</span>
-              </button>
-              <button type="button" onClick={() => navigasi("password")}>
-                <IkonKunci aktif={false} />
-                <span>{profil?.punyaPassword ? "Ganti password" : "Buat password"}</span>
-              </button>
-              <button type="button" onClick={() => navigasi("keamanan")}>
-                <IkonPerisai aktif={false} />
-                <span>Keamanan</span>
-              </button>
-              <button type="button" onClick={() => navigasi("hapus-akun")}>
-                <IkonHapus aktif={false} />
-                <span>Hapus akun</span>
-              </button>
-            </div>
+          <section className="profil-head">
+            <span className="profil-avatar besar">
+              <img src={avatarTampil || "/icon-192.png"} alt="" width={96} height={96} />
+            </span>
+            <h2>{namaTampil}</h2>
+            <p className="muted">{profil?.email ?? "Memuat akun..."}</p>
+            <span className={`status-live ${statusLive}`}>
+              <i /> {statusLive === "hidup" ? "Tersinkron" : "Koneksi terputus"}
+            </span>
+            <Tombol varian="sekunder" onClick={() => navigasi("ubah-profil")}>
+              Edit profil
+            </Tombol>
           </section>
 
-          <section className="kartu profil-bagian">
-            <div className="baris-antara">
-              <div>
-                <h2>Tampilan</h2>
-                <p className="muted kecil">Mode {tema === "gelap" ? "gelap" : "terang"} aktif</p>
-              </div>
-              <Tombol varian="sekunder" ukuran="kecil" onClick={() => setTema(tema === "gelap" ? "terang" : "gelap")}>
-                {tema === "gelap" ? "Mode terang" : "Mode gelap"}
-              </Tombol>
-            </div>
-          </section>
-
-          <section className="kartu profil-bagian">
-            <h2>Menu lainnya</h2>
-            <div className="profil-menu">
-              <button type="button" onClick={() => navigasi("rencana")}>
-                <IkonRencana aktif={false} />
-                <span>Rencana bulanan</span>
-              </button>
-              <button type="button" onClick={() => navigasi("pos")}>
-                <IkonPos aktif={false} />
-                <span>Pos pengeluaran</span>
-              </button>
-              <button type="button" onClick={() => navigasi("piutang")}>
-                <IkonPiutang aktif={false} />
-                <span>Piutang &amp; utang</span>
-              </button>
-              <button type="button" onClick={() => navigasi("target")}>
-                <IkonTarget aktif={false} />
-                <span>Target tabungan</span>
-              </button>
-              <button type="button" onClick={() => navigasi("asisten")}>
-                <IkonAsisten aktif={false} />
-                <span>Asisten keuangan</span>
-              </button>
-              <button type="button" onClick={() => navigasi("rekap")}>
-                <IkonRekap aktif={false} />
-                <span>Rekap keuangan</span>
-              </button>
-            </div>
+          <section className="profil-daftar">
+            <button type="button" onClick={() => navigasi("ubah-profil")}>
+              <IkonKunci aktif={false} />
+              <span>{profil?.punyaPassword ? "Ubah password" : "Buat password"}</span>
+              <IkonPanah />
+            </button>
+            <button type="button" onClick={() => void unduhXlsx(data.transaksi, NAMA_TIPE)}>
+              <IkonRekap aktif={false} />
+              <span>Cadangan (ekspor .xlsx)</span>
+              <IkonPanah />
+            </button>
+            <button type="button" onClick={() => setTema(tema === "gelap" ? "terang" : "gelap")}>
+              <IkonMata buka={tema === "gelap"} />
+              <span>Tema {tema === "gelap" ? "gelap" : "terang"}</span>
+              <IkonPanah />
+            </button>
+            <button type="button" onClick={() => void hapusCache()}>
+              <IkonHapus aktif={false} />
+              <span>Hapus cache</span>
+              <IkonPanah />
+            </button>
+            <button type="button" className="keluar" onClick={() => void keluar()}>
+              <IkonKeluar aktif={false} />
+              <span>Log out</span>
+              <IkonPanah />
+            </button>
           </section>
         </>
       ) : null}
 
       {bagian === "ubah-profil" ? (
-        <section className="kartu profil-bagian">
-          <h2>Ubah profil</h2>
-          <div className="form">
-            <div className="profil-foto-baris">
-              <span className="profil-avatar kecil">
-                <img src={avatarTampil || "/icon-192.png"} alt="" width={48} height={48} />
-              </span>
-              <div className="baris-tombol">
-                <Tombol varian="sekunder" ukuran="kecil" onClick={() => fotoRef.current?.click()} disabled={sibukProfil}>
-                  Ganti foto
-                </Tombol>
-                {avatarTampil ? (
-                  <Tombol varian="tautan" onClick={() => { setAvatarDraf(null); setAvatarTampil(null); }}>
-                    Hapus foto
-                  </Tombol>
-                ) : null}
-              </div>
-              <input
-                ref={fotoRef}
-                type="file"
-                accept="image/jpeg,image/png,image/webp"
-                hidden
-                onChange={(event) => {
-                  void pilihFoto(event.target.files?.[0]);
-                  event.target.value = "";
-                }}
-              />
-            </div>
-            <label>
-              Nama panggilan
-              <input value={drafNama} onChange={(e) => setDrafNama(e.target.value)} placeholder="Nama kamu" maxLength={60} />
-            </label>
-            <label>
-              Email
-              <input type="email" value={drafEmail} onChange={(e) => setDrafEmail(e.target.value)} maxLength={254} />
-            </label>
-            {galatProfil ? <p className="error" role="alert">{galatProfil}</p> : null}
-            <Tombol lebar onClick={() => void simpanProfil()} disabled={sibukProfil}>
-              {sibukProfil ? "Menyimpan..." : "Simpan profil"}
-            </Tombol>
-          </div>
-        </section>
-      ) : null}
-
-      {bagian === "password" ? (
-        <section className="kartu profil-bagian">
-          <h2>{profil?.punyaPassword ? "Ganti password" : "Buat password"}</h2>
-          <p className="muted kecil">Minimal 12 karakter. Password dipakai untuk login email.</p>
-          <div className="form">
-            {profil?.punyaPassword ? (
-              <label>
-                Password lama
-                <input type="password" autoComplete="current-password" value={passwordLama} onChange={(e) => setPasswordLama(e.target.value)} maxLength={1024} />
-              </label>
+        <>
+          <section className="profil-head">
+            <span className="profil-avatar besar">
+              <img src={avatarTampil || "/icon-192.png"} alt="" width={96} height={96} />
+            </span>
+            <button type="button" className="tautan" onClick={() => fotoRef.current?.click()} disabled={sibukProfil}>
+              Ganti foto
+            </button>
+            {avatarTampil ? (
+              <button type="button" className="tautan muted" onClick={() => { setAvatarDraf(null); setAvatarTampil(null); }}>
+                Hapus foto
+              </button>
             ) : null}
-            <label>
-              Password baru
-              <input type="password" autoComplete="new-password" value={passwordBaru} onChange={(e) => setPasswordBaru(e.target.value)} minLength={12} maxLength={1024} />
-            </label>
-            <label>
-              Ulangi password baru
-              <input type="password" autoComplete="new-password" value={passwordUlang} onChange={(e) => setPasswordUlang(e.target.value)} minLength={12} maxLength={1024} />
-            </label>
-            {galatProfil ? <p className="error" role="alert">{galatProfil}</p> : null}
-            <Tombol varian="sekunder" lebar onClick={() => void ubahPassword()} disabled={sibukProfil}>
-              {profil?.punyaPassword ? "Ganti password" : "Aktifkan login password"}
+            <input
+              ref={fotoRef}
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              hidden
+              onChange={(event) => {
+                void pilihFoto(event.target.files?.[0]);
+                event.target.value = "";
+              }}
+            />
+          </section>
+
+          <section className="kartu profil-bagian">
+            <h2>Edit profil</h2>
+            <div className="form">
+              <label>
+                Nama lengkap
+                <input value={drafNama} onChange={(e) => setDrafNama(e.target.value)} placeholder="Nama kamu" maxLength={60} />
+              </label>
+              <label>
+                Email
+                <input type="email" value={drafEmail} onChange={(e) => setDrafEmail(e.target.value)} maxLength={254} />
+              </label>
+              <label>
+                Nomor telepon
+                <input type="tel" inputMode="tel" value={drafTelepon} onChange={(e) => setDrafTelepon(e.target.value)} maxLength={20} placeholder="08xxxxxxxxxx" />
+              </label>
+              <label>
+                Tanggal lahir
+                <input type="date" value={drafTanggalLahir} onChange={(e) => setDrafTanggalLahir(e.target.value)} />
+              </label>
+              <h3 className="profil-subjudul">{profil?.punyaPassword ? "Ganti password" : "Buat password"}</h3>
+              <p className="muted kecil">Kosongkan bagian ini jika tidak ingin mengganti password. Minimal 12 karakter.</p>
+              {profil?.punyaPassword ? (
+                <label>
+                  Password lama
+                  <input type="password" autoComplete="current-password" value={passwordLama} onChange={(e) => setPasswordLama(e.target.value)} maxLength={1024} />
+                </label>
+              ) : null}
+              <label>
+                Password baru
+                <input type="password" autoComplete="new-password" value={passwordBaru} onChange={(e) => setPasswordBaru(e.target.value)} minLength={12} maxLength={1024} />
+              </label>
+              <label>
+                Ulangi password baru
+                <input type="password" autoComplete="new-password" value={passwordUlang} onChange={(e) => setPasswordUlang(e.target.value)} minLength={12} maxLength={1024} />
+              </label>
+              {galatProfil ? <p className="error" role="alert">{galatProfil}</p> : null}
+              <Tombol lebar ukuran="besar" onClick={() => void simpanProfil()} disabled={sibukProfil}>
+                {sibukProfil ? "Menyimpan..." : "Update"}
+              </Tombol>
+            </div>
+          </section>
+
+          <section className="kartu profil-bagian">
+            <h2>Perangkat &amp; sesi</h2>
+            <p className="muted kecil">
+              {profil?.providers.length ? `Terhubung: ${profil.providers.join(", ")}` : "Login email dan password"}
+            </p>
+            <Tombol varian="bahaya" lebar onClick={() => void keluarSemua()}>
+              Log out dari semua perangkat
             </Tombol>
-          </div>
-        </section>
+          </section>
+        </>
       ) : null}
 
-      {bagian === "keamanan" ? (
-        <section className="kartu profil-bagian">
-          <h2>Keamanan</h2>
-          <p className="muted kecil">
-            {data.periode.aktif ? `Periode aktif sejak ${data.periode.mulai ?? "-"}` : `Data dimulai ${data.hariIni}`}
-          </p>
-          <p className="muted kecil">
-            {profil?.providers.length ? `Terhubung: ${profil.providers.join(", ")}` : "Login email dan password"}
-          </p>
-          <div className="baris-tombol">
-            <Tombol varian="sekunder" onClick={() => void keluar()}>
-              Keluar
-            </Tombol>
-            <Tombol varian="bahaya" onClick={() => void keluarSemua()}>
-              Keluar semua perangkat
-            </Tombol>
-          </div>
-        </section>
-      ) : null}
-
-      {bagian === "hapus-akun" ? (
+      {bagian === "ubah-profil" ? (
         <section className="kartu profil-bagian bahaya">
           <h2>Hapus akun</h2>
           <p className="muted kecil">
@@ -1687,6 +1842,7 @@ function Transaksi({
   tipeAwal,
   navigasi,
   mintaKonfirmasi,
+  bukaDetail,
 }: {
   data: DashboardData;
   kirim: (url: string, method: string, body?: unknown) => Promise<boolean>;
@@ -1695,6 +1851,7 @@ function Transaksi({
   tipeAwal: "in" | "out";
   navigasi: (tab: Tab) => void;
   mintaKonfirmasi: (judul: string, teks: string) => Promise<boolean>;
+  bukaDetail: (t: TxView) => void;
 }) {
   const [tipe, setTipe] = useState<string>(tipeAwal);
   const [nominal, setNominal] = useState("");
@@ -1964,7 +2121,19 @@ function Transaksi({
             const judul = t.subPost ?? t.label ?? NAMA_TIPE[t.tipe] ?? "Tanpa pos";
             const nilai = keluar ? t.nominal + t.biayaAdmin : t.nominal;
             return (
-              <li key={t.id} className={t.status === "batal" ? "item-transaksi batal" : "item-transaksi"}>
+              <li
+                key={t.id}
+                className={t.status === "batal" ? "item-transaksi batal" : "item-transaksi"}
+                role="button"
+                tabIndex={0}
+                onClick={() => bukaDetail(t)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" || event.key === " ") {
+                    event.preventDefault();
+                    bukaDetail(t);
+                  }
+                }}
+              >
                 <span className={keluar ? "avatar-uang" : "avatar-uang masuk"}>
                   {judul.trim().charAt(0).toUpperCase() || "?"}
                 </span>
@@ -1982,7 +2151,10 @@ function Transaksi({
                     <button
                       type="button"
                       className="hapus-kecil"
-                      onClick={() => void hapus(t.id, `${NAMA_TIPE[t.tipe] ?? t.tipe} ${rp(t.nominal)}`)}
+                      onClick={(event) => {
+                        event.stopPropagation();
+                        void hapus(t.id, `${NAMA_TIPE[t.tipe] ?? t.tipe} ${rp(t.nominal)}`);
+                      }}
                       disabled={sibuk}
                     >
                       Hapus

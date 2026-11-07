@@ -7,7 +7,11 @@ export async function jumlahPengguna(): Promise<number> {
   return r.rows[0].n;
 }
 
-export async function daftar(email: string, password: string): Promise<string | null> {
+export async function daftar(
+  email: string,
+  password: string,
+  profil: { nama?: string | null; telepon?: string | null; tanggalLahir?: string | null } = {},
+): Promise<string | null> {
   const client = await getPool().connect();
   try {
     await client.query("BEGIN");
@@ -17,7 +21,10 @@ export async function daftar(email: string, password: string): Promise<string | 
     const count = await client.query("SELECT COUNT(*)::int AS n FROM auth_users");
     const firstUser = count.rows[0].n === 0;
     const hash = await hashPassword(password);
-    const user = await client.query<{ id: string }>("INSERT INTO auth_users (email,password_hash) VALUES ($1,$2) RETURNING id", [email, hash]);
+    const user = await client.query<{ id: string }>(
+      "INSERT INTO auth_users (email,password_hash,nama,telepon,tanggal_lahir) VALUES ($1,$2,$3,$4,$5::date) RETURNING id",
+      [email, hash, profil.nama ?? null, profil.telepon ?? null, profil.tanggalLahir ?? null],
+    );
     const userId = user.rows[0].id;
     if (firstUser) {
       for (const table of ["groups", "sub_posts", "aliases", "plan_versions", "plan_items", "transactions", "debts", "saving_goals", "config"]) {
@@ -41,4 +48,58 @@ export async function masuk(email: string, password: string): Promise<string | n
 
 export async function cabutSemuaSesi(userId: string): Promise<void> {
   await getPool().query("DELETE FROM auth_sessions WHERE user_id = $1", [userId]);
+}
+
+export async function buatTokenReset(email: string): Promise<{ token: string; telepon: string | null } | null> {
+  const cari = await getPool().query<{ id: string; telepon: string | null }>(
+    "SELECT id, telepon FROM auth_users WHERE lower(email) = lower($1)",
+    [email],
+  );
+  const akun = cari.rows[0];
+  if (!akun) return null;
+  const token = randomBytes(32).toString("base64url");
+  const client = await getPool().connect();
+  try {
+    await client.query("BEGIN");
+    await client.query("UPDATE password_reset_tokens SET used_at = now() WHERE user_id = $1 AND used_at IS NULL", [akun.id]);
+    await client.query(
+      "INSERT INTO password_reset_tokens (token_hash, user_id, expires_at) VALUES ($1, $2, now() + interval '30 minutes')",
+      [hashToken(token), akun.id],
+    );
+    await client.query("COMMIT");
+    return { token, telepon: akun.telepon };
+  } catch (e) {
+    await client.query("ROLLBACK");
+    throw e;
+  } finally {
+    client.release();
+  }
+}
+
+export async function pakaiTokenReset(token: string, password: string): Promise<boolean> {
+  const hash = hashToken(token);
+  const hashBaru = await hashPassword(password);
+  const client = await getPool().connect();
+  try {
+    await client.query("BEGIN");
+    const hasil = await client.query<{ user_id: string }>(
+      "SELECT user_id FROM password_reset_tokens WHERE token_hash = $1 AND used_at IS NULL AND expires_at > now() FOR UPDATE",
+      [hash],
+    );
+    const userId = hasil.rows[0]?.user_id;
+    if (!userId) {
+      await client.query("ROLLBACK");
+      return false;
+    }
+    await client.query("UPDATE auth_users SET password_hash = $2 WHERE id = $1", [userId, hashBaru]);
+    await client.query("UPDATE password_reset_tokens SET used_at = now() WHERE token_hash = $1", [hash]);
+    await client.query("DELETE FROM auth_sessions WHERE user_id = $1", [userId]);
+    await client.query("COMMIT");
+    return true;
+  } catch (e) {
+    await client.query("ROLLBACK");
+    throw e;
+  } finally {
+    client.release();
+  }
 }

@@ -126,6 +126,7 @@ export class PgRepo implements Repo {
           wadahTujuan: t.wadah_tujuan as Wadah | null,
           tanggal: t.tanggal,
           label: t.label,
+          detail: t.detail && typeof t.detail === "object" && !Array.isArray(t.detail) ? t.detail : null,
           sumber: t.sumber,
           status: t.status,
           penggantiDari: t.pengganti_dari,
@@ -206,11 +207,11 @@ export class PgRepo implements Repo {
     const r = await this.db.query(
       `INSERT INTO transactions
         (user_id, tipe, nominal, biaya_admin, sub_post_id, sub_post_id_tujuan, wadah_asal, wadah_tujuan, tanggal, label,
-         sumber, status, pengganti_dari, induk_id, plan_version_id, wa_message_id)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16) RETURNING id`,
+         detail, sumber, status, pengganti_dari, induk_id, plan_version_id, wa_message_id)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17) RETURNING id`,
       [
         this.financeUser(), t.tipe, t.nominal, t.biayaAdmin ?? 0, t.subPostId, t.subPostIdTujuan, t.wadahAsal, t.wadahTujuan, t.tanggal,
-        t.label, t.sumber, t.status ?? "berlaku", t.penggantiDari, t.indukId, t.planVersionId, t.waMessageId,
+        t.label, t.detail ? JSON.stringify(t.detail) : "{}", t.sumber, t.status ?? "berlaku", t.penggantiDari, t.indukId, t.planVersionId, t.waMessageId,
       ],
     );
     return r.rows[0].id as number;

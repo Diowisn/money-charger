@@ -12,6 +12,15 @@ export interface StrukRaw {
   sub_pos?: unknown;
   tanggal_text?: unknown;
   label?: unknown;
+  toko?: unknown;
+  alamat?: unknown;
+  kontak?: unknown;
+  konsumen?: unknown;
+  kasir?: unknown;
+  kategori?: unknown;
+  pajak_text?: unknown;
+  dibayar_text?: unknown;
+  kembalian_text?: unknown;
 }
 
 export interface StrukValid {
@@ -20,6 +29,25 @@ export interface StrukValid {
   subPos: string | null;
   tanggal: string | null;
   label: string | null;
+  toko: string | null;
+  alamat: string | null;
+  kontak: string | null;
+  konsumen: string | null;
+  kasir: string | null;
+  kategori: string | null;
+  pajak: number | null;
+  dibayar: number | null;
+  kembalian: number | null;
+}
+
+function teksOpsional(nilai: unknown, maks = 120): string | null {
+  return typeof nilai === "string" && nilai.trim() ? nilai.trim().slice(0, maks) : null;
+}
+
+function nominalOpsional(nilai: unknown): number | null {
+  if (typeof nilai !== "string" || !nilai.trim()) return null;
+  const a = parseAmount(nilai.trim(), { izinkanNol: true });
+  return a.ok ? a.value : null;
 }
 
 export type StrukVerdict =
@@ -46,8 +74,26 @@ export function validasiStruk(raw: StrukRaw | null, namaSubPos: string[], today:
     if (!d.error && d.date) tanggal = d.date; // gagal parse tanggal -> abaikan, pakai tanggal hari ini
   }
 
-  const label = typeof raw.label === "string" && raw.label.trim() ? raw.label.trim().slice(0, 80) : null;
-  return { ok: true, hasil: { nominal: a.value, subPos, tanggal, label } };
+  const toko = teksOpsional(raw.toko);
+  const label = toko ?? teksOpsional(raw.label, 80);
+  return {
+    ok: true,
+    hasil: {
+      nominal: a.value,
+      subPos,
+      tanggal,
+      label,
+      toko,
+      alamat: teksOpsional(raw.alamat),
+      kontak: teksOpsional(raw.kontak, 40),
+      konsumen: teksOpsional(raw.konsumen),
+      kasir: teksOpsional(raw.kasir, 60),
+      kategori: teksOpsional(raw.kategori, 60),
+      pajak: nominalOpsional(raw.pajak_text),
+      dibayar: nominalOpsional(raw.dibayar_text),
+      kembalian: nominalOpsional(raw.kembalian_text),
+    },
+  };
 }
 
 export interface VisionClient {
@@ -58,10 +104,19 @@ export interface VisionClient {
 const SISTEM_STRUK = `Kamu membaca foto struk belanja atau tangkapan layar transaksi (bank/e-wallet) berbahasa Indonesia.
 Balas HANYA dengan satu objek JSON berisi kunci:
 - "intent": "out" bila ini jelas pengeluaran/pembayaran, atau "tidak_jelas" bila gambar tidak bisa dibaca atau bukan struk/transaksi
-- "amount_text": nominal TOTAL pembayaran PERSIS seperti tertulis di gambar (jangan dihitung ulang, jangan ditafsirkan)
+- "amount_text": nominal TOTAL akhir yang dibayar PERSIS seperti tertulis di gambar, termasuk pajak/biaya admin/biaya transfer bila ada. Bila ada baris "Total", pakai angka itu. Jangan dihitung ulang.
 - "sub_pos": salah satu nama dari daftar yang diberikan PERSIS, atau null bila tidak yakin
 - "tanggal_text": tanggal transaksi persis seperti tertulis di gambar (mis. "20/10/2026"), atau null bila tidak terlihat
-- "label": nama toko/merchant/keterangan singkat, atau null
+- "toko": nama toko/merchant, atau null
+- "alamat": alamat toko, atau null
+- "kontak": nomor telepon toko, atau null
+- "konsumen": nama konsumen/pelanggan, atau null
+- "kasir": nama kasir, atau null
+- "kategori": kategori transaksi bila tertulis di struk, atau null
+- "pajak_text": nominal pajak/PPN persis seperti tertulis, atau null
+- "dibayar_text": nominal uang dibayar persis seperti tertulis, atau null
+- "kembalian_text": nominal kembalian persis seperti tertulis, atau null
+- "label": keterangan singkat bila "toko" tidak ada, atau null
 Jika nominal total tidak terlihat jelas, intent harus "tidak_jelas".`;
 
 export function buatGroqVisionClient(env: NodeJS.ProcessEnv = process.env): VisionClient | null {

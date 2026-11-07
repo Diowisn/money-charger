@@ -30,17 +30,103 @@ function angkaDari(cocok: RegExpExecArray | null): number | null {
   return Number.isFinite(angka) && angka > 0 ? angka : null;
 }
 
+function angkaDariTeks(teks: string): number | null {
+  return angkaDari(/(\d{1,3}(?:[.,]\d{3})+|\d+)(?:[.,]\d{2})?/.exec(teks));
+}
+
+/** Mengambil nilai setelah label pada baris yang sama, mis. "Nama Merchant : Trijaya". */
+function ambilBaris(polos: string, label: string): string | null {
+  const pola = new RegExp(`^\\s*${label}\\b\\s*:?\\s*(.+?)\\s*$`, "im");
+  const m = pola.exec(polos);
+  const nilai = m?.[1]?.replace(/\s+/g, " ").trim();
+  return nilai ? nilai.slice(0, 120) : null;
+}
+
+function nominalBaris(polos: string, label: string): number | null {
+  const nilai = ambilBaris(polos, label);
+  return nilai ? angkaDariTeks(nilai) : null;
+}
+
+function pertamaNominal(polos: string, label: string[]): number | null {
+  for (const l of label) {
+    const nilai = nominalBaris(polos, l);
+    if (nilai) return nilai;
+  }
+  return null;
+}
+
+function pertamaTeks(polos: string, label: string[]): string | null {
+  for (const l of label) {
+    const nilai = ambilBaris(polos, l);
+    if (nilai) return nilai;
+  }
+  return null;
+}
+
+export interface DetailEmail {
+  [kunci: string]: string | number | null;
+  merchant: string | null;
+  lokasi: string | null;
+  kontak: string | null;
+  konsumen: string | null;
+  kasir: string | null;
+  jenisTransaksi: string | null;
+  rrn: string | null;
+  terminal: string | null;
+  noTransaksi: string | null;
+  referensi: string | null;
+  nominal: number | null;
+  biayaAdmin: number | null;
+  total: number | null;
+  pajak: number | null;
+  dibayar: number | null;
+  kembalian: number | null;
+}
+
+const LABEL_TOTAL = ["Total Pembayaran", "Total Biaya", "Total"];
+const LABEL_NOMINAL = ["Nominal Transaksi", "Nominal", "Jumlah", "Amount"];
+const LABEL_ADMIN = ["Biaya Admin", "Biaya Transfer", "Biaya Lainnya", "Biaya Tambahan", "Admin"];
+
 /**
- * Mengambil nominal rupiah dari teks notifikasi bank/email.
+ * Membaca detail notifikasi transaksi (khususnya BSI/QRIS).
+ * `total` diutamakan dari baris "Total"; bila tidak ada, nominal ditambah biaya admin/transfer.
+ */
+export function ekstrakDetailEmail(teks: string): DetailEmail {
+  const polos = teksPolos(teks);
+  const nominal = pertamaNominal(polos, LABEL_NOMINAL);
+  const biayaAdmin = pertamaNominal(polos, LABEL_ADMIN);
+  const total = pertamaNominal(polos, LABEL_TOTAL) ?? (nominal ? nominal + (biayaAdmin ?? 0) : null);
+
+  return {
+    merchant: pertamaTeks(polos, ["Nama Merchant", "Merchant"]),
+    lokasi: pertamaTeks(polos, ["Lokasi Merchant", "Lokasi"]),
+    kontak: pertamaTeks(polos, ["Kontak", "No. HP", "Telepon"]),
+    konsumen: pertamaTeks(polos, ["Nama Konsumen", "Konsumen", "Pelanggan"]),
+    kasir: pertamaTeks(polos, ["Kasir", "Nama Kasir"]),
+    jenisTransaksi: pertamaTeks(polos, ["Jenis Transaksi"]),
+    rrn: pertamaTeks(polos, ["RRN"]),
+    terminal: pertamaTeks(polos, ["Terminal", "ID Terminal"]),
+    noTransaksi: pertamaTeks(polos, ["No. Transaksi", "Nomor Transaksi", "No Transaksi"]),
+    referensi: pertamaTeks(polos, ["Referensi", "No. Referensi", "Nomor Referensi"]),
+    nominal,
+    biayaAdmin,
+    total,
+    pajak: pertamaNominal(polos, ["Pajak", "PPN", "Tax"]),
+    dibayar: pertamaNominal(polos, ["Dibayar", "Jumlah Dibayar", "Tunai"]),
+    kembalian: pertamaNominal(polos, ["Kembalian", "Kembali"]),
+  };
+}
+
+/**
+ * Mengambil nominal TOTAL rupiah dari teks notifikasi bank/email.
+ * Bila ada biaya admin/transfer, nilainya ikut ditambahkan kecuali baris "Total" sudah tersedia.
  * Mendukung format Indonesia (`Rp 25.925,00`) dan tabel Inggris (`1,800,000.00`).
  */
 export function ekstrakNominalEmail(teks: string): number | null {
-  const bersih = teksPolos(teks).replace(/\n/g, " ").replace(/\s+/g, " ");
+  const detail = ekstrakDetailEmail(teks);
+  if (detail.total) return detail.total;
 
-  // Label paling spesifik lebih dulu: "Nominal Transaksi", "Nominal", "Total".
-  const label = /\b(?:Nominal(?:\s+Transaksi)?|Total|Jumlah)\b[^\d]{0,40}(\d{1,3}(?:[.,]\d{3})+|\d+)(?:[.,]\d{2})?/i.exec(bersih);
-  const hasilLabel = angkaDari(label);
-  if (hasilLabel) return hasilLabel;
+  const bersih = teksPolos(teks).replace(/\n/g, " ").replace(/\s+/g, " ");
 
   // Diutamakan angka yang didahului "Rp" (format umum notifikasi bank).
   const dekatRp = /\bRp\.?\s*(\d{1,3}(?:[.,]\d{3})+|\d+)(?:[.,]\d{2})?/i.exec(bersih);
