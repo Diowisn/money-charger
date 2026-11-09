@@ -46,8 +46,29 @@ function teksOpsional(nilai: unknown, maks = 120): string | null {
 
 function nominalOpsional(nilai: unknown): number | null {
   if (typeof nilai !== "string" || !nilai.trim()) return null;
-  const a = parseAmount(nilai.trim(), { izinkanNol: true });
+  const a = parseAmount(normalisasiNominalStruk(nilai), { izinkanNol: true });
   return a.ok ? a.value : null;
+}
+
+/**
+ * Struk Indonesia sering menulis ribuan dengan koma ("6,700") atau titik + desimal
+ * ("1.175.000,00"). parseAmount sengaja ketat untuk teks chat, jadi format struk
+ * dinormalkan lebih dulu: buang Rp/spasi, lalu hilangkan pemisah ribuan/desimal.
+ */
+export function normalisasiNominalStruk(teks: string): string {
+  const tanpaRp = teks
+    .trim()
+    .replace(/^rp\.?\s*/i, "")
+    .replace(/^(?:\(|\[)+/, "")
+    .replace(/[)\]]+$/, "")
+    .trim();
+  const cocok = /(\d[\d.,]*)\s*$/.exec(tanpaRp);
+  const angka = (cocok?.[1] ?? tanpaRp).replace(/\s+/g, "");
+  if (!/^\d[\d.,]*$/.test(angka)) return teks;
+  if (/^\d{1,3}(?:\.\d{3})+(?:,\d{1,2})?$/.test(angka)) return angka.replace(/\./g, "").replace(/,\d{1,2}$/, "");
+  if (/^\d{1,3}(?:,\d{3})+(?:\.\d{1,2})?$/.test(angka)) return angka.replace(/,/g, "").replace(/\.\d{1,2}$/, "");
+  if (/^\d+,\d{1,2}$/.test(angka)) return angka.replace(/,\d{1,2}$/, "");
+  return angka;
 }
 
 export type StrukVerdict =
@@ -62,7 +83,7 @@ export function validasiStruk(raw: StrukRaw | null, namaSubPos: string[], today:
 
   const amountText = typeof raw.amount_text === "string" ? raw.amount_text.trim() : "";
   if (!amountText) return { ok: false, alasan: "tidak_jelas", detail: "amount_text kosong" };
-  const a = parseAmount(amountText);
+  const a = parseAmount(normalisasiNominalStruk(amountText));
   if (!a.ok) return { ok: false, alasan: "tidak_jelas", detail: a.reason };
 
   let subPos: string | null = null;

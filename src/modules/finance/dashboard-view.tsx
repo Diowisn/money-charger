@@ -88,6 +88,36 @@ function BarisInfo({ label, nilai }: { label: string; nilai: ReactNode }) {
   );
 }
 
+const MAKS_SISI_GAMBAR = 1600;
+
+/** Perkecil foto struk sebelum upload supaya proses AI lebih cepat dan hemat kuota. */
+async function kompresGambar(file: File): Promise<File> {
+  if (!file.type.startsWith("image/")) return file;
+  try {
+    const bitmap = await createImageBitmap(file);
+    const skala = Math.min(1, MAKS_SISI_GAMBAR / Math.max(bitmap.width, bitmap.height));
+    if (skala === 1 && file.size < 1_500_000) {
+      bitmap.close();
+      return file;
+    }
+    const kanvas = document.createElement("canvas");
+    kanvas.width = Math.round(bitmap.width * skala);
+    kanvas.height = Math.round(bitmap.height * skala);
+    const ctx = kanvas.getContext("2d");
+    if (!ctx) {
+      bitmap.close();
+      return file;
+    }
+    ctx.drawImage(bitmap, 0, 0, kanvas.width, kanvas.height);
+    bitmap.close();
+    const blob = await new Promise<Blob | null>((selesai) => kanvas.toBlob(selesai, "image/jpeg", 0.82));
+    if (!blob || blob.size >= file.size) return file;
+    return new File([blob], `${file.name.replace(/\.[^.]+$/, "")}.jpg`, { type: "image/jpeg" });
+  } catch {
+    return file;
+  }
+}
+
 function IkonRingkasan({ aktif }: { aktif: boolean }) {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={aktif ? 2.4 : 1.8}>
@@ -552,7 +582,7 @@ export default function Dashboard({ awal }: { awal: DashboardData }) {
     setPesan(null);
     try {
       const form = new FormData();
-      form.append("image", file);
+      form.append("image", await kompresGambar(file));
       const res = await fetch("/api/receipt", { method: "POST", body: form });
       if (res.status === 401) {
         window.location.href = "/login";

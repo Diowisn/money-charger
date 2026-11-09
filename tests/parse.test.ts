@@ -4,7 +4,7 @@ import { parseCommand } from "@/lib/parse/command";
 import { extractDate, wibDate } from "@/lib/parse/date";
 import { rp, splitPesan } from "@/lib/format";
 import { validasiAi } from "@/lib/ai";
-import { validasiStruk } from "@/lib/ai-vision";
+import { normalisasiNominalStruk, validasiStruk } from "@/lib/ai-vision";
 import { arahEmail, ekstrakDetailEmail, ekstrakNominalEmail, ekstrakTanggalEmail, kemungkinanGaji, labelEmail } from "@/lib/email";
 
 const v = (t: string) => {
@@ -184,6 +184,20 @@ describe("validasi struk/foto (vision AI)", () => {
   it("tanggal di luar format diabaikan, bukan menggagalkan seluruh hasil", () => {
     const r = validasiStruk({ intent: "out", amount_text: "10rb", tanggal_text: "entah kapan" }, nama, today);
     expect(r).toMatchObject({ ok: true, hasil: { tanggal: null } });
+  });
+  it("menerima nominal struk format Indonesia (koma ribuan)", () => {
+    expect(normalisasiNominalStruk("6,700")).toBe("6700");
+    expect(normalisasiNominalStruk("Rp 1.175.000,00")).toBe("1175000");
+    expect(normalisasiNominalStruk("6,700.00")).toBe("6700");
+    expect(normalisasiNominalStruk("Rp45.000")).toBe("45000");
+    expect(normalisasiNominalStruk("20rb")).toBe("20rb");
+
+    const r = validasiStruk(
+      { intent: "out", amount_text: "TOTAL BELANJA : 6,700", toko: "Indomaret" },
+      nama,
+      today,
+    );
+    expect(r).toMatchObject({ ok: true, hasil: { nominal: 6_700, toko: "Indomaret" } });
   });
   it("membaca detail struk: toko, alamat, pajak, dibayar, kembalian", () => {
     const r = validasiStruk(
