@@ -1,6 +1,23 @@
 export const WADAH = ["saldo", "tabungan", "investasi"] as const;
 export type Wadah = (typeof WADAH)[number];
 
+export const TIPE_AKUN = ["bank", "ewallet", "tunai", "lainnya"] as const;
+export type AkunTipe = (typeof TIPE_AKUN)[number];
+
+export interface Akun {
+  id: number;
+  nama: string;
+  tipe: AkunTipe;
+  saldoAwal: number;
+  urutan: number;
+  aktif: boolean;
+}
+
+export type NewAkun = Omit<Akun, "id" | "urutan" | "aktif"> & {
+  urutan?: number;
+  aktif?: boolean;
+};
+
 export type TxTipe =
   | "out"
   | "in"
@@ -29,6 +46,8 @@ export interface Tx {
   subPostIdTujuan: number | null;
   wadahAsal: Wadah | null;
   wadahTujuan: Wadah | null;
+  accountId: number | null;
+  accountIdTujuan: number | null;
   tanggal: string; // YYYY-MM-DD (WIB)
   label: string | null;
   /** Detail tambahan dari sumber (mis. merchant, lokasi, RRN, biaya admin dari email BSI). */
@@ -52,6 +71,8 @@ export function buatTx(
     subPostIdTujuan: null,
     wadahAsal: null,
     wadahTujuan: null,
+    accountId: null,
+    accountIdTujuan: null,
     label: null,
     detail: null,
     sumber: "kaku",
@@ -154,6 +175,7 @@ export type NewSavingGoal = Omit<SavingGoal, "id" | "status" | "terkumpul"> & {
 
 export interface State {
   config: Config;
+  accounts: Akun[];
   groups: Group[];
   subPosts: SubPost[];
   aliases: AliasRow[];

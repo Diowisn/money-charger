@@ -9,11 +9,12 @@ import {
   SEED_TABUNGAN,
 } from "./seed";
 import { parseConfig } from "./engine";
-import type { Debt, NewDebt, NewSavingGoal, NewTx, Pending, PlanItem, SavingGoal, State, Tx } from "./types";
+import type { Debt, NewAkun, NewDebt, NewSavingGoal, NewTx, Pending, PlanItem, SavingGoal, State, Tx } from "./types";
 
 interface Data {
   allowed: string[];
   config: Record<string, string>;
+  accounts: State["accounts"];
   groups: State["groups"];
   subPosts: State["subPosts"];
   aliases: State["aliases"];
@@ -24,7 +25,7 @@ interface Data {
   pendings: (Pending & { status: string })[];
   inbound: Map<string, string>;
   outbox: { id: number; waNumber: string; pesan: string }[];
-  seq: { tx: number; plan: number; sub: number; pending: number; debt: number; goal: number; outbox: number };
+  seq: { tx: number; plan: number; sub: number; pending: number; debt: number; goal: number; outbox: number; account: number };
 }
 
 /** Implementasi dalam memori, dipakai pengujian. Perilakunya mengikuti PgRepo. */
@@ -36,6 +37,7 @@ export class MemRepo implements Repo {
     this.d = {
       allowed,
       config: { ...SEED_CONFIG_DEFAULT },
+      accounts: [],
       groups: [],
       subPosts: [],
       aliases: [],
@@ -46,7 +48,7 @@ export class MemRepo implements Repo {
       pendings: [],
       inbound: new Map(),
       outbox: [],
-      seq: { tx: 0, plan: 0, sub: 0, pending: 0, debt: 0, goal: 0, outbox: 0 },
+      seq: { tx: 0, plan: 0, sub: 0, pending: 0, debt: 0, goal: 0, outbox: 0, account: 0 },
     };
     this.seed();
   }
@@ -73,6 +75,7 @@ export class MemRepo implements Repo {
     const d = this.d;
     return structuredClone({
       config: parseConfig(d.config),
+      accounts: d.accounts,
       groups: d.groups,
       subPosts: d.subPosts,
       aliases: d.aliases,
@@ -161,6 +164,13 @@ export class MemRepo implements Repo {
   }
   async addAlias(subPostId: number, alias: string) {
     if (!this.d.aliases.some((a) => a.alias === alias)) this.d.aliases.push({ alias, subPostId });
+  }
+
+  async addAccount(a: NewAkun) {
+    const id = ++this.d.seq.account;
+    const urutan = a.urutan ?? Math.max(0, ...this.d.accounts.map((x) => x.urutan)) + 1;
+    this.d.accounts.push({ ...a, id, urutan, aktif: a.aktif ?? true });
+    return id;
   }
 
   async addDebt(d: NewDebt) {

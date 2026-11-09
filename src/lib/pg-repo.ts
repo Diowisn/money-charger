@@ -10,7 +10,7 @@ import {
   SEED_SUBPOS,
   SEED_TABUNGAN,
 } from "./seed";
-import type { Debt, NewDebt, NewSavingGoal, NewTx, Pending, PlanItem, SavingGoal, State, Tx, Wadah } from "./types";
+import type { Debt, NewAkun, NewDebt, NewSavingGoal, NewTx, Pending, PlanItem, SavingGoal, State, Tx, Wadah } from "./types";
 
 // bigint (int8) -> number, date -> string 'YYYY-MM-DD' (hindari konversi zona waktu)
 types.setTypeParser(20, (v) => Number(v));
@@ -82,8 +82,9 @@ export class PgRepo implements Repo {
   async load(): Promise<State> {
     const userId = this.financeUser();
     const q = (t: string) => this.db.query(t, t.includes("$1") ? [userId] : undefined).then((r) => r.rows);
-    const [cfg, groups, subs, aliases, plans, items, txs, debts, goals] = await Promise.all([
+    const [cfg, accounts, groups, subs, aliases, plans, items, txs, debts, goals] = await Promise.all([
       q("SELECT kunci, nilai FROM config WHERE user_id IS NOT DISTINCT FROM $1"),
+      q("SELECT id, nama, tipe, saldo_awal, urutan, aktif FROM accounts WHERE user_id IS NOT DISTINCT FROM $1 ORDER BY urutan, id"),
       q("SELECT id, nama, urutan FROM groups WHERE user_id IS NOT DISTINCT FROM $1 ORDER BY urutan, id"),
       q("SELECT id, group_id, nama, kategori, aktif, urutan FROM sub_posts WHERE user_id IS NOT DISTINCT FROM $1 ORDER BY urutan, id"),
       q("SELECT alias, sub_post_id FROM aliases WHERE user_id IS NOT DISTINCT FROM $1 ORDER BY id"),
@@ -96,6 +97,14 @@ export class PgRepo implements Repo {
     const config = parseConfig(Object.fromEntries(cfg.map((r) => [r.kunci, r.nilai])));
     return {
       config,
+      accounts: accounts.map((a) => ({
+        id: a.id,
+        nama: a.nama,
+        tipe: a.tipe,
+        saldoAwal: a.saldo_awal,
+        urutan: a.urutan,
+        aktif: a.aktif,
+      })),
       groups: groups.map((g) => ({ id: g.id, nama: g.nama, urutan: g.urutan })),
       subPosts: subs.map((s) => ({
         id: s.id,
@@ -124,6 +133,8 @@ export class PgRepo implements Repo {
           subPostIdTujuan: t.sub_post_id_tujuan,
           wadahAsal: t.wadah_asal as Wadah | null,
           wadahTujuan: t.wadah_tujuan as Wadah | null,
+          accountId: t.account_id ?? null,
+          accountIdTujuan: t.account_id_tujuan ?? null,
           tanggal: t.tanggal,
           label: t.label,
           detail: t.detail && typeof t.detail === "object" && !Array.isArray(t.detail) ? t.detail : null,
@@ -206,12 +217,13 @@ export class PgRepo implements Repo {
   async insertTx(t: NewTx) {
     const r = await this.db.query(
       `INSERT INTO transactions
-        (user_id, tipe, nominal, biaya_admin, sub_post_id, sub_post_id_tujuan, wadah_asal, wadah_tujuan, tanggal, label,
-         detail, sumber, status, pengganti_dari, induk_id, plan_version_id, wa_message_id)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17) RETURNING id`,
+        (user_id, tipe, nominal, biaya_admin, sub_post_id, sub_post_id_tujuan, wadah_asal, wadah_tujuan, account_id, account_id_tujuan,
+         tanggal, label, detail, sumber, status, pengganti_dari, induk_id, plan_version_id, wa_message_id)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19) RETURNING id`,
       [
-        this.financeUser(), t.tipe, t.nominal, t.biayaAdmin ?? 0, t.subPostId, t.subPostIdTujuan, t.wadahAsal, t.wadahTujuan, t.tanggal,
-        t.label, t.detail ? JSON.stringify(t.detail) : "{}", t.sumber, t.status ?? "berlaku", t.penggantiDari, t.indukId, t.planVersionId, t.waMessageId,
+        this.financeUser(), t.tipe, t.nominal, t.biayaAdmin ?? 0, t.subPostId, t.subPostIdTujuan, t.wadahAsal, t.wadahTujuan,
+        t.accountId, t.accountIdTujuan, t.tanggal, t.label, t.detail ? JSON.stringify(t.detail) : "{}", t.sumber,
+        t.status ?? "berlaku", t.penggantiDari, t.indukId, t.planVersionId, t.waMessageId,
       ],
     );
     return r.rows[0].id as number;
@@ -307,6 +319,17 @@ export class PgRepo implements Repo {
       );
       if (existing.rowCount === 0) throw new Error("Sub-post is not available to this owner");
     }
+  }
+
+  async addAccount(a: NewAkun) {
+    const userId = this.financeUser();
+    const r = await this.db.query(
+      `INSERT INTO accounts (user_id, nama, tipe, saldo_awal, urutan)
+       VALUES ($1,$2,$3,$4, COALESCE($5, (SELECT COALESCE(MAX(urutan),0)+1 FROM accounts WHERE user_id IS NOT DISTINCT FROM $1)))
+       RETURNING id`,
+      [userId, a.nama, a.tipe, a.saldoAwal, a.urutan ?? null],
+    );
+    return Number(r.rows[0].id);
   }
 
   async addDebt(d: NewDebt) {

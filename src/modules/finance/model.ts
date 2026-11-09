@@ -4,6 +4,7 @@ import { wibDate } from "@/lib/parse/date";
 import { PgRepo } from "@/lib/pg-repo";
 import { daftarAturan } from "@/modules/recurring/model";
 import { ambilProfil } from "@/modules/profile/model";
+import { pastikanAkunDefault } from "@/modules/accounts/model";
 import {
   batalkanDebt,
   batalkanGoal,
@@ -29,6 +30,7 @@ import { AksiError } from "@/lib/web-actions";
 
 export async function muatDashboard(userId: string) {
   const hariIni = wibDate(Date.now());
+  await pastikanAkunDefault(userId);
   const [state, profil, otomatis] = await Promise.all([
     new PgRepo(undefined, undefined, userId).load(),
     ambilProfil(userId),

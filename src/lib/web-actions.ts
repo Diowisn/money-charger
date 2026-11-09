@@ -1,6 +1,7 @@
 import {
   aktifPlan,
   bagiBonus,
+  hitungAkun,
   hitungWadah,
   nominalItem,
   periodes,
@@ -10,7 +11,18 @@ import {
 import { diffDays } from "./parse/date";
 import { norm } from "./parse/pos";
 import type { Repo } from "./repo";
-import { TURUNAN, WADAH, buatTx, type DebtJenis, type PlanItem, type State, type TxTipe, type Wadah } from "./types";
+import {
+  TIPE_AKUN,
+  TURUNAN,
+  WADAH,
+  buatTx,
+  type AkunTipe,
+  type DebtJenis,
+  type PlanItem,
+  type State,
+  type TxTipe,
+  type Wadah,
+} from "./types";
 
 export class AksiError extends Error {}
 
@@ -59,6 +71,13 @@ function wadahSah(v: unknown, fallback: Wadah | null = null): Wadah {
   if ((WADAH as readonly string[]).includes(w)) return w as Wadah;
   if (fallback) return fallback;
   throw new AksiError("Wadah tidak valid.");
+}
+
+function akunSah(state: State, v: unknown): number | null {
+  if (v === undefined || v === null || v === "") return null;
+  const akun = state.accounts.find((a) => a.id === Number(v) && a.aktif);
+  if (!akun) throw new AksiError("Dompet tidak ditemukan atau sudah nonaktif.");
+  return akun.id;
 }
 
 function tarifJatah(plan: { items: PlanItem[] }): number {
@@ -151,6 +170,7 @@ export interface InputTransaksi {
   wadah?: Wadah | string | null;
   wadahAsal?: Wadah | string | null;
   wadahTujuan?: Wadah | string | null;
+  accountId?: number | string | null;
   paksa?: boolean;
   detail?: Record<string, string | number | null> | null;
 }
@@ -177,16 +197,18 @@ export async function tambahTransaksi(
         if (!sub) throw new AksiError("Pos tidak ditemukan atau sudah nonaktif.");
         subPostId = sub.id;
       }
+      const accountId = akunSah(state, input.accountId);
       const id = await tx.insertTx(
-        buatTx({ tipe: "out", nominal, biayaAdmin, subPostId, tanggal, label, detail: input.detail ?? null, sumber: "kaku" }),
+        buatTx({ tipe: "out", nominal, biayaAdmin, subPostId, accountId, tanggal, label, detail: input.detail ?? null, sumber: "kaku" }),
       );
       return { id };
     }
 
     if (input.tipe === "in") {
       const tujuan = wadahSah(input.wadah, "saldo");
+      const accountId = akunSah(state, input.accountId);
       const id = await tx.insertTx(
-        buatTx({ tipe: "in", nominal, wadahTujuan: tujuan, tanggal, label, detail: input.detail ?? null, sumber: "kaku" }),
+        buatTx({ tipe: "in", nominal, wadahTujuan: tujuan, accountId, tanggal, label, detail: input.detail ?? null, sumber: "kaku" }),
       );
       return { id };
     }
@@ -199,8 +221,9 @@ export async function tambahTransaksi(
       if (dari !== "saldo" && w[dari] < nominal) {
         throw new AksiError(`Isi ${dari} hanya Rp${w[dari].toLocaleString("id-ID")}, kurang dari nominal.`);
       }
+      const accountId = akunSah(state, input.accountId);
       const id = await tx.insertTx(
-        buatTx({ tipe: input.tipe, nominal, wadahAsal: dari, wadahTujuan: ke, tanggal, label, detail: input.detail ?? null }),
+        buatTx({ tipe: input.tipe, nominal, wadahAsal: dari, wadahTujuan: ke, accountId, tanggal, label, detail: input.detail ?? null }),
       );
       return { id };
     }
@@ -225,8 +248,9 @@ export async function tambahTransaksi(
       const R = totalPlan(plan);
       const tab = nominalItem(plan, "tabungan");
       const inv = nominalItem(plan, "investasi");
+      const accountId = akunSah(state, input.accountId);
       const gid = await tx.insertTx(
-        buatTx({ tipe: "gaji", nominal, tanggal, planVersionId: plan.id, label, detail: input.detail ?? null }),
+        buatTx({ tipe: "gaji", nominal, accountId, tanggal, planVersionId: plan.id, label, detail: input.detail ?? null }),
       );
       if (tab > 0) {
         await tx.insertTx(buatTx({ tipe: "alokasi_gaji", nominal: tab, wadahTujuan: "tabungan", tanggal, indukId: gid }));
@@ -252,10 +276,11 @@ export async function tambahTransaksi(
 
     const ps = periodes(state);
     const berjalan = ps.length > 0 && ps[ps.length - 1].start <= hariIni;
+    const accountId = akunSah(state, input.accountId);
     if (input.wadah || !berjalan) {
       const tujuan = wadahSah(input.wadah, "saldo");
       const id = await tx.insertTx(
-        buatTx({ tipe: "bonus", nominal, wadahTujuan: tujuan, tanggal, label }),
+        buatTx({ tipe: "bonus", nominal, wadahTujuan: tujuan, accountId, tanggal, label }),
       );
       return { id };
     }
@@ -263,7 +288,7 @@ export async function tambahTransaksi(
     const { jajan, saldo } = bagiBonus(nominal, state.config.persenJajan);
     const subId = state.config.bonusSubPostId;
     const sub = state.subPosts.find((s) => s.id === subId && s.aktif);
-    const gid = await tx.insertTx(buatTx({ tipe: "bonus", nominal, tanggal, label }));
+    const gid = await tx.insertTx(buatTx({ tipe: "bonus", nominal, accountId, tanggal, label }));
     if (!sub) {
       await tx.insertTx(buatTx({ tipe: "bonus", nominal, wadahTujuan: "saldo", tanggal, indukId: gid }));
       return { id: gid };
@@ -405,6 +430,65 @@ export async function simpanGajiPokok(r: Repo, nominal: number): Promise<void> {
   const n = bulat(nominal, false);
   await r.transaction(async (tx) => {
     await tx.setConfig("gaji_pokok", String(n));
+  });
+}
+
+export interface InputAkun {
+  nama?: unknown;
+  tipe?: unknown;
+  saldoAwal?: unknown;
+}
+
+export async function tambahAkun(r: Repo, input: InputAkun): Promise<{ id: number }> {
+  const nama = typeof input.nama === "string" ? input.nama.trim().slice(0, 80) : "";
+  if (!nama) throw new AksiError("Nama dompet wajib diisi.");
+  const tipe = (TIPE_AKUN as readonly string[]).includes(String(input.tipe)) ? (String(input.tipe) as AkunTipe) : "tunai";
+  const saldoAwal = bulat(input.saldoAwal ?? 0, true);
+  return r.transaction(async (tx) => {
+    const state = await tx.load();
+    if (state.accounts.some((a) => norm(a.nama) === norm(nama))) {
+      throw new AksiError("Nama dompet sudah dipakai.");
+    }
+    const id = await tx.addAccount({ nama, tipe, saldoAwal });
+    return { id };
+  });
+}
+
+export interface InputPindahAkun {
+  dariId?: unknown;
+  keId?: unknown;
+  nominal?: unknown;
+  tanggal?: unknown;
+  label?: unknown;
+}
+
+export async function pindahAkun(r: Repo, hariIni: string, input: InputPindahAkun): Promise<{ id: number }> {
+  const nominal = bulat(input.nominal, false);
+  const tanggal = tanggalSah(input.tanggal, hariIni);
+  const label = typeof input.label === "string" ? input.label.trim().slice(0, 120) || null : null;
+  return r.transaction(async (tx) => {
+    const state = await tx.load();
+    const dari = state.accounts.find((a) => a.id === Number(input.dariId) && a.aktif);
+    const ke = state.accounts.find((a) => a.id === Number(input.keId) && a.aktif);
+    if (!dari || !ke) throw new AksiError("Dompet asal atau tujuan tidak ditemukan.");
+    if (dari.id === ke.id) throw new AksiError("Dompet asal dan tujuan harus berbeda.");
+    const saldo = hitungAkun(state).daftar.find((a) => a.id === dari.id)?.saldo ?? 0;
+    if (saldo < nominal) {
+      throw new AksiError(`Saldo ${dari.nama} hanya Rp${saldo.toLocaleString("id-ID")}, kurang dari nominal.`);
+    }
+    const id = await tx.insertTx(
+      buatTx({
+        tipe: "pindah",
+        nominal,
+        wadahAsal: "saldo",
+        wadahTujuan: "saldo",
+        accountId: dari.id,
+        accountIdTujuan: ke.id,
+        tanggal,
+        label,
+      }),
+    );
+    return { id };
   });
 }
 

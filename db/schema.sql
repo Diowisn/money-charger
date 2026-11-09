@@ -20,6 +20,19 @@ CREATE TABLE IF NOT EXISTS allowed_numbers (
   aktif      BOOLEAN NOT NULL DEFAULT TRUE
 );
 
+CREATE TABLE IF NOT EXISTS accounts (
+  id          BIGSERIAL PRIMARY KEY,
+  user_id     UUID REFERENCES auth_users(id) ON DELETE CASCADE,
+  nama        TEXT NOT NULL,
+  tipe        TEXT NOT NULL DEFAULT 'tunai' CHECK (tipe IN ('bank','ewallet','tunai','lainnya')),
+  saldo_awal  BIGINT NOT NULL DEFAULT 0,
+  urutan      INT NOT NULL DEFAULT 0,
+  aktif       BOOLEAN NOT NULL DEFAULT TRUE,
+  dibuat_pada TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_accounts_user ON accounts (user_id, urutan, id);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_accounts_user_nama ON accounts (user_id, lower(nama)) WHERE user_id IS NOT NULL;
+
 CREATE TABLE IF NOT EXISTS groups (
   id      SERIAL PRIMARY KEY,
   user_id UUID REFERENCES auth_users(id) ON DELETE CASCADE,
@@ -81,6 +94,8 @@ CREATE TABLE IF NOT EXISTS transactions (
   induk_id            BIGINT,                               -- turunan gaji/bonus ikut batal bersama induknya
   plan_version_id     INT REFERENCES plan_versions(id),     -- hanya untuk gaji: rencana yang berlaku di periode itu
   wa_message_id       TEXT,
+  account_id          BIGINT REFERENCES accounts(id) ON DELETE SET NULL,
+  account_id_tujuan   BIGINT REFERENCES accounts(id) ON DELETE SET NULL,
   dibuat_pada         TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS idx_tx_tanggal ON transactions (tanggal);
@@ -88,6 +103,9 @@ CREATE INDEX IF NOT EXISTS idx_tx_induk ON transactions (induk_id);
 CREATE INDEX IF NOT EXISTS idx_tx_user_id ON transactions (user_id, id);
 ALTER TABLE transactions ADD COLUMN IF NOT EXISTS biaya_admin BIGINT NOT NULL DEFAULT 0 CHECK (biaya_admin >= 0);
 ALTER TABLE transactions ADD COLUMN IF NOT EXISTS detail JSONB NOT NULL DEFAULT '{}'::jsonb;
+ALTER TABLE transactions ADD COLUMN IF NOT EXISTS account_id BIGINT REFERENCES accounts(id) ON DELETE SET NULL;
+ALTER TABLE transactions ADD COLUMN IF NOT EXISTS account_id_tujuan BIGINT REFERENCES accounts(id) ON DELETE SET NULL;
+CREATE INDEX IF NOT EXISTS idx_tx_account ON transactions (account_id, tanggal);
 
 CREATE TABLE IF NOT EXISTS debts (
   id            BIGSERIAL PRIMARY KEY,

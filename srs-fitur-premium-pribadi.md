@@ -19,8 +19,9 @@ Sudah diimplementasikan:
 - API `/api/recurring`.
 - Impor CSV melalui `/api/import`.
 - Digest WhatsApp mingguan dan peringatan proaktif melalui cron/outbox.
+- Multi-dompet: tabel `accounts`, saldo per dompet, transfer, net worth.
 - Peringatan dalam aplikasi.
-- Skema versi v2.
+- Skema versi v3.
 
 ## 2. Arsitektur tambahan
 
@@ -76,6 +77,19 @@ Sudah diimplementasikan:
 - Recipient: nomor aktif pertama di `allowed_numbers`.
 - Toggle aktif/mati di tab Wawasan melalui `/api/pengaturan`.
 
+### 2.5 Multi-dompet
+
+- `src/modules/accounts/model.ts`
+  - `pastikanAkunDefault(userId)` membuat dompet utama dari `saldo_awal` bila belum ada.
+  - `tambahAkunFinance`, `pindahAkunFinance`.
+- `src/modules/accounts/controller.ts` + `src/app/api/accounts/route.ts`.
+- `src/lib/engine.ts`
+  - `hitungAkun(state)` menghitung saldo per dompet dari transaksi.
+  - Net worth = total saldo dompet + tabungan + investasi - utang aktif.
+- Tabel `accounts`; `transactions.account_id` dan `transactions.account_id_tujuan`.
+- UI: `src/modules/finance/view/tab-dompet.tsx`; pilihan dompet di form transaksi.
+- Migrasi: `npm run db:setup` membuat dompet utama untuk akun lama.
+
 ## 3. Persyaratan fungsional
 
 ### FR-REC — Transaksi berulang
@@ -107,6 +121,15 @@ Sudah diimplementasikan:
 - **FR-DIG-04 MUST:** digest dapat dimatikan dari pengaturan.
 - **FR-DIG-05 MUST:** recipient hanya nomor aktif di `allowed_numbers`.
 
+### FR-DOM — Multi-dompet
+
+- **FR-DOM-01 MUST:** dompet punya nama, tipe, saldo awal, dan urutan.
+- **FR-DOM-02 MUST:** saldo dompet dihitung dari transaksi, bukan disimpan.
+- **FR-DOM-03 MUST:** transfer antar dompet membuat transaksi `pindah` dengan dompet asal/tujuan.
+- **FR-DOM-04 MUST:** transfer ditolak bila saldo dompet asal kurang.
+- **FR-DOM-05 MUST:** transaksi pengeluaran/pemasukan/gaji/bonus dapat memilih dompet.
+- **FR-DOM-06 MUST:** net worth = saldo dompet + tabungan + investasi - utang aktif.
+
 ### FR-WS — Wawasan dan peringatan
 
 - **FR-WS-01 MUST:** skor 0–100 dengan label.
@@ -118,7 +141,7 @@ Sudah diimplementasikan:
 
 ## 4. Keamanan dan integritas
 
-- Semua API recurring/import memakai `pemilikRequest`.
+- Semua API recurring/import/accounts memakai `pemilikRequest`.
 - `user_id` aturan berasal dari sesi, bukan body.
 - Query aturan/CSV dibatasi `user_id` pemilik.
 - Tidak ada token/password di log.
@@ -128,7 +151,8 @@ Sudah diimplementasikan:
 ## 5. Migrasi
 
 - Skema v2 menambahkan `recurring_rules` dan `recurring_runs`.
-- Jalankan `npm run db:setup` untuk menerapkan skema idempoten.
+- Skema v3 menambahkan `accounts` dan kolom dompet pada `transactions`.
+- Jalankan `npm run db:setup` untuk menerapkan skema idempoten dan dompet utama.
 - Sebelum migrasi berisiko, buat snapshot Neon.
 - Marker versi dicatat di `schema_version`.
 - Digest tidak menambah tabel; status kirim disimpan di `config`.
@@ -158,6 +182,13 @@ Sudah diimplementasikan:
 - **AC-DIG-03:** digest mati tidak membuat outbox.
 - **AC-DIG-04:** tanpa nomor aktif di `allowed_numbers`, digest dilewati.
 
+### Dompet
+
+- **AC-DOM-01:** gaji, alokasi, pengeluaran, dan transfer mengubah saldo dompet yang benar.
+- **AC-DOM-02:** transfer melebihi saldo dompet asal ditolak.
+- **AC-DOM-03:** transaksi tanpa dompet memakai dompet utama.
+- **AC-DOM-04:** net worth mengikuti saldo dompet + tabungan + investasi - utang aktif.
+
 ### Wawasan
 
 - **AC-WS-01:** skor selalu 0–100.
@@ -175,7 +206,7 @@ Sudah diimplementasikan:
 - Recipient: nomor pemilik yang terverifikasi di `allowed_numbers`.
 - Bisa dimatikan dari tab Wawasan.
 
-### 7.2 Multi-dompet
+### 7.2 Multi-dompet (sudah diimplementasikan)
 
 - Tabel `accounts` dengan tipe, saldo awal, urutan.
 - Transfer antar akun sebagai transaksi.
@@ -208,4 +239,5 @@ Sudah diimplementasikan:
 | F-PREM-02 | FR-REC | AC-REC |
 | F-PREM-03 | FR-CSV | AC-CSV |
 | F-PREM-04 | FR-DIG | AC-DIG |
-| F-PREM-05–09 | Bagian 7 | Belum diimplementasikan |
+| F-PREM-05 | FR-DOM | AC-DOM |
+| F-PREM-06–09 | Bagian 7 | Belum diimplementasikan |

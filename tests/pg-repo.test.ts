@@ -6,6 +6,7 @@ import { hitungWadah } from "@/lib/engine";
 import { tanganiPesan } from "@/lib/handler";
 import { antreInbound, klaimInbound, selesaikanInbound } from "@/lib/inbound-queue";
 import { PgRepo } from "@/lib/pg-repo";
+import { buatTx } from "@/lib/types";
 
 /** Menjalankan PgRepo (SQL asli) di atas Postgres tertanam supaya skema dan query teruji tanpa DBMS. */
 const OWNER = "628111";
@@ -71,6 +72,16 @@ describe("PgRepo di Postgres sungguhan", () => {
     expect((await r.load()).config.gajiPokok).toBe(2_500_000);
     await r.setConfig("gaji_pokok", "1800000");
     expect((await r.load()).config.gajiPokok).toBe(1_800_000);
+  });
+
+  it("menyimpan dompet dan menautkan transaksi ke dompet", async () => {
+    const r = new PgRepo(adapter, true, ownerId);
+    const id = await r.addAccount({ nama: "BCA", tipe: "bank", saldoAwal: 50_000 });
+    expect((await r.load()).accounts.find((a) => a.id === id)).toMatchObject({ nama: "BCA", saldoAwal: 50_000 });
+    await r.insertTx(buatTx({ tipe: "out", nominal: 10_000, tanggal: "2026-11-01", accountId: id }));
+    expect((await r.load()).txs.find((t) => t.accountId === id)?.nominal).toBe(10_000);
+    await adapter.query("DELETE FROM transactions WHERE account_id = $1", [id]);
+    await adapter.query("DELETE FROM accounts WHERE id = $1", [id]);
   });
 
   it("job tanpa sesi memakai email akun atau akun pertama sebagai pemilik", async () => {

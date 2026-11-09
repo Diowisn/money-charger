@@ -36,17 +36,17 @@ Membuat Money-Charger terasa seperti aplikasi keuangan kelas berbayar untuk pema
 - **Transaksi otomatis**: aturan tagihan bulanan, jeda/lanjutkan/hapus, anti-duplikat per bulan.
 - **Impor mutasi CSV**: out/in, pos, biaya admin, wadah, anti-duplikat berbasis hash.
 - **Digest WhatsApp**: ringkasan mingguan, peringatan anggaran/tagihan, anti-duplikat harian/mingguan, dapat dimatikan.
+- **Multi-dompet dan net worth**: saldo per rekening/e-wallet, transfer antar dompet, kekayaan bersih.
 - Backup/restore melalui Neon Console, audit log dasar, ekspor CSV.
 
 ### Berikutnya, berurutan
 
-1. **Multi-dompet dan net worth**: saldo per rekening/e-wallet, total kekayaan bersih.
-2. **Laporan lanjutan**: PDF, periode kustom, laporan terjadwal.
-3. **AI Pro**: review bulanan otomatis, tanya jawab seluruh riwayat, deteksi anomali.
-4. **Integrasi**: impor email bank/e-wallet yang lebih kaya, Google Sheets, kalender.
-5. **Kolaborasi keluarga**: anggota, peran, anggaran bersama, persetujuan.
-6. **Keamanan/kepercayaan**: 2FA, manajemen sesi, ekspor terenkripsi.
-7. **Mekanik paywall**: hanya jika akan dipublikasikan; tidak diperlukan untuk pemakaian pribadi.
+1. **Laporan lanjutan**: PDF, periode kustom, laporan terjadwal.
+2. **AI Pro**: review bulanan otomatis, tanya jawab seluruh riwayat, deteksi anomali.
+3. **Integrasi**: impor email bank/e-wallet yang lebih kaya, Google Sheets, kalender.
+4. **Kolaborasi keluarga**: anggota, peran, anggaran bersama, persetujuan.
+5. **Keamanan/kepercayaan**: 2FA, manajemen sesi, ekspor terenkripsi.
+6. **Mekanik paywall**: hanya jika akan dipublikasikan; tidak diperlukan untuk pemakaian pribadi.
 
 ## 4. Kebutuhan per fitur
 
@@ -89,10 +89,11 @@ Membuat Money-Charger terasa seperti aplikasi keuangan kelas berbayar untuk pema
 - Tidak mengirim data ke nomor selain pemilik.
 - Anti-duplikat: satu ringkasan per minggu ISO dan satu peringatan per hari.
 
-### F-PREM-05 Multi-dompet (berikutnya)
+### F-PREM-05 Multi-dompet
 
 - Rekening/e-wallet dengan saldo masing-masing.
 - Transfer antar dompet.
+- Transaksi dapat dicatat dari dompet pilihan.
 - Net worth = total saldo dompet + tabungan + investasi - utang.
 
 ### F-PREM-06 Laporan lanjutan (berikutnya)

@@ -1,5 +1,6 @@
 import {
   aktifPlan,
+  hitungAkun,
   hitungAwal,
   hitungPeriode,
   hitungWadah,
@@ -107,6 +108,14 @@ export interface LanggananView {
   terakhir: string;
   perkiraanBerikut: string;
   jumlah: number;
+}
+
+export interface DompetView {
+  id: number;
+  nama: string;
+  tipe: string;
+  saldoAwal: number;
+  saldo: number;
 }
 
 export interface AturanView {
@@ -226,6 +235,14 @@ export interface DashboardData {
   sisaAman: SisaAman | null;
   perubahanKategori: PerubahanKategori[];
   wawasan: WawasanData;
+  dompet: {
+    daftar: DompetView[];
+    total: number;
+    tabungan: number;
+    investasi: number;
+    utang: number;
+    netWorth: number;
+  };
   otomatis: AturanView[];
   piutang: DebtView[];
   goals: GoalView[];
@@ -438,6 +455,7 @@ export function bangunDashboard(state: State, hariIni: string): DashboardData {
   const utangAktif = piutang
     .filter((d) => d.status === "aktif" && d.jenis === "utang")
     .reduce((s, d) => s + d.sisa, 0);
+  const dompetAkun = hitungAkun(state);
 
   const tren = hitungTrenPengeluaran(state, hariIni);
   const sisaAman = hitungSisaAman(Math.max(0, totalRencana - terpakai), wadah.saldo, hariIni, perAktif?.start ?? null, perAktif?.end ?? null, tren);
@@ -534,6 +552,14 @@ export function bangunDashboard(state: State, hariIni: string): DashboardData {
       rasioTabungan,
       langganan,
       totalLangganan: langganan.reduce((s, item) => s + item.nominal, 0),
+    },
+    dompet: {
+      daftar: dompetAkun.daftar,
+      total: dompetAkun.total,
+      tabungan: wadah.tabungan,
+      investasi: wadah.investasi,
+      utang: utangAktif,
+      netWorth: dompetAkun.total + wadah.tabungan + wadah.investasi - utangAktif,
     },
     otomatis: [],
     piutang,

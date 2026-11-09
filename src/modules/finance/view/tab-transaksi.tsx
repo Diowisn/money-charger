@@ -30,6 +30,7 @@ export function Transaksi({
   const [biayaAdmin, setBiayaAdmin] = useState("");
   const [tanggal, setTanggal] = useState(data.hariIni);
   const [label, setLabel] = useState("");
+  const [accountId, setAccountId] = useState("");
   const [subPostId, setSubPostId] = useState("");
   const [wadah, setWadah] = useState("saldo");
   const [wadahAsal, setWadahAsal] = useState("tabungan");
@@ -71,6 +72,12 @@ export function Transaksi({
     if (tipe === "out") {
       body.subPostId = subPostId ? Number(subPostId) : null;
       body.biayaAdmin = biayaAdminAktif ? Number(biayaAdmin || 0) : 0;
+    }
+    if (tipe === "out" || tipe === "in" || tipe === "gaji" || tipe === "bonus") {
+      body.accountId = accountId ? Number(accountId) : null;
+    }
+    if ((tipe === "tarik" || tipe === "pindah") && wadahAsal === "saldo") {
+      body.accountId = accountId ? Number(accountId) : null;
     }
     if (tipe === "in") body.wadah = wadah;
     if (tipe === "bonus") body.wadah = wadah || null;
@@ -154,6 +161,20 @@ export function Transaksi({
             <input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="contoh makan siang" />
           </label>
 
+          {tipe === "out" || tipe === "in" || tipe === "gaji" || tipe === "bonus" ? (
+            <label>
+              Dompet
+              <select value={accountId} onChange={(e) => setAccountId(e.target.value)}>
+                <option value="">Dompet utama</option>
+                {data.dompet.daftar.map((akun) => (
+                  <option key={akun.id} value={akun.id}>
+                    {akun.nama} ({rp(akun.saldo)})
+                  </option>
+                ))}
+              </select>
+            </label>
+          ) : null}
+
           {tipe === "out" ? (
             <>
               <label>
@@ -211,6 +232,20 @@ export function Transaksi({
                 <option value="saldo">Saldo</option>
                 <option value="tabungan">Tabungan</option>
                 <option value="investasi">Investasi</option>
+              </select>
+            </label>
+          ) : null}
+
+          {(tipe === "tarik" || tipe === "pindah") && wadahAsal === "saldo" ? (
+            <label>
+              Dompet asal
+              <select value={accountId} onChange={(e) => setAccountId(e.target.value)}>
+                <option value="">Dompet utama</option>
+                {data.dompet.daftar.map((akun) => (
+                  <option key={akun.id} value={akun.id}>
+                    {akun.nama} ({rp(akun.saldo)})
+                  </option>
+                ))}
               </select>
             </label>
           ) : null}

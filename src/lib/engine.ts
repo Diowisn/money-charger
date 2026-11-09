@@ -213,6 +213,45 @@ export function hitungWadah(state: State): SaldoWadah {
   return w;
 }
 
+// ---------- dompet ----------
+
+export interface AkunSaldo {
+  id: number;
+  nama: string;
+  tipe: string;
+  saldoAwal: number;
+  saldo: number;
+}
+
+export function hitungAkun(state: State): { daftar: AkunSaldo[]; total: number } {
+  const saldo = new Map<number, number>(state.accounts.map((a) => [a.id, a.saldoAwal]));
+  const bawaan = (state.accounts.find((a) => a.aktif) ?? state.accounts[0])?.id ?? null;
+  const ubah = (id: number | null, delta: number) => {
+    if (id === null || !saldo.has(id)) return;
+    saldo.set(id, (saldo.get(id) ?? 0) + delta);
+  };
+  for (const t of berlaku(state)) {
+    const akun = t.accountId ?? bawaan;
+    if (t.tipe === "out") ubah(akun, -nominalKeluar(t));
+    else if (t.tipe === "gaji") ubah(akun, t.nominal);
+    else if (t.tipe === "alokasi_gaji") ubah(akun, -t.nominal);
+    else if (t.tipe === "in" && (t.wadahTujuan === null || t.wadahTujuan === "saldo")) ubah(akun, t.nominal);
+    else if (t.tipe === "bonus" && t.indukId === null && (t.wadahTujuan === null || t.wadahTujuan === "saldo")) ubah(akun, t.nominal);
+    else if (t.tipe === "tarik" || t.tipe === "pindah") {
+      if (t.wadahAsal === "saldo") ubah(akun, -t.nominal);
+      if (t.wadahTujuan === "saldo") ubah(t.accountIdTujuan ?? akun, t.nominal);
+    }
+  }
+  const daftar = state.accounts.map((a) => ({
+    id: a.id,
+    nama: a.nama,
+    tipe: a.tipe,
+    saldoAwal: a.saldoAwal,
+    saldo: saldo.get(a.id) ?? a.saldoAwal,
+  }));
+  return { daftar, total: daftar.reduce((s, a) => s + a.saldo, 0) };
+}
+
 // ---------- bonus ----------
 
 export function bagiBonus(b: number, persenJajan: number): { jajan: number; saldo: number } {
