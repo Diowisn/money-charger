@@ -9,6 +9,7 @@ import {
   kelolaPos,
   muatDashboard,
   nabungGoalFinance,
+  simpanDigestFinance,
   simpanGajiPokokFinance,
   simpanRencanaFinance,
   simpanSetupFinance,
@@ -154,8 +155,16 @@ export async function postPengaturan(req: NextRequest) {
   if ("tolak" in auth) return auth.tolak;
   try {
     const body = await bacaBody(req);
-    await simpanGajiPokokFinance(Number(body.gajiPokok), auth.userId);
-    return ok({ pesan: "Gaji pokok diperbarui." });
+    if (body.gajiPokok !== undefined) {
+      await simpanGajiPokokFinance(Number(body.gajiPokok), auth.userId);
+    }
+    if (body.digestAktif !== undefined) {
+      await simpanDigestFinance(body.digestAktif === true, auth.userId);
+    }
+    if (body.gajiPokok === undefined && body.digestAktif === undefined) {
+      throw new AksiError("Tidak ada perubahan.");
+    }
+    return ok({ pesan: "Pengaturan diperbarui." });
   } catch (e) {
     return galat(e);
   }

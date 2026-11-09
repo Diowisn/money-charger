@@ -94,6 +94,13 @@ export async function simpanGajiPokokFinance(nominal: number, userId: string) {
   await catatAudit("web", "gaji_pokok_diubah", { nominal });
 }
 
+export async function simpanDigestFinance(aktif: boolean, userId: string) {
+  await new PgRepo(undefined, undefined, userId).transaction(async (tx) => {
+    await tx.setConfig("digest_aktif", aktif ? "1" : "0");
+  });
+  await catatAudit("web", "digest_diubah", { aktif });
+}
+
 export async function tambahDebtFinance(input: InputDebt, userId: string) {
   return tambahDebt(new PgRepo(undefined, undefined, userId), wibDate(Date.now()), input);
 }

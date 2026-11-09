@@ -18,6 +18,9 @@ export function parseConfig(m: Record<string, string>): Config {
     // Bawaan aktif agar perilaku lama tetap jalan; "ai off" mencabut izin.
     aiAktif: m.ai_aktif !== "0",
     aiKonfirmasi: m.ai_konfirmasi !== "0",
+    digestAktif: m.digest_aktif !== "0",
+    digestMinggu: m.digest_minggu ?? null,
+    digestHarian: m.digest_harian ?? null,
   };
 }
 

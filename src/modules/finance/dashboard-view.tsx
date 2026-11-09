@@ -355,7 +355,7 @@ export default function Dashboard({ awal }: { awal: DashboardData }) {
             />
           ) : null}
           {tab === "rekap" ? <Rekap data={data} navigasi={navigasiKe} /> : null}
-          {tab === "wawasan" ? <Wawasan data={data} /> : null}
+          {tab === "wawasan" ? <Wawasan data={data} kirim={kirim} sibuk={sibuk} /> : null}
           {tab === "profil" || tab === "ubah-profil" ? (
             <Profil
               bagian={tab}

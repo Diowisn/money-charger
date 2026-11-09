@@ -109,6 +109,12 @@ export interface Config {
   aiAktif: boolean;
   /** Tampilkan pratinjau dan minta "ya" sebelum transaksi hasil AI dicatat. */
   aiKonfirmasi: boolean;
+  /** Kirim digest WhatsApp mingguan dan peringatan proaktif. */
+  digestAktif: boolean;
+  /** Kunci minggu ISO terakhir yang sudah dikirim. */
+  digestMinggu: string | null;
+  /** Tanggal terakhir peringatan harian dikirim. */
+  digestHarian: string | null;
 }
 
 export type DebtJenis = "piutang" | "utang";

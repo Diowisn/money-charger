@@ -35,18 +35,18 @@ Membuat Money-Charger terasa seperti aplikasi keuangan kelas berbayar untuk pema
 - **Wawasan**: skor kesehatan finansial, proyeksi pengeluaran/saldo akhir bulan, rasio tabungan, deteksi langganan, peringatan dalam aplikasi.
 - **Transaksi otomatis**: aturan tagihan bulanan, jeda/lanjutkan/hapus, anti-duplikat per bulan.
 - **Impor mutasi CSV**: out/in, pos, biaya admin, wadah, anti-duplikat berbasis hash.
+- **Digest WhatsApp**: ringkasan mingguan, peringatan anggaran/tagihan, anti-duplikat harian/mingguan, dapat dimatikan.
 - Backup/restore melalui Neon Console, audit log dasar, ekspor CSV.
 
 ### Berikutnya, berurutan
 
-1. **Digest WhatsApp**: ringkasan mingguan dan peringatan anggaran/tagihan.
-2. **Multi-dompet dan net worth**: saldo per rekening/e-wallet, total kekayaan bersih.
-3. **Laporan lanjutan**: PDF, periode kustom, laporan terjadwal.
-4. **AI Pro**: review bulanan otomatis, tanya jawab seluruh riwayat, deteksi anomali.
-5. **Integrasi**: impor email bank/e-wallet yang lebih kaya, Google Sheets, kalender.
-6. **Kolaborasi keluarga**: anggota, peran, anggaran bersama, persetujuan.
-7. **Keamanan/kepercayaan**: 2FA, manajemen sesi, ekspor terenkripsi.
-8. **Mekanik paywall**: hanya jika akan dipublikasikan; tidak diperlukan untuk pemakaian pribadi.
+1. **Multi-dompet dan net worth**: saldo per rekening/e-wallet, total kekayaan bersih.
+2. **Laporan lanjutan**: PDF, periode kustom, laporan terjadwal.
+3. **AI Pro**: review bulanan otomatis, tanya jawab seluruh riwayat, deteksi anomali.
+4. **Integrasi**: impor email bank/e-wallet yang lebih kaya, Google Sheets, kalender.
+5. **Kolaborasi keluarga**: anggota, peran, anggaran bersama, persetujuan.
+6. **Keamanan/kepercayaan**: 2FA, manajemen sesi, ekspor terenkripsi.
+7. **Mekanik paywall**: hanya jika akan dipublikasikan; tidak diperlukan untuk pemakaian pribadi.
 
 ## 4. Kebutuhan per fitur
 
@@ -81,12 +81,13 @@ Membuat Money-Charger terasa seperti aplikasi keuangan kelas berbayar untuk pema
 
 **Sukses:** impor 100 baris selesai <1 menit dan tidak menggandakan transaksi.
 
-### F-PREM-04 Digest WhatsApp (berikutnya)
+### F-PREM-04 Digest WhatsApp
 
 - Ringkasan mingguan: pengeluaran, sisa anggaran, proyeksi, tagihan terdekat.
 - Peringatan anggaran/tagihan proaktif.
 - Dapat dimatikan pemilik.
 - Tidak mengirim data ke nomor selain pemilik.
+- Anti-duplikat: satu ringkasan per minggu ISO dan satu peringatan per hari.
 
 ### F-PREM-05 Multi-dompet (berikutnya)
 

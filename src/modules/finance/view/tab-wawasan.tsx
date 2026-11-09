@@ -1,7 +1,9 @@
+import { Tombol } from "@/components/tombol";
 import type { DashboardData } from "@/lib/dashboard";
 import { rp } from "./format";
+import type { Kirim } from "./tipe";
 
-export function Wawasan({ data }: { data: DashboardData }) {
+export function Wawasan({ data, kirim, sibuk }: { data: DashboardData; kirim: Kirim; sibuk: boolean }) {
   const w = data.wawasan;
   const kategori = data.perubahanKategori;
 
@@ -86,6 +88,25 @@ export function Wawasan({ data }: { data: DashboardData }) {
             <li className="muted kecil">Belum ada pola langganan bulanan yang terdeteksi.</li>
           ) : null}
         </ul>
+      </section>
+
+      <section className="kartu">
+        <div className="baris-antara">
+          <h2>Digest WhatsApp</h2>
+          <span className={`badge ${data.pengaturan.digestAktif ? "hijau" : ""}`}>
+            {data.pengaturan.digestAktif ? "Aktif" : "Mati"}
+          </span>
+        </div>
+        <p className="muted kecil">
+          Ringkasan mingguan dan peringatan anggaran/tagihan dikirim ke nomor WhatsApp pemilik yang terverifikasi.
+        </p>
+        <Tombol
+          varian="sekunder"
+          onClick={() => void kirim("/api/pengaturan", "POST", { digestAktif: !data.pengaturan.digestAktif })}
+          disabled={sibuk}
+        >
+          {data.pengaturan.digestAktif ? "Matikan digest" : "Aktifkan digest"}
+        </Tombol>
       </section>
 
       <section className="kartu">

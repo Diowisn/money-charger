@@ -18,6 +18,7 @@ Sudah diimplementasikan:
 - `recurring_rules`, `recurring_runs`, worker transaksi berulang.
 - API `/api/recurring`.
 - Impor CSV melalui `/api/import`.
+- Digest WhatsApp mingguan dan peringatan proaktif melalui cron/outbox.
 - Peringatan dalam aplikasi.
 - Skema versi v2.
 
@@ -63,6 +64,18 @@ Sudah diimplementasikan:
   - `hitungPerubahanKategori`
 - UI: `src/modules/finance/view/tab-wawasan.tsx`.
 
+### 2.4 Digest WhatsApp
+
+- `src/modules/digest/model.ts`
+  - `kunciMinggu(iso)` menghasilkan kunci minggu ISO.
+  - `pesanMingguan(data)` merangkum pengeluaran, sisa anggaran, proyeksi, dan tagihan ≤7 hari.
+  - `pesanPeringatan(data)` menyalin peringatan wawasan.
+  - `prosesDigest(hariIni)` mengirim melalui outbox dan mencatat status kirim.
+- Cron `/api/cron/outbox` memanggil digest setelah transaksi berulang.
+- Status disimpan di `config`: `digest_aktif`, `digest_minggu`, `digest_harian`.
+- Recipient: nomor aktif pertama di `allowed_numbers`.
+- Toggle aktif/mati di tab Wawasan melalui `/api/pengaturan`.
+
 ## 3. Persyaratan fungsional
 
 ### FR-REC — Transaksi berulang
@@ -85,6 +98,14 @@ Sudah diimplementasikan:
 - **FR-CSV-06 MUST:** transaksi dengan `importHash` sama untuk pengguna yang sama dilewati.
 - **FR-CSV-07 MUST:** impor hanya membuat `out`/`in`; gaji/bonus lewat jalur transaksi biasa.
 - **FR-CSV-08 SHOULD:** pos dicocokkan berdasarkan nama/alias aktif; jika ambigu, transaksi tanpa pos.
+
+### FR-DIG — Digest WhatsApp
+
+- **FR-DIG-01 MUST:** digest membuat baris `outbox`, bukan mengirim langsung.
+- **FR-DIG-02 MUST:** ringkasan mingguan maksimal sekali per minggu ISO.
+- **FR-DIG-03 MUST:** peringatan proaktif maksimal sekali per hari.
+- **FR-DIG-04 MUST:** digest dapat dimatikan dari pengaturan.
+- **FR-DIG-05 MUST:** recipient hanya nomor aktif di `allowed_numbers`.
 
 ### FR-WS — Wawasan dan peringatan
 
@@ -110,6 +131,7 @@ Sudah diimplementasikan:
 - Jalankan `npm run db:setup` untuk menerapkan skema idempoten.
 - Sebelum migrasi berisiko, buat snapshot Neon.
 - Marker versi dicatat di `schema_version`.
+- Digest tidak menambah tabel; status kirim disimpan di `config`.
 
 ## 6. Acceptance criteria
 
@@ -129,6 +151,13 @@ Sudah diimplementasikan:
 - **AC-CSV-04:** satu baris invalid menghasilkan error baris dan baris valid tetap masuk.
 - **AC-CSV-05:** tanggal masa depan ditolak.
 
+### Digest
+
+- **AC-DIG-01:** dua cron pada minggu yang sama hanya membuat satu ringkasan mingguan.
+- **AC-DIG-02:** dua cron pada hari yang sama hanya membuat satu peringatan harian.
+- **AC-DIG-03:** digest mati tidak membuat outbox.
+- **AC-DIG-04:** tanpa nomor aktif di `allowed_numbers`, digest dilewati.
+
 ### Wawasan
 
 - **AC-WS-01:** skor selalu 0–100.
@@ -138,13 +167,13 @@ Sudah diimplementasikan:
 
 ## 7. Rencana fitur berikutnya
 
-### 7.1 Digest WhatsApp
+### 7.1 Digest WhatsApp (sudah diimplementasikan)
 
-- Tabel/konfigurasi status kirim untuk mencegah duplikat harian/mingguan.
+- Status kirim di `config` untuk mencegah duplikat harian/mingguan.
 - Worker membuat outbox, bukan mengirim langsung.
 - Konten: pengeluaran, sisa anggaran, proyeksi, tagihan terdekat.
-- Recipient: nomor pemilik yang terverifikasi.
-- Bisa dimatikan dari pengaturan.
+- Recipient: nomor pemilik yang terverifikasi di `allowed_numbers`.
+- Bisa dimatikan dari tab Wawasan.
 
 ### 7.2 Multi-dompet
 
@@ -178,4 +207,5 @@ Sudah diimplementasikan:
 | F-PREM-01 | FR-WS | AC-WS |
 | F-PREM-02 | FR-REC | AC-REC |
 | F-PREM-03 | FR-CSV | AC-CSV |
-| F-PREM-04–09 | Bagian 7 | Belum diimplementasikan |
+| F-PREM-04 | FR-DIG | AC-DIG |
+| F-PREM-05–09 | Bagian 7 | Belum diimplementasikan |
