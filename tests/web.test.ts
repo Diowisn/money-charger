@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { bangunDashboard, kebutuhanTarget } from "../src/lib/dashboard";
+import { bangunDashboard, deteksiLangganan, hitungSkorKesehatan, kebutuhanTarget, proyeksiPengeluaranBulan } from "../src/lib/dashboard";
 import { aktifPlan, periodes, totalPlan } from "../src/lib/engine";
 import { MemRepo } from "../src/lib/mem-repo";
 import {
@@ -76,6 +76,30 @@ describe("dashboard", () => {
     expect(kebutuhanTarget(1_200_000, "2026-04-15", HARI)).toEqual({ perBulan: 400_000, perMinggu: 93_000 });
     expect(kebutuhanTarget(500_000, null, HARI)).toEqual({ perBulan: null, perMinggu: null });
     expect(kebutuhanTarget(0, "2026-04-15", HARI)).toEqual({ perBulan: null, perMinggu: null });
+  });
+
+  it("menghitung skor kesehatan dan proyeksi pengeluaran bulanan", () => {
+    expect(hitungSkorKesehatan({ rasioAnggaran: 0, rasioTabungan: 0.2, bulanDanaDarurat: 3, saldoPositif: true })).toEqual({ nilai: 100, label: "Sangat sehat" });
+    expect(hitungSkorKesehatan({ rasioAnggaran: 1, rasioTabungan: 0, bulanDanaDarurat: 0, saldoPositif: false }).label).toBe("Perlu perhatian");
+    expect(proyeksiPengeluaranBulan(310_000, "2026-01-10")).toBe(961_000);
+  });
+
+  it("mendeteksi langganan bulanan dengan nominal stabil", async () => {
+    const repo = await repoDenganGaji();
+    await tambahTransaksi(repo, HARI, { tipe: "out", nominal: 50_000, tanggal: "2025-12-10", label: "Netflix" });
+    await tambahTransaksi(repo, HARI, { tipe: "out", nominal: 50_000, tanggal: HARI, label: "Netflix" });
+    const hasil = deteksiLangganan(await repo.load());
+    expect(hasil).toHaveLength(1);
+    expect(hasil[0]).toMatchObject({ nama: "Netflix", nominal: 50_000, jumlah: 2 });
+  });
+
+  it("wawasan tersedia di data dashboard", async () => {
+    const repo = await repoDenganGaji();
+    const d = bangunDashboard(await repo.load(), HARI);
+    expect(d.wawasan.skor).toBeGreaterThanOrEqual(0);
+    expect(d.wawasan.skor).toBeLessThanOrEqual(100);
+    expect(d.wawasan.faktor).toHaveLength(3);
+    expect(d.wawasan.proyeksiPengeluaran).toBeGreaterThanOrEqual(0);
   });
 
   it("menghitung pengeluaran periode awal terhadap rencana aktif", async () => {

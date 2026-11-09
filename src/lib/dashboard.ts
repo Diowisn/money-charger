@@ -100,6 +100,25 @@ export interface PerubahanKategori {
   delta: number;
 }
 
+export interface LanggananView {
+  nama: string;
+  nominal: number;
+  terakhir: string;
+  perkiraanBerikut: string;
+  jumlah: number;
+}
+
+export interface WawasanData {
+  skor: number;
+  label: string;
+  faktor: string[];
+  proyeksiPengeluaran: number;
+  proyeksiSaldo: number;
+  rasioTabungan: number;
+  langganan: LanggananView[];
+  totalLangganan: number;
+}
+
 export function kebutuhanTarget(sisa: number, targetTanggal: string | null, hariIni: string): { perBulan: number | null; perMinggu: number | null } {
   if (!targetTanggal || sisa <= 0) return { perBulan: null, perMinggu: null };
   const hari = Math.max(1, diffDays(targetTanggal, hariIni));
@@ -191,6 +210,7 @@ export interface DashboardData {
   tren: TrenHari[];
   sisaAman: SisaAman | null;
   perubahanKategori: PerubahanKategori[];
+  wawasan: WawasanData;
   piutang: DebtView[];
   goals: GoalView[];
   posLain: { dd: number; tabungan: number; investasi: number; ddSisa: number };
@@ -207,6 +227,59 @@ export interface DashboardData {
   rencana: { id: number; nama: string; total: number } | null;
   rencanaLain: { dd: number; tabungan: number; investasi: number };
   versiRencana: number;
+}
+
+export function jumlahHariBulan(hariIni: string): number {
+  const [tahun, bulan] = hariIni.split("-").map(Number);
+  return new Date(Date.UTC(tahun, bulan, 0)).getUTCDate();
+}
+
+export function proyeksiPengeluaranBulan(pengeluaran: number, hariIni: string): number {
+  const hariKe = Math.max(1, Number(hariIni.slice(8, 10)));
+  return Math.round((pengeluaran / hariKe) * jumlahHariBulan(hariIni));
+}
+
+export function hitungSkorKesehatan(input: { rasioAnggaran: number; rasioTabungan: number; bulanDanaDarurat: number; saldoPositif: boolean }): { nilai: number; label: string } {
+  const anggaran = Math.max(0, 35 * (1 - Math.min(1, input.rasioAnggaran)));
+  const tabungan = Math.min(30, Math.max(0, (input.rasioTabungan / 0.2) * 30));
+  const darurat = Math.min(20, Math.max(0, (input.bulanDanaDarurat / 3) * 20));
+  const arus = input.saldoPositif ? 15 : 0;
+  const nilai = Math.round(Math.max(0, Math.min(100, anggaran + tabungan + darurat + arus)));
+  const label = nilai >= 80 ? "Sangat sehat" : nilai >= 60 ? "Sehat" : nilai >= 40 ? "Cukup" : "Perlu perhatian";
+  return { nilai, label };
+}
+
+export function deteksiLangganan(state: State, batas = 5): LanggananView[] {
+  const grup = new Map<string, Tx[]>();
+  for (const t of state.txs) {
+    if (t.status !== "berlaku" || t.tipe !== "out" || t.indukId !== null) continue;
+    const merchant = typeof t.detail?.merchant === "string" ? t.detail.merchant.trim() : "";
+    const nama = merchant || t.label?.trim() || namaSubPost(state, t.subPostId);
+    if (!nama) continue;
+    const kunci = nama.toLowerCase();
+    const isi = grup.get(kunci) ?? [];
+    isi.push(t);
+    grup.set(kunci, isi);
+  }
+  const hasil: LanggananView[] = [];
+  for (const isi of grup.values()) {
+    if (isi.length < 2) continue;
+    const bulan = new Set(isi.map((t) => t.tanggal.slice(0, 7)));
+    if (bulan.size < 2 || isi.length > bulan.size * 2) continue;
+    const rata = isi.reduce((s, t) => s + nominalKeluar(t), 0) / isi.length;
+    if (rata <= 0 || isi.some((t) => Math.abs(nominalKeluar(t) - rata) > rata * 0.15)) continue;
+    const urut = isi.slice().sort((a, b) => (a.tanggal < b.tanggal ? -1 : a.tanggal > b.tanggal ? 1 : a.id - b.id));
+    const terakhir = urut[urut.length - 1];
+    const namaTampil = (typeof terakhir.detail?.merchant === "string" && terakhir.detail.merchant.trim()) || terakhir.label?.trim() || namaSubPost(state, terakhir.subPostId) || "Langganan";
+    hasil.push({
+      nama: namaTampil,
+      nominal: Math.round(rata),
+      terakhir: terakhir.tanggal,
+      perkiraanBerikut: addDays(terakhir.tanggal, 30),
+      jumlah: isi.length,
+    });
+  }
+  return hasil.sort((a, b) => b.nominal - a.nominal).slice(0, batas);
 }
 
 const POSITIF = new Set<TxTipe>(["gaji", "in", "bonus"]);
@@ -350,6 +423,7 @@ export function bangunDashboard(state: State, hariIni: string): DashboardData {
     .reduce((s, d) => s + d.sisa, 0);
 
   const tren = hitungTrenPengeluaran(state, hariIni);
+  const sisaAman = hitungSisaAman(Math.max(0, totalRencana - terpakai), wadah.saldo, hariIni, perAktif?.start ?? null, perAktif?.end ?? null, tren);
   const goals: GoalView[] = state.goals
     .filter((g) => g.status !== "batal")
     .map((g) => {
@@ -378,6 +452,14 @@ export function bangunDashboard(state: State, hariIni: string): DashboardData {
   const goalAktifList = goals.filter((g) => g.status === "aktif");
   const goalTerkumpulAktif = goalAktifList.reduce((s, g) => s + g.terkumpul, 0);
   const goalTargetAktif = goalAktifList.reduce((s, g) => s + g.targetNominal, 0);
+
+  const rasioAnggaran = totalRencana ? terpakai / totalRencana : 0;
+  const rasioTabungan = totalRencana ? (nominalItem(planPeriode, "tabungan") + nominalItem(planPeriode, "investasi")) / totalRencana : 0;
+  const danaDarurat = wadah.tabungan + wadah.investasi;
+  const bulanDanaDarurat = pengeluaranBulanIni > 0 ? danaDarurat / pengeluaranBulanIni : danaDarurat > 0 ? 3 : 0;
+  const skor = hitungSkorKesehatan({ rasioAnggaran, rasioTabungan, bulanDanaDarurat, saldoPositif: wadah.saldo >= 0 });
+  const langganan = deteksiLangganan(state);
+  const proyeksiPengeluaran = proyeksiPengeluaranBulan(pengeluaranBulanIni, hariIni);
 
   return {
     hariIni,
@@ -410,8 +492,22 @@ export function bangunDashboard(state: State, hariIni: string): DashboardData {
     },
     grup,
     tren,
-    sisaAman: hitungSisaAman(Math.max(0, totalRencana - terpakai), wadah.saldo, hariIni, perAktif?.start ?? null, perAktif?.end ?? null, tren),
+    sisaAman,
     perubahanKategori: hitungPerubahanKategori(state, hariIni),
+    wawasan: {
+      skor: skor.nilai,
+      label: skor.label,
+      faktor: [
+        `Anggaran terpakai ${Math.round(rasioAnggaran * 100)}% dari rencana periode.`,
+        `Tabungan + investasi ${Math.round(rasioTabungan * 100)}% dari total rencana.`,
+        `Dana darurat + tabungan setara ${bulanDanaDarurat.toFixed(1)} bulan pengeluaran bulan ini.`,
+      ],
+      proyeksiPengeluaran,
+      proyeksiSaldo: wadah.saldo - Math.max(0, proyeksiPengeluaran - pengeluaranBulanIni),
+      rasioTabungan,
+      langganan,
+      totalLangganan: langganan.reduce((s, item) => s + item.nominal, 0),
+    },
     piutang,
     goals,
     posLain: {

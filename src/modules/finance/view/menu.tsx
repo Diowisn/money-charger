@@ -10,6 +10,7 @@ import {
   IkonTambah,
   IkonTarget,
   IkonTransaksi,
+  IkonWawasan,
 } from "./ikon";
 import type { Tab } from "./tipe";
 
@@ -24,6 +25,7 @@ export const MENU_SAMPING: [Tab, string, (p: { aktif: boolean }) => ReactElement
   ["ringkasan", "Beranda", IkonRingkasan],
   ["riwayat", "Transaksi", IkonTransaksi],
   ["rekap", "Rekap", IkonRekap],
+  ["wawasan", "Wawasan", IkonWawasan],
   ["catat", "Catat transaksi", IkonTambah],
   ["rencana", "Rencana bulanan", IkonRencana],
   ...MENU_LAIN,
@@ -41,7 +43,7 @@ export const MENU_LAINNYA: [Tab, string, (p: { aktif: boolean }) => ReactElement
 ];
 
 export const TAB_IDENTITAS = new Set<Tab>(["profil", "ubah-profil"]);
-export const TAB_UTAMA = new Set<Tab>(["ringkasan", "riwayat", "rekap"]);
+export const TAB_UTAMA = new Set<Tab>(["ringkasan", "riwayat", "rekap", "wawasan"]);
 
 export const JUDUL_TAB: Record<Tab, string> = {
   ringkasan: "Beranda",
@@ -49,6 +51,7 @@ export const JUDUL_TAB: Record<Tab, string> = {
   catat: "Transaksi",
   riwayat: "Transaksi",
   rekap: "Rekap",
+  wawasan: "Wawasan",
   profil: "Profil saya",
   "ubah-profil": "Edit profil",
   pos: "Pos pengeluaran",

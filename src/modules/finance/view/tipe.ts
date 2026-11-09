@@ -24,6 +24,7 @@ export type Tab =
   | "catat"
   | "riwayat"
   | "rekap"
+  | "wawasan"
   | "profil"
   | "ubah-profil"
   | "pos"

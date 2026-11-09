@@ -2566,6 +2566,108 @@ body {
   margin-top: 6px;
 }
 
+.wawasan {
+  display: grid;
+  gap: 14px;
+}
+
+.wawasan-skor {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.wawasan-skor h2 {
+  margin: 8px 0 2px;
+}
+
+.wawasan-predikat {
+  margin: 0;
+  color: var(--hijau);
+  font-size: 1.1rem;
+  font-weight: 800;
+}
+
+.skor-bulat {
+  display: grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 112px;
+  aspect-ratio: 1;
+  border-radius: 50%;
+}
+
+.skor-bulat > div {
+  display: grid;
+  place-items: center;
+  width: 84px;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  background: var(--kartu);
+  box-shadow: inset 0 0 0 1px var(--garis);
+}
+
+.skor-bulat b {
+  font-size: 1.7rem;
+  line-height: 1;
+}
+
+.skor-bulat span {
+  color: var(--muted);
+  font-size: 0.7rem;
+}
+
+.wawasan-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.wawasan-metrik .angka {
+  margin: 6px 0 4px;
+}
+
+.wawasan-daftar {
+  display: grid;
+  gap: 9px;
+  margin: 10px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.wawasan-daftar li {
+  padding-bottom: 9px;
+  border-bottom: 1px solid var(--garis);
+}
+
+.wawasan-daftar li:last-child {
+  padding-bottom: 0;
+  border-bottom: 0;
+}
+
+.wawasan-daftar small {
+  font-weight: 400;
+}
+
+@media (max-width: 720px) {
+  .wawasan-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .wawasan-skor {
+    align-items: flex-start;
+  }
+
+  .skor-bulat {
+    width: 92px;
+  }
+
+  .skor-bulat > div {
+    width: 70px;
+  }
+}
+
 .rekap-kategori ul {
   margin: 8px 0 0;
   padding: 0;

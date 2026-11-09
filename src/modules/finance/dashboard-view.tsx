@@ -6,7 +6,7 @@ import type { DashboardData, TxView } from "@/lib/dashboard";
 import { DetailDialog, KonfirmasiDialog, ScanDialog } from "./view/dialog";
 import { INTERVAL_LIVE_MS, temaAwal } from "./view/format";
 import { kompresGambar } from "./view/gambar";
-import { IkonLainnya, IkonRekap, IkonRingkasan, IkonTambah, IkonTransaksi } from "./view/ikon";
+import { IkonLainnya, IkonRekap, IkonRingkasan, IkonTambah, IkonTransaksi, IkonWawasan } from "./view/ikon";
 import { JUDUL_TAB, MENU_IDENTITAS, MENU_SAMPING, TAB_UTAMA, indukTab } from "./view/menu";
 import { Asisten } from "./view/tab-asisten";
 import { Lainnya } from "./view/tab-lainnya";
@@ -18,6 +18,7 @@ import { Rencana } from "./view/tab-rencana";
 import { Ringkasan } from "./view/tab-ringkasan";
 import { Target } from "./view/tab-target";
 import { Transaksi } from "./view/tab-transaksi";
+import { Wawasan } from "./view/tab-wawasan";
 import type { HasilScan, Konfirmasi, Pesan, StatusLive, Tab, Tema } from "./view/tipe";
 
 export default function Dashboard({ awal }: { awal: DashboardData }) {
@@ -352,6 +353,7 @@ export default function Dashboard({ awal }: { awal: DashboardData }) {
             />
           ) : null}
           {tab === "rekap" ? <Rekap data={data} navigasi={navigasiKe} /> : null}
+          {tab === "wawasan" ? <Wawasan data={data} /> : null}
           {tab === "profil" || tab === "ubah-profil" ? (
             <Profil
               bagian={tab}
@@ -424,6 +426,7 @@ export default function Dashboard({ awal }: { awal: DashboardData }) {
               ["ringkasan", "Beranda", IkonRingkasan],
               ["riwayat", "Transaksi", IkonTransaksi],
               ["rekap", "Rekap", IkonRekap],
+              ["wawasan", "Wawasan", IkonWawasan],
               ["lainnya", "Lainnya", IkonLainnya],
             ] as [Tab, string, (p: { aktif: boolean }) => ReactElement][]
           ).map(([id, label, Ikon]) => {

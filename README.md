@@ -268,6 +268,7 @@ Isi dashboard:
 - **Ringkasan**: sisa uang, rasio terpakai, pendapatan/pengeluaran bulan ini, alokasi per grup, dan detail pos yang bisa dilipat.
 - **Sisa aman**: batas belanja harian dari sisa jatah periode, rata-rata belanja 14 hari, dan perkiraan berapa hari saldo masih cukup.
 - **Perubahan kategori**: kategori yang naik/turun paling besar dibanding bulan lalu di tab Rekap.
+- **Wawasan**: skor kesehatan finansial, proyeksi pengeluaran/saldo akhir bulan, rasio tabungan, deteksi langganan bulanan, dan daftar hal yang perlu diperhatikan.
 - **Rencana**: slider jatah per pos, Dana Darurat, Tabungan, dan Investasi. Simpan membuat versi rencana baru (versi lama diarsipkan). Opsi "berlaku juga di periode berjalan" menyesuaikan gaji periode aktif dan mencatat selisih ke Saldo.
 - **Transaksi**: catat pengeluaran, pemasukan, gaji, bonus, tarik, dan pindah; hapus transaksi (pembatalan, bukan hapus permanen). Menghapus gaji juga membatalkan alokasi dan selisihnya.
 - **Pos**: tambah pos (langsung masuk rencana aktif), ganti nama, tambah alias, nonaktifkan, dan setup awal sebelum gaji pertama.
