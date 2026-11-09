@@ -46,6 +46,19 @@ export function Wawasan({ data }: { data: DashboardData }) {
       </section>
 
       <section className="kartu">
+        <div className="baris-antara">
+          <h2>Peringatan</h2>
+          <span className={`badge ${w.peringatan.length ? "tipe-out" : "hijau"}`}>{w.peringatan.length ? `${w.peringatan.length} hal` : "Aman"}</span>
+        </div>
+        <ul className="wawasan-daftar">
+          {w.peringatan.map((item) => (
+            <li key={item}>{item}</li>
+          ))}
+          {!w.peringatan.length ? <li className="muted kecil">Tidak ada peringatan penting saat ini.</li> : null}
+        </ul>
+      </section>
+
+      <section className="kartu">
         <h2>Yang perlu diperhatikan</h2>
         <ul className="wawasan-daftar">
           {w.faktor.map((faktor) => (

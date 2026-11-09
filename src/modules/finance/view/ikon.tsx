@@ -69,6 +69,23 @@ export function IkonAsisten({ aktif }: { aktif: boolean }) {
   );
 }
 
+export function IkonImpor({ aktif }: { aktif: boolean }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={aktif ? 2.4 : 1.8}>
+      <path d="M12 3v12M7 10l5 5 5-5M4 21h16" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+export function IkonOtomatis({ aktif }: { aktif: boolean }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={aktif ? 2.4 : 1.8}>
+      <path d="M20 7v5h-5M4 17v-5h5" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M18.4 12a6.5 6.5 0 0 0-11.8-3.6L4 12M5.6 12a6.5 6.5 0 0 0 11.8 3.6L20 12" strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
 export function IkonWawasan({ aktif }: { aktif: boolean }) {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={aktif ? 2.4 : 1.8}>

@@ -10,6 +10,7 @@ import {
   totalJatahSubPos,
   totalPlan,
 } from "./engine";
+import { rp } from "./format";
 import { addDays, diffDays } from "./parse/date";
 import { TURUNAN, type ProfilAkun, type State, type Tx, type TxTipe, type Wadah } from "./types";
 
@@ -108,10 +109,24 @@ export interface LanggananView {
   jumlah: number;
 }
 
+export interface AturanView {
+  id: number;
+  nama: string;
+  nominal: number;
+  hari: number;
+  subPostId: number | null;
+  subPost: string | null;
+  aktif: boolean;
+  mulai: string;
+  terakhirJalan: string | null;
+  berikutnya: string | null;
+}
+
 export interface WawasanData {
   skor: number;
   label: string;
   faktor: string[];
+  peringatan: string[];
   proyeksiPengeluaran: number;
   proyeksiSaldo: number;
   rasioTabungan: number;
@@ -211,6 +226,7 @@ export interface DashboardData {
   sisaAman: SisaAman | null;
   perubahanKategori: PerubahanKategori[];
   wawasan: WawasanData;
+  otomatis: AturanView[];
   piutang: DebtView[];
   goals: GoalView[];
   posLain: { dd: number; tabungan: number; investasi: number; ddSisa: number };
@@ -460,6 +476,15 @@ export function bangunDashboard(state: State, hariIni: string): DashboardData {
   const skor = hitungSkorKesehatan({ rasioAnggaran, rasioTabungan, bulanDanaDarurat, saldoPositif: wadah.saldo >= 0 });
   const langganan = deteksiLangganan(state);
   const proyeksiPengeluaran = proyeksiPengeluaranBulan(pengeluaranBulanIni, hariIni);
+  const proyeksiSaldo = wadah.saldo - Math.max(0, proyeksiPengeluaran - pengeluaranBulanIni);
+  const peringatan: string[] = [];
+  if (rasioAnggaran >= 0.8) peringatan.push(`Anggaran periode sudah terpakai ${Math.round(rasioAnggaran * 100)}%.`);
+  if (proyeksiSaldo < 0) peringatan.push(`Proyeksi saldo akhir bulan ${rp(proyeksiSaldo)}.`);
+  if (sisaAman && sisaAman.habisDalamHari !== null && sisaAman.habisDalamHari < 7) peringatan.push(`Saldo diperkirakan habis dalam ${sisaAman.habisDalamHari} hari.`);
+  for (const item of langganan) {
+    const jeda = diffDays(item.perkiraanBerikut, hariIni);
+    if (jeda >= 0 && jeda <= 7) peringatan.push(`${item.nama} sekitar ${rp(item.nominal)} jatuh tempo ${item.perkiraanBerikut}.`);
+  }
 
   return {
     hariIni,
@@ -502,12 +527,14 @@ export function bangunDashboard(state: State, hariIni: string): DashboardData {
         `Tabungan + investasi ${Math.round(rasioTabungan * 100)}% dari total rencana.`,
         `Dana darurat + tabungan setara ${bulanDanaDarurat.toFixed(1)} bulan pengeluaran bulan ini.`,
       ],
+      peringatan,
       proyeksiPengeluaran,
-      proyeksiSaldo: wadah.saldo - Math.max(0, proyeksiPengeluaran - pengeluaranBulanIni),
+      proyeksiSaldo,
       rasioTabungan,
       langganan,
       totalLangganan: langganan.reduce((s, item) => s + item.nominal, 0),
     },
+    otomatis: [],
     piutang,
     goals,
     posLain: {

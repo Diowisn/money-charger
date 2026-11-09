@@ -1,6 +1,8 @@
 import type { ReactElement } from "react";
 import {
   IkonAsisten,
+  IkonImpor,
+  IkonOtomatis,
   IkonPos,
   IkonProfil,
   IkonPiutang,
@@ -18,6 +20,8 @@ export const MENU_LAIN: [Tab, string, (p: { aktif: boolean }) => ReactElement][]
   ["pos", "Pos pengeluaran", IkonPos],
   ["piutang", "Piutang & utang", IkonPiutang],
   ["target", "Target tabungan", IkonTarget],
+  ["otomatis", "Transaksi otomatis", IkonOtomatis],
+  ["impor", "Impor mutasi CSV", IkonImpor],
   ["asisten", "Asisten keuangan", IkonAsisten],
 ];
 
@@ -57,6 +61,8 @@ export const JUDUL_TAB: Record<Tab, string> = {
   pos: "Pos pengeluaran",
   piutang: "Piutang & utang",
   target: "Target tabungan",
+  otomatis: "Transaksi otomatis",
+  impor: "Impor mutasi CSV",
   asisten: "Asisten keuangan",
   lainnya: "Lainnya",
 };

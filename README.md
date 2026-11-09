@@ -5,7 +5,7 @@ Next.js di Vercel + Postgres online di Neon + Groq (AI cadangan). Tidak perlu me
 
 SRS SaaS adalah target masa depan; aplikasi ini masih satu pemilik. Multi-tenant, akun pelanggan, billing, dan isolasi data tenant belum tersedia—jangan buka sebagai layanan publik/berbayar.
 
-Acuan: [PRD Money-Charger SaaS](./prd-catatan-keuangan-whatsapp.md) dan [SRS](./srs-catatan-keuangan-whatsapp.md).
+Acuan: [PRD Money-Charger SaaS](./prd-catatan-keuangan-whatsapp.md) dan [SRS](./srs-catatan-keuangan-whatsapp.md). Roadmap fitur premium pribadi: [PRD premium pribadi](./prd-fitur-premium-pribadi.md) dan [SRS premium pribadi](./srs-fitur-premium-pribadi.md).
 
 ## Struktur
 
@@ -88,7 +88,7 @@ Untuk percobaan lokal, isi variabel WhatsApp berikut sesuai API Setup Meta: `WA_
 
 ```bash
 npm install
-npm run db:setup     # memastikan skema, mencatat baseline v1, seed default, dan whitelist nomor
+npm run db:setup     # memastikan skema, mencatat baseline v1/v2, seed default, dan whitelist nomor
 npm run lint
 npm run typecheck
 npm test
@@ -268,7 +268,9 @@ Isi dashboard:
 - **Ringkasan**: sisa uang, rasio terpakai, pendapatan/pengeluaran bulan ini, alokasi per grup, dan detail pos yang bisa dilipat.
 - **Sisa aman**: batas belanja harian dari sisa jatah periode, rata-rata belanja 14 hari, dan perkiraan berapa hari saldo masih cukup.
 - **Perubahan kategori**: kategori yang naik/turun paling besar dibanding bulan lalu di tab Rekap.
-- **Wawasan**: skor kesehatan finansial, proyeksi pengeluaran/saldo akhir bulan, rasio tabungan, deteksi langganan bulanan, dan daftar hal yang perlu diperhatikan.
+- **Wawasan**: skor kesehatan finansial, proyeksi pengeluaran/saldo akhir bulan, rasio tabungan, deteksi langganan bulanan, peringatan otomatis, dan daftar hal yang perlu diperhatikan.
+- **Transaksi otomatis**: aturan tagihan/langganan bulanan (nama, nominal, tanggal, pos). Cron yang sama dengan antrean WhatsApp mencatat transaksi pada tanggal jatuh tempo dan tidak menggandakan bulan yang sama.
+- **Impor mutasi CSV**: unggah/tempel CSV dengan kolom `tanggal,tipe,nominal` (opsional `label,pos,biaya_admin,wadah`), lengkap dengan deteksi duplikat.
 - **Rencana**: slider jatah per pos, Dana Darurat, Tabungan, dan Investasi. Simpan membuat versi rencana baru (versi lama diarsipkan). Opsi "berlaku juga di periode berjalan" menyesuaikan gaji periode aktif dan mencatat selisih ke Saldo.
 - **Transaksi**: catat pengeluaran, pemasukan, gaji, bonus, tarik, dan pindah; hapus transaksi (pembatalan, bukan hapus permanen). Menghapus gaji juga membatalkan alokasi dan selisihnya.
 - **Pos**: tambah pos (langsung masuk rencana aktif), ganti nama, tambah alias, nonaktifkan, dan setup awal sebelum gaji pertama.

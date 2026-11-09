@@ -47,6 +47,9 @@ beforeAll(async () => {
   );
   const versions = await adapter.query("SELECT version FROM schema_version ORDER BY version");
   expect(versions.rows.map((row) => row.version)).toEqual([1]);
+  const recurring = await adapter.query("SELECT to_regclass('public.recurring_rules') AS rules, to_regclass('public.recurring_runs') AS runs");
+  expect(recurring.rows[0].rules).toBeTruthy();
+  expect(recurring.rows[0].runs).toBeTruthy();
   const user = await adapter.query("INSERT INTO auth_users (email) VALUES ('test@example.com') RETURNING id");
   ownerId = user.rows[0].id;
   repo = new PgRepo(adapter, true, ownerId);

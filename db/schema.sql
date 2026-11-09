@@ -241,6 +241,28 @@ CREATE TABLE IF NOT EXISTS password_reset_tokens (
 CREATE INDEX IF NOT EXISTS idx_reset_tokens_user ON password_reset_tokens (user_id);
 CREATE INDEX IF NOT EXISTS idx_reset_tokens_expires ON password_reset_tokens (expires_at);
 
+CREATE TABLE IF NOT EXISTS recurring_rules (
+  id             BIGSERIAL PRIMARY KEY,
+  user_id        UUID REFERENCES auth_users(id) ON DELETE CASCADE,
+  nama           TEXT NOT NULL,
+  nominal        BIGINT NOT NULL CHECK (nominal > 0),
+  sub_post_id    INT REFERENCES sub_posts(id) ON DELETE SET NULL,
+  hari           INT NOT NULL CHECK (hari BETWEEN 1 AND 31),
+  mulai          DATE NOT NULL,
+  aktif          BOOLEAN NOT NULL DEFAULT TRUE,
+  terakhir_jalan DATE,
+  dibuat_pada    TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS idx_recurring_rules_aktif ON recurring_rules (aktif, user_id);
+
+CREATE TABLE IF NOT EXISTS recurring_runs (
+  rule_id        BIGINT NOT NULL REFERENCES recurring_rules(id) ON DELETE CASCADE,
+  periode        TEXT NOT NULL,
+  transaction_id BIGINT REFERENCES transactions(id) ON DELETE SET NULL,
+  dibuat_pada    TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (rule_id, periode)
+);
+
 CREATE TABLE IF NOT EXISTS schema_version (
   version INTEGER PRIMARY KEY,
   applied_at TIMESTAMPTZ NOT NULL DEFAULT now(),

@@ -20,7 +20,11 @@ async function main() {
     "INSERT INTO schema_version (version, description) VALUES ($1, $2) ON CONFLICT (version) DO NOTHING",
     [1, "Baseline skema saat ini; tidak merekam riwayat perubahan sebelum versioning diperkenalkan."],
   );
-  console.log("Skema siap. Baseline skema v1 tercatat.");
+  await getPool().query(
+    "INSERT INTO schema_version (version, description) VALUES ($1, $2) ON CONFLICT (version) DO NOTHING",
+    [2, "Transaksi berulang otomatis (recurring_rules, recurring_runs)."],
+  );
+  console.log("Skema siap. Baseline skema v1 dan v2 tercatat.");
 
   const seeded = await new PgRepo().seed(nomor);
   console.log(seeded ? "Draft 1 dan alias bawaan terisi." : "Data bawaan sudah ada, dilewati.");

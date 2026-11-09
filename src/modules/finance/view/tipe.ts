@@ -30,6 +30,8 @@ export type Tab =
   | "pos"
   | "piutang"
   | "target"
+  | "otomatis"
+  | "impor"
   | "asisten"
   | "lainnya";
 

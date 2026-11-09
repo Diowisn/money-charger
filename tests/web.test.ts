@@ -99,6 +99,7 @@ describe("dashboard", () => {
     expect(d.wawasan.skor).toBeGreaterThanOrEqual(0);
     expect(d.wawasan.skor).toBeLessThanOrEqual(100);
     expect(d.wawasan.faktor).toHaveLength(3);
+    expect(Array.isArray(d.wawasan.peringatan)).toBe(true);
     expect(d.wawasan.proyeksiPengeluaran).toBeGreaterThanOrEqual(0);
   });
 

@@ -9,8 +9,10 @@ import { kompresGambar } from "./view/gambar";
 import { IkonLainnya, IkonRekap, IkonRingkasan, IkonTambah, IkonTransaksi, IkonWawasan } from "./view/ikon";
 import { JUDUL_TAB, MENU_IDENTITAS, MENU_SAMPING, TAB_UTAMA, indukTab } from "./view/menu";
 import { Asisten } from "./view/tab-asisten";
+import { Impor } from "./view/tab-impor";
 import { Lainnya } from "./view/tab-lainnya";
 import { Piutang } from "./view/tab-piutang";
+import { Otomatis } from "./view/tab-otomatis";
 import { Pos } from "./view/tab-pos";
 import { Profil } from "./view/tab-profil";
 import { Rekap } from "./view/tab-rekap";
@@ -372,6 +374,8 @@ export default function Dashboard({ awal }: { awal: DashboardData }) {
           {tab === "pos" ? <Pos data={data} kirim={kirim} sibuk={sibuk} mintaKonfirmasi={mintaKonfirmasi} /> : null}
           {tab === "piutang" ? <Piutang data={data} kirim={kirim} sibuk={sibuk} mintaKonfirmasi={mintaKonfirmasi} /> : null}
           {tab === "target" ? <Target data={data} kirim={kirim} sibuk={sibuk} mintaKonfirmasi={mintaKonfirmasi} /> : null}
+          {tab === "otomatis" ? <Otomatis data={data} kirim={kirim} sibuk={sibuk} mintaKonfirmasi={mintaKonfirmasi} /> : null}
+          {tab === "impor" ? <Impor kirim={kirim} sibuk={sibuk} /> : null}
           {tab === "asisten" ? <Asisten /> : null}
           {tab === "lainnya" ? <Lainnya navigasi={navigasiKe} /> : null}
         </main>

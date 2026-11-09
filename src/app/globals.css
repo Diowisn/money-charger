@@ -1132,7 +1132,8 @@ input[type="range"] {
 }
 
 input,
-select {
+select,
+textarea {
   width: 100%;
   min-height: 46px;
   padding: 11px 12px;
@@ -1145,12 +1146,14 @@ select {
 }
 
 input:hover,
-select:hover {
+select:hover,
+textarea:hover {
   border-color: var(--aksen);
 }
 
 input:focus,
-select:focus {
+select:focus,
+textarea:focus {
   outline: none;
   border-color: var(--aksen-kuat);
   background: var(--kartu);
@@ -2648,6 +2651,18 @@ body {
 
 .wawasan-daftar small {
   font-weight: 400;
+}
+
+.kode-contoh {
+  overflow-x: auto;
+  margin: 10px 0;
+  padding: 12px;
+  border-radius: 12px;
+  background: var(--bg);
+  border: 1px solid var(--garis);
+  font-size: 0.75rem;
+  line-height: 1.5;
+  white-space: pre;
 }
 
 @media (max-width: 720px) {

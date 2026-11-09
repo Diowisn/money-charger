@@ -237,3 +237,9 @@ Rilis R0 ditahan bila akun kedua dapat dibuat, sesi yang dicabut tetap berlaku, 
 - **R1:** target pasar, isolasi skema/tenant, onboarding Meta, email verification, dukungan, kebijakan privasi/retensi/penghapusan, dan akses admin.
 - **R2:** paket/harga/kuota, gateway, jadwal dan prorata, retry/masa tenggang, pembatalan/refund, invoice/pajak, serta akses ekspor setelah berhenti.
 - Jangan menetapkan harga, SLA, retensi hukum, atau klaim kepatuhan tanpa validasi pihak yang sesuai.
+
+## 14. Lampiran fitur premium pribadi
+
+Spesifikasi implementasi fitur kelas berbayar untuk pemakaian pribadi ada di [SRS fitur premium pribadi](./srs-fitur-premium-pribadi.md), dengan ringkasan produk di [PRD fitur premium pribadi](./prd-fitur-premium-pribadi.md). Tidak ada billing/tenant pada tahap ini.
+
+Status ringkas: skema v2 (`recurring_rules`, `recurring_runs`), worker transaksi berulang, API `/api/recurring`, impor CSV `/api/import`, dan data Wawasan sudah diimplementasikan.

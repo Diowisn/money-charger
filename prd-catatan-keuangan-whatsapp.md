@@ -251,3 +251,9 @@ Keputusan berikut harus ditutup sebelum rilis yang menyentuh area terkait:
 - Webhook pembayaran terverifikasi, idempoten, tahan replay, dan dapat direkonsiliasi dengan provider.
 - Kasus sukses/gagal, duplikat, terlambat, refund, pembatalan, masa tenggang, dan perubahan paket diuji.
 - Ketentuan harga, pembayaran, privasi, refund, dukungan, pajak/nota, dan penanganan data setelah berhenti ditinjau sebelum aktivasi produksi.
+
+## 16. Lampiran fitur premium pribadi
+
+Fitur kelas berbayar untuk pemakaian pribadi—tanpa billing/paywall—dicatat terpisah agar mudah dilanjutkan di sesi berikutnya: [PRD fitur premium pribadi](./prd-fitur-premium-pribadi.md). Dokumen teknisnya: [SRS fitur premium pribadi](./srs-fitur-premium-pribadi.md).
+
+Status ringkas: Wawasan, transaksi berulang, impor CSV, dan peringatan dalam aplikasi sudah ada. Berikutnya digest WhatsApp, multi-dompet, laporan lanjutan, AI Pro, kolaborasi, dan keamanan.
