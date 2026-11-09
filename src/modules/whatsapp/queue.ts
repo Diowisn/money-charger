@@ -1,5 +1,5 @@
 import { catatAudit } from "@/lib/audit";
-import { tanganiPesan } from "@/lib/handler";
+import { tanganiPesan } from "./handler";
 import { klaimInbound, selesaikanInbound } from "@/lib/inbound-queue";
 import { kirimOutbox } from "@/lib/outbox";
 import { PgRepo } from "@/lib/pg-repo";

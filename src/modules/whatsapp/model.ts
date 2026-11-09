@@ -2,7 +2,7 @@ import { buatGroqClient } from "@/lib/ai";
 import { buatGroqVisionClient } from "@/lib/ai-vision";
 import { antreInbound } from "@/lib/inbound-queue";
 import { ekstrakPesan, unduhMediaWhatsapp, verifySignature } from "@/lib/whatsapp";
-import type { Deps } from "@/lib/handler";
+import type { Deps } from "./handler";
 
 export function tokenVerifikasi(): string | undefined {
   return process.env.WA_VERIFY_TOKEN;

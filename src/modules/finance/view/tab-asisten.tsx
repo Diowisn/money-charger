@@ -1,0 +1,149 @@
+import { useEffect, useRef, useState } from "react";
+import { Tombol } from "@/components/tombol";
+import { formatMarkdown } from "./format";
+import type { ChatPesan } from "./tipe";
+
+function JawabanRapi({ teks }: { teks: string }) {
+  const isi = teks.replace(/\r\n?/g, "\n").trim();
+  const blok = isi.split(/\n\s*\n/).filter(Boolean);
+  const renderBaris = (baris: string, i: number) => {
+    const teksBaris = baris.trim();
+    if (/^\*\*[^*]+\*\*$/.test(teksBaris)) {
+      return <h3 key={i}>{teksBaris.slice(2, -2)}</h3>;
+    }
+    const item = teksBaris.match(/^(?:[-*]\s+|\d+[.)]\s+)(.+)$/);
+    if (!item) return <p key={i}>{formatMarkdown(teksBaris)}</p>;
+    const nomor = baris.trim().match(/^(\d+)[.)]/)?.[1];
+    return (
+      <div className="jawaban-item" key={i}>
+        <span>{nomor ?? "•"}</span>
+        <p>{formatMarkdown(item[1])}</p>
+      </div>
+    );
+  };
+
+  return (
+    <div className="jawaban-rapi">
+      {blok.map((bagian, i) => {
+        const baris = bagian.split("\n").filter((b) => b.trim());
+        const daftar = baris.every((b) => /^(?:[-*]\s+|\d+[.)]\s+)/.test(b.trim()));
+        return daftar ? (
+          <div className="jawaban-daftar" key={i}>{baris.map(renderBaris)}</div>
+        ) : (
+          <div className="jawaban-blok" key={i}>{baris.map(renderBaris)}</div>
+        );
+      })}
+    </div>
+  );
+}
+
+const SARAN_TANYA = [
+  "Pos apa yang paling boros bulan ini?",
+  "Bagaimana cara menabung lebih banyak?",
+  "Ringkas kondisi keuanganku.",
+  "Sisa uangku cukup sampai gaji berikutnya?",
+];
+
+export function Asisten() {
+  const [riwayat, setRiwayat] = useState<ChatPesan[]>([]);
+  const [teks, setTeks] = useState("");
+  const [sibuk, setSibuk] = useState(false);
+  const [galat, setGalat] = useState<string | null>(null);
+  const ujung = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    ujung.current?.scrollIntoView({ behavior: "smooth", block: "end" });
+  }, [riwayat, sibuk]);
+
+  async function kirimTanya(pertanyaan: string) {
+    const isi = pertanyaan.trim();
+    if (!isi || sibuk) return;
+    setGalat(null);
+    setRiwayat((r) => [...r, { peran: "user", teks: isi }]);
+    setTeks("");
+    setSibuk(true);
+    try {
+      const res = await fetch("/api/insight", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ pertanyaan: isi }),
+      });
+      if (res.status === 401) {
+        window.location.href = "/login";
+        return;
+      }
+      const j = (await res.json().catch(() => ({}))) as { ok?: boolean; jawaban?: string; error?: string };
+      if (!res.ok || !j.ok || !j.jawaban) {
+        setGalat(j.error ?? "Asisten gagal menjawab.");
+        return;
+      }
+      setRiwayat((r) => [...r, { peran: "ai", teks: j.jawaban! }]);
+    } catch {
+      setGalat("Tidak bisa menghubungi server.");
+    } finally {
+      setSibuk(false);
+    }
+  }
+
+  return (
+    <div className="tumpuk sempit">
+      <section className="kartu">
+        <h2>Tanya Asisten</h2>
+        <p className="muted">
+          Jawaban memakai data keuangan di dashboard ini. Asisten tidak mengubah transaksi.
+        </p>
+
+        {riwayat.length === 0 ? (
+          <div className="saran-chat">
+            {SARAN_TANYA.map((s) => (
+              <button key={s} type="button" className="chip" onClick={() => void kirimTanya(s)}>
+                {s}
+              </button>
+            ))}
+          </div>
+        ) : null}
+
+        <div className="chat" aria-live="polite">
+          {riwayat.map((m, i) => (
+            <div key={i} className={`chat-pesan ${m.peran}`}>
+              {m.peran === "ai" ? <JawabanRapi teks={m.teks} /> : m.teks}
+            </div>
+          ))}
+          {sibuk ? <div className="chat-pesan ai muted">Sedang membaca data...</div> : null}
+          <div ref={ujung} />
+        </div>
+
+        {galat ? <p className="merah kecil">{galat}</p> : null}
+
+        <form
+          className="chat-form"
+          onSubmit={(e) => {
+            e.preventDefault();
+            void kirimTanya(teks);
+          }}
+        >
+          <input
+            value={teks}
+            onChange={(e) => setTeks(e.target.value)}
+            placeholder="Tulis pertanyaan tentang keuanganmu..."
+            maxLength={400}
+            disabled={sibuk}
+            aria-label="Pertanyaan untuk asisten"
+          />
+          <Tombol type="submit" disabled={sibuk || teks.trim().length < 3}>
+            Kirim
+          </Tombol>
+        </form>
+        <p className="muted kecil">
+          {riwayat.length ? (
+            <Tombol varian="tautan" onClick={() => setRiwayat([])}>
+              Bersihkan percakapan
+            </Tombol>
+          ) : (
+            "Butuh GROQ_API_KEY agar asisten aktif."
+          )}
+        </p>
+      </section>
+    </div>
+  );
+}
