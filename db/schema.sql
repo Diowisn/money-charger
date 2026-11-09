@@ -85,6 +85,7 @@ CREATE TABLE IF NOT EXISTS transactions (
 );
 CREATE INDEX IF NOT EXISTS idx_tx_tanggal ON transactions (tanggal);
 CREATE INDEX IF NOT EXISTS idx_tx_induk ON transactions (induk_id);
+CREATE INDEX IF NOT EXISTS idx_tx_user_id ON transactions (user_id, id);
 ALTER TABLE transactions ADD COLUMN IF NOT EXISTS biaya_admin BIGINT NOT NULL DEFAULT 0 CHECK (biaya_admin >= 0);
 ALTER TABLE transactions ADD COLUMN IF NOT EXISTS detail JSONB NOT NULL DEFAULT '{}'::jsonb;
 

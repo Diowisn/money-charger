@@ -33,7 +33,8 @@ type Tab =
   | "pos"
   | "piutang"
   | "target"
-  | "asisten";
+  | "asisten"
+  | "lainnya";
 type StatusLive = "hidup" | "terputus";
 
 const INTERVAL_LIVE_MS = 5000;
@@ -228,6 +229,17 @@ function IkonKeluar({ aktif }: { aktif: boolean }) {
   );
 }
 
+function IkonLainnya({ aktif }: { aktif: boolean }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={aktif ? 2.4 : 1.8}>
+      <rect x="4" y="4" width="6" height="6" rx="1.5" />
+      <rect x="14" y="4" width="6" height="6" rx="1.5" />
+      <rect x="4" y="14" width="6" height="6" rx="1.5" />
+      <rect x="14" y="14" width="6" height="6" rx="1.5" />
+    </svg>
+  );
+}
+
 const BULAN_PENDEK = ["Jan", "Feb", "Mar", "Apr", "Mei", "Jun", "Jul", "Agu", "Sep", "Okt", "Nov", "Des"];
 
 function tanggalPendek(iso: string) {
@@ -349,7 +361,16 @@ const JUDUL_TAB: Record<Tab, string> = {
   piutang: "Piutang & utang",
   target: "Target tabungan",
   asisten: "Asisten keuangan",
+  lainnya: "Lainnya",
 };
+
+const TAB_UTAMA = new Set<Tab>(["ringkasan", "riwayat", "rekap"]);
+
+function indukTab(tab: Tab): Tab {
+  if (tab === "ubah-profil") return "profil";
+  if (TAB_IDENTITAS.has(tab) || tab === "lainnya" || TAB_UTAMA.has(tab)) return "ringkasan";
+  return "lainnya";
+}
 
 function drafRencana(data: DashboardData): Record<string, number> {
   const d: Record<string, number> = {
@@ -641,8 +662,8 @@ export default function Dashboard({ awal }: { awal: DashboardData }) {
             <button
               className="header-back"
               type="button"
-              onClick={() => navigasiKe(tab === "profil" ? "ringkasan" : TAB_IDENTITAS.has(tab) ? "profil" : "ringkasan")}
-              aria-label={tab === "profil" ? "Kembali ke beranda" : TAB_IDENTITAS.has(tab) ? "Kembali ke identitas diri" : "Kembali ke beranda"}
+              onClick={() => navigasiKe(indukTab(tab))}
+              aria-label={`Kembali ke ${JUDUL_TAB[indukTab(tab)].toLowerCase()}`}
             >
               ←
             </button>
@@ -863,6 +884,7 @@ export default function Dashboard({ awal }: { awal: DashboardData }) {
           {tab === "piutang" ? <Piutang data={data} kirim={kirim} sibuk={sibuk} mintaKonfirmasi={mintaKonfirmasi} /> : null}
           {tab === "target" ? <Target data={data} kirim={kirim} sibuk={sibuk} mintaKonfirmasi={mintaKonfirmasi} /> : null}
           {tab === "asisten" ? <Asisten /> : null}
+          {tab === "lainnya" ? <Lainnya navigasi={navigasiKe} /> : null}
         </main>
 
         <input
@@ -915,22 +937,25 @@ export default function Dashboard({ awal }: { awal: DashboardData }) {
               ["ringkasan", "Beranda", IkonRingkasan],
               ["riwayat", "Transaksi", IkonTransaksi],
               ["rekap", "Rekap", IkonRekap],
-              ["profil", "Profil", IkonProfil],
+              ["lainnya", "Lainnya", IkonLainnya],
             ] as [Tab, string, (p: { aktif: boolean }) => ReactElement][]
-          ).map(([id, label, Ikon]) => (
-            <button
-              key={id}
-              type="button"
-              className={`nav-item${tab === id || (id === "profil" && TAB_IDENTITAS.has(tab)) ? " aktif" : ""}`}
-              aria-current={tab === id || (id === "profil" && TAB_IDENTITAS.has(tab)) ? "page" : undefined}
-              onClick={() => {
-                navigasiKe(id);
-              }}
-            >
-              <Ikon aktif={tab === id} />
-              <span>{label}</span>
-            </button>
-          ))}
+          ).map(([id, label, Ikon]) => {
+            const aktif = tab === id || (id === "lainnya" && !TAB_UTAMA.has(tab));
+            return (
+              <button
+                key={id}
+                type="button"
+                className={`nav-item${aktif ? " aktif" : ""}`}
+                aria-current={aktif ? "page" : undefined}
+                onClick={() => {
+                  navigasiKe(id);
+                }}
+              >
+                <Ikon aktif={aktif} />
+                <span>{label}</span>
+              </button>
+            );
+          })}
         </nav>
 
         <footer className="kaki">
@@ -1227,6 +1252,31 @@ async function fileKeAvatar(file: File): Promise<string> {
   const tinggi = image.height * skala;
   ctx.drawImage(image, (size - lebar) / 2, (size - tinggi) / 2, lebar, tinggi);
   return canvas.toDataURL("image/jpeg", 0.82);
+}
+
+const MENU_LAINNYA: [Tab, string, (p: { aktif: boolean }) => ReactElement][] = [
+  ["rencana", "Rencana bulanan", IkonRencana],
+  ...MENU_LAIN,
+  ["profil", "Profil saya", IkonProfil],
+];
+
+function Lainnya({ navigasi }: { navigasi: (tab: Tab) => void }) {
+  return (
+    <div className="profil">
+      <section>
+        <h2 className="profil-subjudul">Menu lainnya</h2>
+        <div className="profil-daftar">
+          {MENU_LAINNYA.map(([id, label, Ikon]) => (
+            <button key={id} type="button" onClick={() => navigasi(id)}>
+              <Ikon aktif={false} />
+              <span>{label}</span>
+              <IkonPanah />
+            </button>
+          ))}
+        </div>
+      </section>
+    </div>
+  );
 }
 
 function Profil({
@@ -1707,10 +1757,15 @@ function Rencana({
 }) {
   const [draf, setDraf] = useState<Record<string, number>>(() => drafRencana(data));
   const [sekarang, setSekarang] = useState(true);
+  const [gajiPokok, setGajiPokok] = useState(String(data.pengaturan.gajiPokok));
 
   useEffect(() => {
     setDraf(drafRencana(data));
   }, [data.versiRencana]);
+
+  useEffect(() => {
+    setGajiPokok(String(data.pengaturan.gajiPokok));
+  }, [data.pengaturan.gajiPokok]);
 
   const ubah = (key: string, v: number) => setDraf((d) => ({ ...d, [key]: Math.max(0, Math.round(v)) }));
   const total = useMemo(() => Object.values(draf).reduce((s, v) => s + v, 0), [draf]);
@@ -1725,6 +1780,10 @@ function Rencana({
     items.push({ tipe: "tabungan", subPostId: null, nominal: draf.tabungan ?? 0 });
     items.push({ tipe: "investasi", subPostId: null, nominal: draf.investasi ?? 0 });
     await kirim("/api/plan", "POST", { items, sekarang });
+  }
+
+  async function simpanGajiPokok() {
+    await kirim("/api/pengaturan", "POST", { gajiPokok: Math.round(Number(gajiPokok || 0)) });
   }
 
   return (
@@ -1742,6 +1801,28 @@ function Rencana({
         <p className="muted">
           Geser jatah tiap pos. Perubahan disimpan sebagai versi rencana baru, versi lama tetap tersimpan.
         </p>
+      </section>
+
+      <section className="kartu">
+        <h2>Gaji Pokok</h2>
+        <p className="muted">
+          Dipakai sebagai acuan peringatan saat total rencana tidak sama dengan gaji pokok. Bisa diubah kapan saja.
+        </p>
+        <div className="form">
+          <label>
+            Gaji pokok (Rp)
+            <input
+              type="number"
+              min={1}
+              step={10000}
+              value={gajiPokok}
+              onChange={(e) => setGajiPokok(e.target.value)}
+            />
+          </label>
+          <Tombol lebar onClick={() => void simpanGajiPokok()} disabled={sibuk || Number(gajiPokok) < 1}>
+            {sibuk ? "Menyimpan..." : "Simpan gaji pokok"}
+          </Tombol>
+        </div>
       </section>
 
       {data.grup.map((g) => (

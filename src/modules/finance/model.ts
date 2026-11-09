@@ -11,6 +11,7 @@ import {
   gantiNamaPos,
   nabungGoal,
   nonaktifkanPos,
+  simpanGajiPokok,
   simpanRencana,
   simpanSetup,
   tambahAliasPos,
@@ -83,6 +84,11 @@ export async function simpanSetupFinance(body: {
   investasiAwal: number;
 }, userId: string) {
   return simpanSetup(new PgRepo(undefined, undefined, userId), wibDate(Date.now()), body);
+}
+
+export async function simpanGajiPokokFinance(nominal: number, userId: string) {
+  await simpanGajiPokok(new PgRepo(undefined, undefined, userId), nominal);
+  await catatAudit("web", "gaji_pokok_diubah", { nominal });
 }
 
 export async function tambahDebtFinance(input: InputDebt, userId: string) {

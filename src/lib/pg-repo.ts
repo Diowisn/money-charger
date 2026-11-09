@@ -27,7 +27,7 @@ export function getPool(): Pool {
   if (!pool) {
     const url = process.env.DATABASE_URL;
     if (!url) throw new Error("DATABASE_URL belum diatur");
-    pool = new Pool({ connectionString: url, max: 1, idleTimeoutMillis: 10_000 });
+    pool = new Pool({ connectionString: url, max: 5, idleTimeoutMillis: 10_000 });
   }
   return pool;
 }
@@ -231,29 +231,43 @@ export class PgRepo implements Repo {
   }
 
   async setConfig(k: string, v: string) {
-    await this.db.query(
-      "INSERT INTO config (user_id, kunci, nilai) VALUES ($1,$2,$3) ON CONFLICT DO NOTHING",
-      [this.financeUser(), k, v],
-    );
+    const userId = this.financeUser();
+    if (userId) {
+      await this.db.query(
+        `INSERT INTO config (user_id, kunci, nilai) VALUES ($1,$2,$3)
+         ON CONFLICT (user_id, kunci) WHERE user_id IS NOT NULL
+         DO UPDATE SET nilai = EXCLUDED.nilai`,
+        [userId, k, v],
+      );
+    } else {
+      await this.db.query(
+        `INSERT INTO config (user_id, kunci, nilai) VALUES (NULL,$1,$2)
+         ON CONFLICT (kunci) WHERE user_id IS NULL
+         DO UPDATE SET nilai = EXCLUDED.nilai`,
+        [k, v],
+      );
+    }
   }
 
   async createPlanVersion(nama: string, status: "aktif" | "usulan" | "arsip", items: PlanItem[]) {
     const userId = this.financeUser();
-    for (const it of items) {
-      if (it.subPostId !== null) {
-        const subPost = await this.db.query(
-          "SELECT 1 FROM sub_posts WHERE id = $1 AND user_id IS NOT DISTINCT FROM $2",
-          [it.subPostId, userId],
-        );
-        if (subPost.rowCount === 0) throw new Error("Plan item references an unavailable sub-post");
-      }
+    const subIds = items.map((i) => i.subPostId).filter((x): x is number => x !== null);
+    if (subIds.length) {
+      const found = await this.db.query(
+        "SELECT id FROM sub_posts WHERE user_id IS NOT DISTINCT FROM $1 AND id = ANY($2::int[])",
+        [userId, subIds],
+      );
+      const tersedia = new Set(found.rows.map((r) => r.id as number));
+      if (subIds.some((id) => !tersedia.has(id))) throw new Error("Plan item references an unavailable sub-post");
     }
     const r = await this.db.query("INSERT INTO plan_versions (user_id, nama, status) VALUES ($1,$2,$3) RETURNING id", [userId, nama, status]);
     const id = r.rows[0].id as number;
-    for (const it of items) {
+    if (items.length) {
       await this.db.query(
-        "INSERT INTO plan_items (user_id, plan_version_id, tipe, sub_post_id, nominal) VALUES ($1,$2,$3,$4,$5)",
-        [userId, id, it.tipe, it.subPostId, it.nominal],
+        `INSERT INTO plan_items (user_id, plan_version_id, tipe, sub_post_id, nominal)
+         SELECT $1, $2, t.tipe, t.sub_post_id, t.nominal
+         FROM unnest($3::text[], $4::int[], $5::bigint[]) AS t(tipe, sub_post_id, nominal)`,
+        [userId, id, items.map((i) => i.tipe), items.map((i) => i.subPostId), items.map((i) => i.nominal)],
       );
     }
     return id;

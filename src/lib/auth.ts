@@ -55,6 +55,15 @@ export async function tolakJikaBelumLogin(req: NextRequest): Promise<Response | 
   return null;
 }
 
+/** Validasi sesi sekali saja; hasilnya dipakai ulang oleh handler (hemat satu query per request). */
+export async function pemilikRequest(req: NextRequest): Promise<{ userId: string } | { tolak: Response }> {
+  const userId = await userIdDariRequest(req);
+  if (!userId) {
+    return { tolak: Response.json({ ok: false, error: "Sesi habis. Silakan login ulang." }, { status: 401 }) };
+  }
+  return { userId };
+}
+
 export function normalisasiNomorWa(nomor: string): string {
   const digit = nomor.replace(/\D/g, "");
   if (!digit) return "";

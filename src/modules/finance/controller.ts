@@ -1,5 +1,5 @@
 import type { NextRequest } from "next/server";
-import { tolakJikaBelumLogin, userIdDariRequest } from "@/lib/auth";
+import { pemilikRequest } from "@/lib/auth";
 import { AksiError } from "@/lib/web-actions";
 import {
   batalkanDebtFinance,
@@ -9,6 +9,7 @@ import {
   kelolaPos,
   muatDashboard,
   nabungGoalFinance,
+  simpanGajiPokokFinance,
   simpanRencanaFinance,
   simpanSetupFinance,
   tambahDebtFinance,
@@ -18,10 +19,9 @@ import {
 import { bacaBody, dashboard, galat, ok } from "./view";
 
 export async function getDashboard(req: NextRequest) {
-  const tolak = await tolakJikaBelumLogin(req);
-  if (tolak) return tolak;
-  const userId = await userIdDariRequest(req);
-  if (!userId) return Response.json({ ok: false, error: "unauthorized" }, { status: 401 });
+  const auth = await pemilikRequest(req);
+  if ("tolak" in auth) return auth.tolak;
+  const userId = auth.userId;
   try {
     return dashboard(await muatDashboard(userId));
   } catch (e) {
@@ -31,10 +31,9 @@ export async function getDashboard(req: NextRequest) {
 }
 
 export async function postPlan(req: NextRequest) {
-  const tolak = await tolakJikaBelumLogin(req);
-  if (tolak) return tolak;
-  const userId = await userIdDariRequest(req);
-  if (!userId) return Response.json({ ok: false, error: "unauthorized" }, { status: 401 });
+  const auth = await pemilikRequest(req);
+  if ("tolak" in auth) return auth.tolak;
+  const userId = auth.userId;
   try {
     const body = await bacaBody(req);
     const items = Array.isArray(body.items) ? body.items : [];
@@ -46,10 +45,9 @@ export async function postPlan(req: NextRequest) {
 }
 
 export async function postTransaction(req: NextRequest) {
-  const tolak = await tolakJikaBelumLogin(req);
-  if (tolak) return tolak;
-  const userId = await userIdDariRequest(req);
-  if (!userId) return Response.json({ ok: false, error: "unauthorized" }, { status: 401 });
+  const auth = await pemilikRequest(req);
+  if ("tolak" in auth) return auth.tolak;
+  const userId = auth.userId;
   try {
     const body = await bacaBody(req);
     return ok(await tambahTransaksiFinance(body as unknown as Parameters<typeof tambahTransaksiFinance>[0], userId));
@@ -59,10 +57,9 @@ export async function postTransaction(req: NextRequest) {
 }
 
 export async function deleteTransaction(req: NextRequest) {
-  const tolak = await tolakJikaBelumLogin(req);
-  if (tolak) return tolak;
-  const userId = await userIdDariRequest(req);
-  if (!userId) return Response.json({ ok: false, error: "unauthorized" }, { status: 401 });
+  const auth = await pemilikRequest(req);
+  if ("tolak" in auth) return auth.tolak;
+  const userId = auth.userId;
   try {
     const body = await bacaBody(req);
     const pesan = await batalkanTransaksiFinance(Number(body.id), userId);
@@ -73,10 +70,9 @@ export async function deleteTransaction(req: NextRequest) {
 }
 
 export async function postPosition(req: NextRequest) {
-  const tolak = await tolakJikaBelumLogin(req);
-  if (tolak) return tolak;
-  const userId = await userIdDariRequest(req);
-  if (!userId) return Response.json({ ok: false, error: "unauthorized" }, { status: 401 });
+  const auth = await pemilikRequest(req);
+  if ("tolak" in auth) return auth.tolak;
+  const userId = auth.userId;
   try {
     const body = await bacaBody(req);
     const hasil = await kelolaPos(body, userId);
@@ -87,10 +83,9 @@ export async function postPosition(req: NextRequest) {
 }
 
 export async function postDebt(req: NextRequest) {
-  const tolak = await tolakJikaBelumLogin(req);
-  if (tolak) return tolak;
-  const userId = await userIdDariRequest(req);
-  if (!userId) return Response.json({ ok: false, error: "unauthorized" }, { status: 401 });
+  const auth = await pemilikRequest(req);
+  if ("tolak" in auth) return auth.tolak;
+  const userId = auth.userId;
   try {
     const body = await bacaBody(req);
     const aksi = String(body.aksi ?? "");
@@ -113,10 +108,9 @@ export async function postDebt(req: NextRequest) {
 }
 
 export async function postGoal(req: NextRequest) {
-  const tolak = await tolakJikaBelumLogin(req);
-  if (tolak) return tolak;
-  const userId = await userIdDariRequest(req);
-  if (!userId) return Response.json({ ok: false, error: "unauthorized" }, { status: 401 });
+  const auth = await pemilikRequest(req);
+  if ("tolak" in auth) return auth.tolak;
+  const userId = auth.userId;
   try {
     const body = await bacaBody(req);
     const aksi = String(body.aksi ?? "");
@@ -138,10 +132,9 @@ export async function postGoal(req: NextRequest) {
 }
 
 export async function postSetup(req: NextRequest) {
-  const tolak = await tolakJikaBelumLogin(req);
-  if (tolak) return tolak;
-  const userId = await userIdDariRequest(req);
-  if (!userId) return Response.json({ ok: false, error: "unauthorized" }, { status: 401 });
+  const auth = await pemilikRequest(req);
+  if ("tolak" in auth) return auth.tolak;
+  const userId = auth.userId;
   try {
     const body = await bacaBody(req);
     await simpanSetupFinance({
@@ -151,6 +144,18 @@ export async function postSetup(req: NextRequest) {
       investasiAwal: Number(body.investasiAwal ?? 0),
     }, userId);
     return ok();
+  } catch (e) {
+    return galat(e);
+  }
+}
+
+export async function postPengaturan(req: NextRequest) {
+  const auth = await pemilikRequest(req);
+  if ("tolak" in auth) return auth.tolak;
+  try {
+    const body = await bacaBody(req);
+    await simpanGajiPokokFinance(Number(body.gajiPokok), auth.userId);
+    return ok({ pesan: "Gaji pokok diperbarui." });
   } catch (e) {
     return galat(e);
   }

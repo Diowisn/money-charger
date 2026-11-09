@@ -401,6 +401,13 @@ export async function simpanSetup(r: Repo, hariIni: string, input: InputSetup): 
   });
 }
 
+export async function simpanGajiPokok(r: Repo, nominal: number): Promise<void> {
+  const n = bulat(nominal, false);
+  await r.transaction(async (tx) => {
+    await tx.setConfig("gaji_pokok", String(n));
+  });
+}
+
 export interface InputDebt {
   jenis: DebtJenis | string;
   nama: string;

@@ -11,6 +11,7 @@ import {
   nonaktifkanPos,
   simpanRencana,
   simpanSetup,
+  simpanGajiPokok,
   tambahAliasPos,
   tambahDebt,
   tambahPos,
@@ -220,5 +221,18 @@ describe("piutang/utang web", () => {
     await batalkanDebt(repo, id);
     const state = await repo.load();
     expect(state.debts.find((d) => d.id === id)!.status).toBe("batal");
+  });
+});
+
+describe("gaji pokok web", () => {
+  it("menyimpan gaji pokok baru kapan saja", async () => {
+    const repo = await repoDenganGaji();
+    await simpanGajiPokok(repo, 2_500_000);
+    expect((await repo.load()).config.gajiPokok).toBe(2_500_000);
+  });
+
+  it("menolak gaji pokok nol atau negatif", async () => {
+    await expect(simpanGajiPokok(new MemRepo(), 0)).rejects.toBeInstanceOf(AksiError);
+    await expect(simpanGajiPokok(new MemRepo(), -1)).rejects.toBeInstanceOf(AksiError);
   });
 });

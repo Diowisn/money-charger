@@ -52,6 +52,14 @@ describe("PgRepo di Postgres sungguhan", () => {
     expect(s.config.bonusSubPostId).not.toBeNull();
   });
 
+  it("setConfig memperbarui nilai yang sudah ada", async () => {
+    const r = new PgRepo(adapter, true, ownerId);
+    await r.setConfig("gaji_pokok", "2500000");
+    expect((await r.load()).config.gajiPokok).toBe(2_500_000);
+    await r.setConfig("gaji_pokok", "1800000");
+    expect((await r.load()).config.gajiPokok).toBe(1_800_000);
+  });
+
   it("job tanpa sesi memakai email akun atau akun pertama sebagai pemilik", async () => {
     const repo = new PgRepo(adapter);
     expect(await repo.firstUserId()).toBe(ownerId);
@@ -72,9 +80,10 @@ describe("PgRepo di Postgres sungguhan", () => {
     await kirim("set makan 400rb", "2026-11-07");
     await kirim("gaji masuk 1.8 juta", "2026-11-30");
     const w = hitungWadah(await repo.load());
+    // setup saldo 300rb kini benar-benar tersimpan (dulu setConfig ON CONFLICT DO NOTHING).
     // sisa periode 1 = 1.200.000 - 25.000 - 40.000 + DD 100.000 = 1.235.000 ; Saldo = 275.000 + 1.235.000 = 1.510.000
     // set makan 400rb membuat total rencana 1.850.000, jadi gaji 1.800.000 kurang 50.000 -> Saldo -50.000 (AC-10)
-    expect(w).toEqual({ saldo: 1_160_000, tabungan: 800_000, investasi: 200_000 });
+    expect(w).toEqual({ saldo: 1_460_000, tabungan: 800_000, investasi: 200_000 });
     expect(await tanganiPesan(repo, { ai: null }, { id: "x", from: "62999", type: "text", text: "saldo", timestampMs: at("2026-11-30") })).toBeNull();
   });
 

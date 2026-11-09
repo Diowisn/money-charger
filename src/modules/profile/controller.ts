@@ -1,13 +1,11 @@
 import type { NextRequest } from "next/server";
 import { bacaBody, galat, ok } from "@/lib/api";
-import { tolakJikaBelumLogin, userIdDariRequest } from "@/lib/auth";
+import { userIdDariRequest } from "@/lib/auth";
 import { AksiError } from "@/lib/web-actions";
 import { logoutBerhasil } from "@/modules/auth/view";
 import { ambilProfil, gantiPassword, hapusAkun, ubahProfil } from "./model";
 
 async function userId(req: NextRequest): Promise<string | Response> {
-  const tolak = await tolakJikaBelumLogin(req);
-  if (tolak) return tolak;
   const id = await userIdDariRequest(req);
   if (!id) return Response.json({ ok: false, error: "Sesi habis. Silakan login ulang." }, { status: 401 });
   return id;
