@@ -2555,9 +2555,46 @@ body {
 .transaksi-terakhir,
 .rekap-grafik,
 .rekap-tren,
-.rekap-terakhir {
+.rekap-terakhir,
+.sisa-aman,
+.rekap-kategori {
   padding: 18px;
   border-radius: 20px;
+}
+
+.sisa-aman .angka-besar {
+  margin-top: 6px;
+}
+
+.rekap-kategori ul {
+  margin: 8px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.rekap-kategori li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 9px 0;
+  border-bottom: 1px solid var(--garis);
+}
+
+.rekap-kategori li:last-child {
+  border-bottom: 0;
+}
+
+.delta-naik {
+  color: var(--merah);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.delta-turun {
+  color: var(--hijau);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
 }
 
 .daftar-rapi {

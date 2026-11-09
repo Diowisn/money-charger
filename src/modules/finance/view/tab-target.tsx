@@ -110,6 +110,11 @@ export function Target({
                     Terkumpul {rp(g.terkumpul)} dari {rp(g.targetNominal)} (sisa {rp(g.sisa)})
                     {g.targetTanggal ? ` · target ${g.targetTanggal}${g.lewatTempo ? " (lewat)" : ""}` : ""}
                   </p>
+                  {g.perluPerBulan !== null && g.perluPerMinggu !== null ? (
+                    <p className="muted kecil">
+                      Sisihkan {rp(g.perluPerBulan)}/bulan atau {rp(g.perluPerMinggu)}/minggu.
+                    </p>
+                  ) : null}
                   <div className="baris-tombol" style={{ marginTop: 6 }}>
                     <input
                       type="number"

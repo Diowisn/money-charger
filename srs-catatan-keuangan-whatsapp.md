@@ -1,377 +1,239 @@
-# SRS — Money-Charger SaaS
+# SRS — Money-Charger
 
 | Atribut | Nilai |
 |---|---|
-| Status | Draft untuk validasi teknis |
-| Versi | 1.0 |
-| Tanggal | 4 November 2026 |
+| Status | Spesifikasi bertahap; Rilis 0 untuk implementasi sekarang |
+| Versi | 1.1 |
+| Tanggal | 9 November 2026 |
 | Terkait PRD | [PRD](./prd-catatan-keuangan-whatsapp.md) |
-| Platform sasaran | SaaS bersama, multi-tenant; Next.js dengan modul HMVC internal |
+| Platform | Next.js, TypeScript, PostgreSQL/Neon; aplikasi pribadi |
 
-> SRS ini menetapkan perilaku target. Implementasi saat ini masih aplikasi satu pemilik. Tidak satu pun persyaratan multi-tenant di bawah boleh dianggap tersedia sampai migrasi dan acceptance test selesai.
+> SRS ini membedakan kondisi implementasi, kebutuhan penggunaan pribadi (Rilis 0), dan gerbang masa depan untuk beta/produk berbayar. Persyaratan Rilis 1/2 bukan izin membuka aplikasi ke pengguna luar.
 
 ## 1. Tujuan dan konvensi
 
-SRS ini merinci persyaratan fungsional dan nonfungsional, batas integrasi, model data logis, pengujian, dan migrasi untuk mengubah Money-Charger menjadi SaaS multi-tenant.
+Dokumen ini menentukan perilaku sistem yang dapat diuji untuk penggunaan pemilik tunggal dan persiapan migrasi yang terukur. Tidak menetapkan multi-tenant atau billing sebagai kebutuhan sekarang.
 
-- **MUST** = wajib untuk rilis beta eksternal.
-- **SHOULD** = sebaiknya untuk beta; penyimpangan perlu alasan dan pemilik.
-- **MAY** = opsional/fase berikutnya.
-- Setiap waktu bisnis disimpan sebagai tanggal dengan zona waktu tenant; default pasar Indonesia adalah `Asia/Jakarta`.
-- Semua nominal MVP berupa bilangan bulat rupiah. Nilai pecahan ditolak.
-- Setiap requirement mempunyai ID stabil untuk traceability pengembangan dan pengujian.
+- **MUST R0** = wajib untuk penggunaan pribadi yang aman.
+- **MUST R1/R2** = wajib hanya sebelum gerbang tahap tersebut dibuka.
+- **SHOULD** = sasaran yang dapat ditunda dengan alasan.
+- Nominal merupakan integer rupiah; pecahan ditolak.
+- Tanggal bisnis menggunakan zona waktu `Asia/Jakarta` kecuali konfigurasi menyatakan lain.
+- ID requirement stabil untuk traceability.
 
-## 2. Kondisi sistem saat ini dan batas perubahan
+## 2. Sistem dan batas tahap
 
-Sistem sekarang memakai Next.js API routes dan modul HMVC internal (`src/modules/*`), aturan domain di `src/lib`, PostgreSQL melalui `PgRepo`, dan adapter AI/Groq. Fitur yang ada termasuk parser pesan, budget periode, transaksi, rencana, pos, dashboard, login password tunggal, ekspor CSV bertoken, dan endpoint health.
+### 2.1 Kondisi implementasi
 
-Kesenjangan arsitektural yang wajib ditutup:
+Aplikasi memakai Next.js API routes dan modul di `src/modules/*`, aturan bersama di `src/lib`, PostgreSQL melalui `pg`, sesi autentikasi individual, login email/password dan OAuth opsional, dashboard keuangan, ekspor, serta integrasi WhatsApp Cloud API. Skema dan beberapa alur integrasi masih memiliki asumsi satu pemilik. Tabel operasional tertentu bersifat global; implementasi belum boleh dipakai beberapa pelanggan.
 
-- Tabel bisnis tidak memiliki `tenant_id`; `groups`, `sub_posts`, `aliases`, `plan_versions`, `plan_items`, `transactions`, `pending_actions`, `inbound_messages`, dan `config` global.
-- `allowed_numbers` hanya whitelist global, bukan integrasi WhatsApp yang dimiliki tenant.
-- Login memakai satu password deployment; belum ada akun dan sesi yang terkait pengguna.
-- `PgRepo.load()` memuat semua transaksi; pembatasan satu pool/advisory lock global tidak sesuai beban banyak tenant.
-- Webhook menunggu proses AI dan pengiriman balasan; kegagalan kirim balasan dicatat tetapi event masuk sudah idempoten, sehingga retry Meta tidak otomatis memperbaiki balasan.
-- Riwayat dashboard dibatasi 120 baris tanpa pencarian/paginasi server-side.
+Webhook WhatsApp memverifikasi signature dan membatasi ukuran request; pesan masuk diproses melalui antrean idempoten, balasan memakai outbox/retry, dan cron dapat menjalankan worker. Kondisi dan batas aktual harus diverifikasi melalui tes/operasi, bukan disimpulkan dari rancangan.
 
-Fitur inti keuangan dipertahankan kecuali perubahan eksplisit requirement AI-konfirmasi, audit, tenant scope, dan status pesan di bawah.
+### 2.2 Rilis 0 — penggunaan pribadi
 
-## 3. Arsitektur target
+Mencakup akun pemilik, transaksi/anggaran, WhatsApp milik pemilik, pengamanan route, backup/pemulihan, migrasi aman, dan pemantauan kegagalan. Registrasi hanya untuk bootstrap akun pertama; setelah itu pembuatan akun baru ditolak. Tidak ada entitlement berbayar, subscription, tenant/workspace bersama, atau pembayaran.
 
-### 3.1 Lapisan
+### 2.3 Rilis 1 — beta eksternal (gerbang masa depan)
 
-1. **Transport/adapters** — Next.js route handlers untuk web, REST internal, dan webhook.
-2. **HMVC modules** — `auth`, `tenant`, `onboarding`, `finance`, `whatsapp`, `export`, `billing`, `admin`, dan `health`, masing-masing memisahkan controller/use case, model/domain, dan view/serializer.
-3. **Domain** — mesin anggaran dan aturan transaksi murni; tidak bergantung langsung pada framework/vendor.
-4. **Ports** — kontrak `TenantRepository`, `IdentityProvider`, `MessagingProvider`, `AiProvider`, `JobQueue`, `SecretStore`, `BillingProvider`, dan `Mailer`.
-5. **Adapters** — implementasi vendor yang dapat diganti dan dikonfigurasi; tidak ada dependensi vendor di perhitungan uang.
-6. **Persistence** — Postgres dengan migrasi versi, cakupan tenant wajib, foreign key yang mencegah relasi lintas tenant, dan indeks berdasarkan pola akses.
-7. **Workers** — proses antrean untuk balasan outbox, tugas berulang, ekspor/penghapusan, dan rekonsiliasi.
+Hanya setelah persetujuan product owner dan lulus audit isolasi serta keamanan: registrasi/onboarding pelanggan, tenant terisolasi, integrasi WhatsApp per pelanggan, privasi/dukungan/penghapusan yang siap. Semua data, operasi, job, cache, ekspor, dan webhook harus mempunyai pemilik/tenant tepercaya. Tidak aktif pada Rilis 0.
 
-Pemilihan vendor identitas, queue, secret manager/KMS, email, billing, dan provider AI/WhatsApp merupakan keputusan implementasi terpisah. Adapter tidak berarti integrasi provider alternatif sudah disediakan.
+### 2.4 Rilis 2 — berbayar (gerbang masa depan)
 
-### 3.2 Konteks tenant
+Hanya setelah pilot, ekonomi unit, paket/harga, provider, syarat bisnis, dan tinjauan yang relevan diputuskan: checkout, subscription, webhook pembayaran, entitlement, invoice/nota, masa tenggang, pembatalan/refund, rekonsiliasi, dan pembatasan fitur tanpa penghapusan data. Tidak aktif pada Rilis 0.
 
-- Tenant adalah batas pemilik data. Setiap akun pelanggan membuat satu tenant pribadi pada MVP.
-- `tenant_id` berasal dari sesi autentikasi yang tervalidasi atau dari pemetaan `phone_number_id` webhook ke integrasi aktif yang telah diverifikasi.
-- Klien dilarang menentukan/mengganti tenant hanya dengan mengirim `tenant_id` di body, header, query, URL, atau identifier resource.
-- Service-to-service dan worker menerima konteks tenant eksplisit yang ditandatangani/diambil dari record antrean tepercaya.
-- Semua akses data melalui repository/use case yang memerlukan `TenantContext`; pengecualian hanya untuk lookup integrasi webhook dan tugas platform yang dibatasi secara eksplisit.
+## 3. Arsitektur dan batas kepercayaan
 
-## 4. Aktor dan hak akses
+- **SRS-ARCH-01 MUST R0:** domain keuangan mempertahankan integer rupiah dan tidak bergantung pada provider pembayaran.
+- **SRS-ARCH-02 MUST R0:** route web memvalidasi sesi server-side sebelum akses data pemilik; identitas pemilik berasal dari sesi, bukan ID pengguna bebas dari klien.
+- **SRS-ARCH-03 MUST R0:** webhook hanya menerima payload setelah validasi signature dan ukuran; nomor pengirim harus cocok dengan whitelist yang dikonfigurasi.
+- **SRS-ARCH-04 MUST R0:** secret hanya berasal dari environment/secret store; tidak ditulis ke repository, respons, URL, atau log.
+- **SRS-ARCH-05 MUST R0:** perubahan skema dicatat dan dapat diulang dengan aman; migrasi destruktif memerlukan snapshot, verifikasi, dan rencana rollback/forward-fix.
+- **SRS-ARCH-06 MUST R1:** setiap record bisnis/operasional yang terkait pelanggan mempunyai pemilik/tenant dan akses repository memerlukan konteks otorisasi tepercaya.
+- **SRS-ARCH-07 MUST R2:** billing provider berada di boundary integrasi; database tidak menyimpan PAN/CVV atau rahasia pembayaran.
 
-| Aktor | Hak minimum |
-|---|---|
-| Pengunjung | Melihat halaman publik dan membuat akun |
-| Pemilik tenant | Mengakses/mengekspor data sendiri, mengatur keuangan, nomor, AI, privasi, serta menutup tenant |
-| Anggota tenant (fase berikutnya) | Hak eksplisit berbasis peran; tidak aktif pada beta awal |
-| Worker | Menjalankan hanya job dengan tenant dan izin yang tercatat |
-| Support | Metadata status layanan; akses data transaksi ditolak secara default |
-| Operator admin | Mengelola status tenant/integrasi; tindakan sensitif beralasan dan diaudit |
-| Administrator keamanan | Mengelola insiden/kunci dan memeriksa audit dengan least privilege |
+Tidak perlu membangun abstraksi provider, service, queue, tenant, atau billing yang belum punya implementasi kedua/kebutuhan aktif.
+
+## 4. Aktor dan akses
+
+| Aktor | Rilis | Hak |
+|---|---|---|
+| Pemilik | R0 | Mengelola akun, data keuangan, integrasi, ekspor, dan sesi miliknya |
+| Worker/cron | R0 | Memproses job internal tervalidasi; endpoint operasi dilindungi secret |
+| Provider WhatsApp | R0 | Mengakses webhook hanya dengan verifikasi challenge/signature sesuai metode |
+| Pelanggan | R1 | Mengakses tenant miliknya setelah autentikasi dan otorisasi |
+| Support/admin | R1 | Metadata minimum; akses sensitif terpisah, beralasan, dan diaudit |
+| Provider pembayaran | R2 | Mengirim event bertanda tangan; tidak menentukan entitlement dari payload tak terverifikasi |
 
 ## 5. Persyaratan fungsional
 
-### 5.1 Akun, autentikasi, dan tenant
+### 5.1 Identitas dan sesi
 
-- **FR-AUTH-01 MUST** Sistem menyediakan registrasi terbatas/undangan dengan email unik, validasi input, verifikasi email, dan pencatatan versi persetujuan syarat serta privasi.
-- **FR-AUTH-02 MUST** Sistem menyediakan login individual, logout, reset kata sandi melalui proses bertoken berumur pendek, dan pencabutan seluruh sesi.
-- **FR-AUTH-03 MUST** Sesi disimpan/ditandatangani secara aman, memiliki kedaluwarsa idle dan absolut yang diverifikasi server-side, dapat dicabut, serta menggunakan cookie `HttpOnly`, `Secure` pada HTTPS, dan kebijakan `SameSite` yang sesuai.
-- **FR-AUTH-04 MUST** Login, reset password, verifikasi email, dan endpoint sensitif memiliki rate limit; error tidak membocorkan apakah akun/email terdaftar.
-- **FR-TEN-01 MUST** Pendaftaran sukses membuat tenant pribadi, keanggotaan owner, setelan default, dan audit event secara atomik atau dapat dipulihkan.
-- **FR-TEN-02 MUST** Semua model bisnis memiliki tenant owner atau relasi eksplisit yang menjamin tenant owner sama. Tidak boleh ada data transaksi global.
-- **FR-TEN-03 MUST** Semua endpoint memeriksa sesi dan otorisasi sebelum memuat/mengubah resource; resource tenant lain merespons 404 atau penolakan yang tidak membocorkan keberadaan.
-- **FR-TEN-04 MUST** Tenant yang dinonaktifkan tidak dapat menulis data atau menerima pemrosesan pesan baru; pembacaan/ekspor mengikuti status layanan dan kebijakan akun.
-- **FR-TEN-05 SHOULD** Sistem mendukung beberapa anggota tenant di masa depan, tetapi fitur undangan/peran tidak tampil sebelum model dan aturan konflik perubahan disetujui.
+- **FR-AUTH-01 MUST R0:** bootstrap hanya membuat akun pertama; bila akun sudah ada, registrasi publik maupun OAuth tidak boleh membuat akun kedua atau memindahkan record pemilik.
+- **FR-AUTH-02 MUST R0:** login, logout, reset password bertoken sekali pakai/berumur pendek, dan pencabutan semua sesi berfungsi server-side.
+- **FR-AUTH-03 MUST R0:** token sesi acak tidak disimpan mentah di database; sesi kedaluwarsa dan cookie memakai `HttpOnly`, `SameSite` sesuai kebutuhan, `Secure` di production.
+- **FR-AUTH-04 MUST R0:** endpoint login/registrasi/reset memiliki rate limit dan pesan kegagalan tidak membocorkan rahasia.
+- **FR-AUTH-05 MUST R0:** route privat mengembalikan 401 tanpa sesi sah; logout/reset seluruh sesi membuat cookie lama tidak dapat dipakai.
+- **FR-AUTH-06 MUST R1:** setiap akun terikat ke tenant/membership; verifikasi email dan persetujuan versi syarat/privasi selesai sebelum layanan eksternal dibuka.
 
-### 5.2 Onboarding dan integrasi WhatsApp
+### 5.2 Keuangan
 
-- **FR-WA-01 MUST** Wizard setup menjelaskan bahwa satu nomor WhatsApp bot akan terikat ke satu tenant dan memverifikasi kepemilikan sebelum mengaktifkan koneksi.
-- **FR-WA-02 MUST** Informasi integrasi mencatat tenant, provider, business/WABA ID seperlunya, phone number ID, status, waktu koneksi/validasi terakhir, dan referensi rahasia terenkripsi—bukan token akses dalam teks biasa.
-- **FR-WA-03 MUST** Sistem menyediakan tindakan cek status, cabut koneksi, dan rotasi/pembaruan rahasia sesuai kemampuan provider.
-- **FR-WA-04 MUST** Webhook memverifikasi tanda tangan atas body mentah sebelum memproses payload.
-- **FR-WA-05 MUST** Tenant penerima ditentukan dari identifier nomor bot/provider yang telah diverifikasi, bukan hanya dari nomor pengirim. Nomor pengirim kemudian diverifikasi sebagai nomor owner/anggota yang diizinkan tenant itu.
-- **FR-WA-06 MUST** Webhook menerima notifikasi status yang valid tanpa membuat transaksi; tipe pesan tidak didukung mendapat respons produk yang jelas.
-- **FR-WA-07 MUST** Proses integrasi dan kredensial khusus tenant terisolasi; satu token tenant tidak dapat digunakan untuk mengirim atas nama tenant lain.
-- **FR-WA-08 SHOULD** Onboarding beta boleh dibantu operator, tetapi operator tidak boleh meminta pelanggan mengirim token rahasia melalui chat/email biasa. Alur dan tanggung jawab pencabutan akses didokumentasikan.
-- **FR-WA-09 MAY** Embedded Signup/lebih dari satu nomor per tenant ditambahkan setelah kelayakan, kebijakan Meta, persetujuan, dan audit keamanan diverifikasi.
+- **FR-FIN-01 MUST R0:** fitur yang ada untuk pemasukan, pengeluaran, gaji/bonus, pos, rencana anggaran, saldo/wadah, laporan, koreksi, piutang/utang, target tabungan, dan ekspor tidak mengalami regresi.
+- **FR-FIN-02 MUST R0:** validasi menolak nominal pecahan, overflow, tanggal tidak sah, dan input yang tidak sesuai aturan domain; pesan kesalahan dapat dipahami.
+- **FR-FIN-03 MUST R0:** transaksi dan perubahan terkait bersifat atomik; kegagalan tidak meninggalkan perubahan parsial.
+- **FR-FIN-04 MUST R0:** operasi mutasi memakai identitas pemilik dari sesi/konteks internal tervalidasi, bukan `userId` arbitrer dari request.
+- **FR-FIN-05 MUST R0:** ekspor hanya berisi data pemilik, memakai token sekali pakai/berumur pendek atau autentikasi yang sesuai, dan tidak mengungkap data finansial pada URL/log.
+- **FR-FIN-06 MUST R1:** koreksi, pembatalan, laporan, dan ekspor tenant dibatasi penuh pada tenant peminta.
 
-### 5.3 Transaksi dan anggaran
+### 5.3 WhatsApp, antrean, dan balasan
 
-- **FR-FIN-01 MUST** Sistem mempertahankan perintah inti: pemasukan, gaji, pengeluaran, bonus, koreksi/pembatalan, rencana, pos, saldo/wadah, laporan, dan ekspor sesuai fitur saat ini.
-- **FR-FIN-02 MUST** Semua perhitungan dilakukan dengan integer IDR pada domain; input pecahan, overflow, nominal negatif yang tidak valid, serta tanggal tidak valid ditolak dengan pesan yang dapat dipahami.
-- **FR-FIN-03 MUST** Setiap mutasi transaksi dilakukan atomik; induk dan transaksi turunannya dibatalkan/diperbarui bersama.
-- **FR-FIN-04 MUST** Transaksi menyimpan tenant, actor/source, waktu pencatatan, tanggal bisnis, sumber input, dan relasi audit yang diperlukan.
-- **FR-FIN-05 MUST** Koreksi tidak menghapus jejak: perubahan dicatat sebagai pembatalan/pengganti atau audit sebelum/sesudah sesuai rancangan data final.
-- **FR-FIN-06 MUST** Sistem mempertahankan zona waktu tenant pada parser tanggal dan tampilan laporan; pesan yang datang terlambat tetap memakai timestamp provider dengan aturan koreksi yang terdokumentasi.
-- **FR-FIN-07 MUST** Pengguna dapat meninjau transaksi, memfilter tanggal/jenis/pos/status, menavigasi halaman riwayat, serta melihat status sumber AI dan kegagalan.
-- **FR-FIN-08 MUST** Operasi transaksi yang berpotensi menutup periode/berdampak besar, seperti gaji ganda, tetap memerlukan konfirmasi eksplisit dan kedaluwarsa yang jelas.
-- **FR-FIN-09 MUST** Ekspor hanya memuat data tenant peminta, berumur pendek, sekali pakai atau memerlukan autentikasi ulang, dan tidak menaruh data finansial dalam URL.
-- **FR-FIN-10 SHOULD** Sistem menyediakan jejak audit yang bisa dibaca pengguna untuk pencatatan, koreksi, pembatalan, perubahan rencana, dan impor.
+- **FR-WA-01 MUST R0:** webhook membatasi ukuran body dan memverifikasi signature terhadap body mentah sebelum memproses pesan.
+- **FR-WA-02 MUST R0:** pesan pengirim yang tidak diizinkan tidak dapat membaca atau mengubah data; webhook duplikat tidak membuat transaksi ganda.
+- **FR-WA-03 MUST R0:** event inbound dicatat idempoten sebelum pemrosesan; kegagalan pemrosesan dapat ditemukan/dicoba ulang tanpa mutasi duplikat.
+- **FR-WA-04 MUST R0:** transaksi yang berhasil disimpan tetap ada jika pengiriman balasan gagal; status outbox/retry tidak boleh dilaporkan seolah terkirim.
+- **FR-WA-05 MUST R0:** retry memakai backoff dan batas percobaan; status gagal terminal bisa diidentifikasi lewat log/status operasional dan ditangani ulang dengan aman.
+- **FR-WA-06 MUST R0:** log webhook/worker tidak berisi token, isi finansial mentah, atau nomor penuh yang tidak diperlukan.
+- **FR-WA-07 MUST R1:** nomor bot dan pengirim dipetakan ke integrasi dan tenant yang diverifikasi, bukan whitelist global.
 
-### 5.4 AI dan parser
+### 5.4 AI dan privasi
 
-- **FR-AI-01 MUST** Penggunaan AI nonaktif sampai pelanggan memberi persetujuan eksplisit; pelanggan dapat mencabutnya kapan pun tanpa kehilangan parser format baku.
-- **FR-AI-02 MUST** UI menjelaskan jenis isi pesan yang dikirim ke provider AI, tujuan, provider aktif, dan tautan kebijakan/retensi yang telah diverifikasi.
-- **FR-AI-03 MUST** Parser deterministik dipakai lebih dahulu. AI tidak boleh menentukan atau mengubah nominal yang tidak terdapat dalam teks asli.
-- **FR-AI-04 MUST** Hasil AI yang tidak lengkap, ambigu, tidak valid, terlalu besar, atau berisi intent yang tidak didukung tidak boleh menulis transaksi.
-- **FR-AI-05 MUST** Hasil AI ditampilkan sebagai pratinjau berisi jenis, nominal, pos, tanggal, dan label. Mutasi dilakukan hanya setelah tindakan konfirmasi eksplisit sebelum batas waktu.
-- **FR-AI-06 MUST** Pesan konfirmasi mengikat persetujuan ke satu payload/tenant/pengguna, berumur pendek, hanya dapat digunakan sekali, dan tidak dapat menyetujui aksi tenant lain.
-- **FR-AI-07 MUST** Tiap transaksi hasil AI ditandai sumber/provider/model seperlunya, tanpa menyimpan prompt atau isi mentah ke log umum.
-- **FR-AI-08 MUST** Timeout, kuota, provider error, atau validasi gagal menghasilkan fallback aman dan tidak menggandakan transaksi.
-- **FR-AI-09 SHOULD** Sediakan batas penggunaan AI per tenant dan kontrol admin untuk menonaktifkan provider saat insiden.
+- **FR-AI-01 MUST R0:** parser deterministik tetap tersedia; input tidak valid/ambigu tidak menghasilkan mutasi keuangan tanpa jalur konfirmasi yang sudah didukung dan diuji.
+- **FR-AI-02 MUST R0:** AI tidak mengubah nominal yang tidak didukung teks sumber; kegagalan provider tidak menghapus/ menggandakan transaksi.
+- **FR-DATA-01 MUST R0:** ekspor data pengguna tetap tersedia dan tidak bocor ke akun lain.
+- **FR-DATA-02 MUST R1:** consent AI, retensi per kelas data, penutupan akun, pencabutan integrasi, dan penghapusan sesuai kebijakan yang sudah ditinjau.
 
-### 5.5 Webhook, antrean, dan pengiriman
+### 5.5 Paket dan billing (R2 saja)
 
-- **FR-MSG-01 MUST** Peristiwa webhook sah disimpan secara idempoten berdasarkan provider, akun/integrasi, dan ID pesan/event.
-- **FR-MSG-02 MUST** Setelah event dan job penerimaan tersimpan secara durable, webhook boleh memberi acknowledgment; pemrosesan lambat/AI/pengiriman tidak menahan koneksi webhook.
-- **FR-MSG-03 MUST** Perubahan transaksi dan pembuatan outbox balasan terjadi dalam transaksi database yang sama.
-- **FR-MSG-04 MUST** Worker mengirim outbox dengan retry backoff terbatas, batas attempt, jitter, timeout, dan status final; dead-letter/failed message dapat ditinjau dan dipulihkan.
-- **FR-MSG-05 MUST** Retry tidak membuat transaksi ganda. Pengiriman balasan dapat at-least-once; duplikasi balasan harus ditekan menggunakan status/idempotensi provider bila tersedia dan dinyatakan jelas.
-- **FR-MSG-06 MUST** Setiap kegagalan terminal memicu metrik/alert dan menyediakan jalur rekonsiliasi yang tidak membocorkan isi finansial.
-- **FR-MSG-07 MUST** Event yang datang tidak berurutan menggunakan timestamp provider untuk tanggal bisnis; proses konfirmasi/urutan saldo harus memiliki perilaku yang deterministik.
-- **FR-MSG-08 SHOULD** Batas ukuran body dan jumlah event per webhook diterapkan untuk menghindari beban tak terkendali.
+- **FR-BILL-01 MUST R2:** entitlement ditentukan server-side dari subscription/payment state yang telah diverifikasi; UI bukan kontrol akses.
+- **FR-BILL-02 MUST R2:** payment webhook memvalidasi signature, timestamp/replay sesuai provider, dan idempotency key; event duplikat/tidak berurutan tidak merusak status.
+- **FR-BILL-03 MUST R2:** status subscription mencakup trial/aktif, gagal bayar, masa tenggang, ditangguhkan, dibatalkan, kedaluwarsa, dan refund sesuai model bisnis terpilih.
+- **FR-BILL-04 MUST R2:** pembatasan paket tidak menghapus data; akses baca/ekspor setelah berhenti mengikuti kebijakan yang diumumkan.
+- **FR-BILL-05 MUST R2:** rekonsiliasi internal/provider dapat menemukan perbedaan; tindakan admin atas status billing diaudit.
+- **FR-BILL-06 MUST R2:** tidak menyimpan data kartu; invoice/nota/pajak mengikuti keputusan bisnis dan tinjauan yang sesuai.
 
-### 5.6 Privasi, data, dan akun
+## 6. Data dan migrasi
 
-- **FR-DATA-01 MUST** Pelanggan dapat melihat persetujuan yang pernah diberikan, mencabut AI, mencabut integrasi WhatsApp, meminta ekspor, meminta penutupan akun, dan melihat status permintaannya.
-- **FR-DATA-02 MUST** Ekspor akun mencakup transaksi, pos/alias, rencana, setelan, dan metadata yang diperlukan dalam format terdokumentasi; tidak menyertakan rahasia provider.
-- **FR-DATA-03 MUST** Penghapusan mengidentifikasi seluruh record terkait tenant, job, cache, referensi integrasi, dan data yang dapat dihapus pada sistem vendor.
-- **FR-DATA-04 MUST** Permintaan penghapusan menonaktifkan tenant/integrasi sesuai kebijakan dan menghasilkan audit event tanpa mengekalkan isi keuangan yang sudah dihapus.
-- **FR-DATA-05 MUST** Data dalam backup kedaluwarsa sesuai jadwal terdokumentasi; sistem tidak boleh menjanjikan penghapusan instan dari backup jika mekanisme backup tidak mendukungnya.
-- **FR-DATA-06 MUST** Log aplikasi, monitoring, dan analytics tidak menyimpan isi pesan, nominal, label transaksi, token, password, atau connection string.
-- **FR-DATA-07 MUST** Halaman publik menyediakan kebijakan privasi, syarat layanan, kontak dukungan/privasi, dan penjelasan batasan bahwa produk adalah pencatat manual, bukan saldo rekening.
+- **FR-DB-01 MUST R0:** skema yang ada tetap idempoten untuk setup; semua perubahan baru mendapat versi/rekaman migrasi sebelum diterapkan ke data produksi.
+- **FR-DB-02 MUST R0:** sebelum migrasi berisiko tersedia snapshot/backup dan pemeriksaan pascamigrasi.
+- **FR-DB-03 MUST R0:** migrasi data lama merekonsiliasi jumlah record, relasi, status, tanggal, dan nilai saldo/ringkasan yang diketahui.
+- **FR-DB-04 MUST R0:** rollback/forward-fix dibuktikan pada staging untuk migrasi yang dapat memengaruhi data.
+- **FR-DB-05 MUST R1:** proses backfill tenant legacy dilakukan pada clone/staging, memeriksa seluruh tabel bisnis, cache/job/outbox/audit/export dan tidak mengaktifkan signup sebelum tes isolasi lulus.
+- **FR-DB-06 MUST R2:** subscription, invoice, payment event, dan entitlement memiliki unique key/provider reference yang menjaga idempotensi dan riwayat audit.
 
-### 5.7 Billing dan administrasi
+## 7. Antarmuka API dan keamanan
 
-- **FR-BILL-01 MUST (gerbang komersial)** Sebelum paket berbayar umum, pelanggan dapat melihat paket, harga, batas pemakaian, periode, kebijakan pembatalan/refund, dan status langganan sebelum membayar.
-- **FR-BILL-02 MUST (gerbang komersial)** Perubahan status subscription diverifikasi dari provider server-side; webhook billing idempoten dan tenant subscription tidak dapat ditentukan klien.
-- **FR-BILL-03 MUST (gerbang komersial)** Kegagalan pembayaran mengikuti masa tenggang dan kebijakan pembatasan yang diumumkan; data tidak dihapus otomatis karena pembayaran gagal.
-- **FR-BILL-04 MUST** Sistem tidak menyimpan nomor kartu/kredensial pembayaran yang seharusnya ditangani provider pembayaran.
-- **FR-ADM-01 MUST** Admin dapat menangguhkan/mengaktifkan tenant dan mengelola status integrasi dengan audit actor, waktu, alasan, dan perubahan.
-- **FR-ADM-02 MUST** Akses support terhadap isi transaksi tidak tersedia secara default; jika dibutuhkan untuk tiket/insiden, gunakan persetujuan yang tercatat, akses terbatas waktu, dan audit.
-- **FR-ADM-03 MUST** Endpoint health publik, bila tetap ada, hanya mengembalikan status generik. Rincian diagnostik memerlukan autentikasi admin dan tidak membocorkan jumlah tenant/pesan atau konfigurasi rahasia.
-
-## 6. Model data logis minimum
-
-Nama tabel bersifat usulan; skema fisik harus mengikuti migrasi yang direview. Semua tabel tenant-scoped memiliki `tenant_id NOT NULL`.
-
-| Entitas | Kunci/relasi penting | Data sensitif dan aturan |
+| Operasi | Rilis | Autentikasi/otorisasi minimum |
 |---|---|---|
-| `users` | `id`, email ternormalisasi, status | Password/session dikelola adapter identitas; jangan simpan plaintext |
-| `tenants` | `id`, status, locale, timezone, created/closed | Satu pelanggan pemilik per tenant pada MVP |
-| `memberships` | `(tenant_id,user_id)`, role, status | FK komposit/constraint cegah relasi lintas tenant |
-| `consents` | tenant/user, jenis, versi, diberikan/dicabut | Audit persetujuan privasi/AI/syarat |
-| `integrations` | tenant, provider, external account ID, status | Unique partial constraint untuk satu nomor aktif per tenant sesuai aturan |
-| `integration_secrets` | integration, encrypted secret/reference, version | Enkripsi envelope/KMS atau secret manager; tidak masuk response/log |
-| `transactions` | tenant, id, type, amount, business date, source | Unique/idempotency sesuai event; soft-cancel/audit |
-| `groups`, `sub_posts`, `aliases` | tenant-scoped ID dan relasi | Nama unik hanya dalam tenant |
-| `plan_versions`, `plan_items` | tenant-scoped version dan items | Versi historis tetap bisa dijelaskan |
-| `pending_actions` | tenant, user, type, payload, expiry, status | Token/action hash; payload minimum; consume atomik |
-| `inbound_events` | integration, provider event ID, status, received time | Unique `(integration_id, provider_event_id)`; raw body tidak disimpan default |
-| `outbox_messages` | tenant, event, recipient ref, status, attempt, next retry | Isi balasan seperlunya dan terenkripsi/retensi singkat bila perlu |
-| `audit_events` | tenant nullable untuk event platform, actor, action, resource, time | Jangan simpan rahasia atau nilai transaksi lengkap di metadata umum |
-| `subscriptions` | tenant, provider customer/subscription refs, status, plan | Data kartu tidak disimpan |
-| `deletion_requests` | tenant, status, deadline, completion evidence | Dapat diproses berulang tanpa menghapus tenant salah |
+| Login/reset | R0 | Publik dengan rate limit; token reset sekali pakai |
+| Register | R0 | Bootstrap akun pertama saja; setelah ada akun ditolak |
+| Dashboard/keuangan/pengaturan | R0 | Sesi pemilik sah; ID dari klien tidak mengganti owner |
+| Ekspor | R0 | Pemilik sah atau token ekspor pendek/sekali pakai |
+| Webhook WhatsApp | R0 | Challenge/signature provider dan validasi payload |
+| Cron/outbox/email internal | R0 | Secret header server-side; tidak menerima secret di query string |
+| Health | R0 | Publik hanya status generik; detail memakai token dan tidak membocorkan secret |
+| Operasi tenant/admin | R1 | Akun terpisah, least privilege, audit |
+| Billing webhook/portal | R2 | Signature provider dan autentikasi pelanggan; entitlement server-side |
 
-### 6.1 Constraint dan indeks
+- **NFR-SEC-01 MUST R0:** HTTPS pada production dan cookie sesi aman.
+- **NFR-SEC-02 MUST R0:** validasi input pada trust boundary; SQL memakai parameter, bukan interpolasi input.
+- **NFR-SEC-03 MUST R0:** secrets dan PII finansial tidak dicatat atau dikirim pada analytics tanpa kebutuhan/izin yang ditinjau.
+- **NFR-SEC-04 MUST R0:** error internal tersanitasi; health/log tidak memaparkan URL DB, token, body pesan, atau stack trace publik.
+- **NFR-SEC-05 MUST R1:** uji isolasi untuk seluruh endpoint, query, UI, ekspor, job, webhook, cache, dan akses admin sebelum pelanggan luar.
+- **NFR-SEC-06 MUST R2:** billing webhooks tahan replay dan payment details ditangani provider.
 
-- Unique constraints dan relasi antarentitas tenant harus mengikutkan tenant dalam kunci yang relevan; foreign key hanya boleh menyambungkan record pada tenant yang sama.
-- Tambahkan indeks komposit sesuai pola akses seperti `(tenant_id, business_date DESC, id DESC)`, `(tenant_id, status)`, dan unique idempotency key.
-- Hindari memuat seluruh riwayat tenant untuk setiap request; gunakan agregasi yang terukur, rentang tanggal, cursor pagination, dan proyeksi kolom seperlunya.
-- Jumlah nominal disimpan pada tipe yang tidak mengalami overflow; serialisasi JSON menggunakan batas aman dan validasi sebelum konversi.
-- Kebijakan Row-Level Security dapat ditambahkan sebagai defense-in-depth setelah diuji dengan pola pooling/transaksi yang benar; aplikasi tetap wajib menerapkan otorisasi tenant pada layer repository/use case.
+## 8. Reliabilitas, pemulihan, dan observabilitas
 
-## 7. Persyaratan antarmuka
+- **NFR-REL-01 MUST R0:** duplicate webhook/job tidak membuat transaksi ganda.
+- **NFR-REL-02 MUST R0:** kegagalan balasan tercatat dengan status/percobaan; job terminal tidak hilang diam-diam.
+- **NFR-REL-03 MUST R0:** setiap perubahan data penting dapat di-backup dan dipulihkan dari snapshot sesuai fasilitas database aktif.
+- **NFR-BCP-01 MUST R0:** owner, lokasi, jadwal, retensi, akses, dan biaya backup database/configuration penting didokumentasikan; jangan menyimpan dump finansial pada lokasi publik atau repository.
+- **NFR-BCP-02 MUST R0:** restore diuji ke database terpisah; rekonsiliasi jumlah transaksi, rencana, relasi, dan saldo/ringkasan dikenal dicatat sebelum migrasi berisiko.
+- **NFR-BCP-03 MUST R0:** backup dianggap valid hanya setelah bukti pemulihan; retensi dan akses backup ditinjau berkala.
+- **NFR-BCP-04 MUST R0:** migrasi produksi memiliki snapshot yang sesuai, pemeriksaan pascamigrasi, dan rencana rollback/forward-fix.
+- **NFR-OBS-01 MUST R0:** status DB, webhook, inbound/outbox, retry, kegagalan terminal, dan cron dapat didiagnosis tanpa log sensitif.
+- **NFR-OBS-02 MUST R1:** alert operasional dan metrik layanan digunakan sebelum pilot eksternal.
+- **NFR-OBS-03 MUST R2:** status biaya provider pesan/AI/pembayaran dan kegagalan billing dapat ditelusuri secara agregat per tenant.
 
-### 7.1 Web
+## 9. Alur kritis
 
-- Semua halaman dan API privat memerlukan sesi individual.
-- Validasi body memakai skema terketik di boundary; jangan mengandalkan cast TypeScript untuk validasi runtime.
-- Mutasi cookie-authenticated memakai perlindungan CSRF/origin sesuai arsitektur deployment.
-- Pesan error aman, konsisten, berbahasa Indonesia, dan tidak berisi stack trace/SQL/provider secret.
-- UI menampilkan status sesi/integrasi/AI, indikator catatan hasil AI, keadaan antrean bila gagal, dan konfirmasi sebelum operasi destruktif.
-- Riwayat transaksi menggunakan pagination/filter server-side dan selalu terikat tenant.
+### 9.1 Bootstrap dan login
 
-### 7.2 WhatsApp
+1. Pengguna membuat akun awal melalui registrasi atau OAuth yang dikonfigurasi.
+2. Operasi pembuatan akun diserialisasi; hanya jika jumlah akun nol, akun pertama boleh dibuat.
+3. Akun pertama mewarisi data legacy yang belum memiliki `user_id` dalam satu transaksi.
+4. Jika akun sudah ada, registrasi/OAuth untuk identity baru ditolak; OAuth identity yang telah terhubung atau email pemilik yang telah ada dapat login/ditautkan sesuai implementasi.
+5. Login mengeluarkan token sesi acak; database menyimpan hash. Logout/reset/cabut semua sesi menolak token lama.
 
-- Signature webhook diverifikasi dengan secret aplikasi sesuai konfigurasi provider sebelum parsing event.
-- Pemetaan nomor bot ke tenant memeriksa status integrasi aktif; nomor pengirim divalidasi terhadap keanggotaan/integrasi yang telah disetujui.
-- Respons teks tidak menyatakan catatan tersimpan sebelum commit database berhasil.
-- Balasan di luar jendela/aturan provider harus ditangani sesuai aturan WhatsApp yang berlaku; jangan mengirim template/promosi tanpa persetujuan dan verifikasi kebijakan terkini.
+### 9.2 Pencatatan WhatsApp
 
-### 7.3 Integrasi eksternal
+1. Webhook membatasi body dan memverifikasi signature.
+2. Payload tervalidasi dan whitelist pengirim diperiksa.
+3. Pesan masuk dicatat secara idempoten, kemudian diproses melalui antrean.
+4. Domain memvalidasi nominal, tanggal, jenis, dan pos.
+5. Transaksi dan balasan outbox disimpan secara atomik bila memungkinkan.
+6. Worker mengirim balasan; transient failure dijadwalkan ulang dengan backoff, terminal failure tetap terlihat.
 
-Semua adapter harus memetakan error provider ke kategori internal terstruktur: transient, permanent, rate-limited, invalid-credential, dan unavailable. Rahasia/provider payload tidak boleh diteruskan ke klien atau log umum. Provider API version, timeout, retry, serta batas ukuran dikonfigurasi dan memiliki nilai default yang diuji.
+### 9.3 Backup/restore sebelum migrasi
 
-## 8. Persyaratan nonfungsional
+1. Pastikan target backup dan restore adalah database terpisah yang terkendali dan akses rahasianya tidak dicatat.
+2. Buat snapshot melalui fasilitas provider yang tersedia; catat waktu dan identitas snapshot tanpa menyalin rahasia.
+3. Pulihkan ke database terisolasi; jangan arahkan aplikasi produksi ke hasil restore.
+4. Jalankan pemeriksaan skema, jumlah transaksi/pos/rencana, relasi parent-child, rentang tanggal, dan saldo/ringkasan yang diketahui.
+5. Catat hasil dan bersihkan database restore sesuai kebijakan retensi.
+6. Jangan mulai migrasi produksi jika restore atau rekonsiliasi gagal.
 
-### 8.1 Keamanan
+## 10. Acceptance criteria
 
-- **NFR-SEC-01 MUST:** 100% jalur akses data pelanggan melalui tenant authorization; tes matriks lintas tenant untuk operasi baca, ubah, hapus, ekspor, laporan, konfirmasi, job, dan dukungan harus lulus.
-- **NFR-SEC-02 MUST:** TLS untuk semua koneksi eksternal; enkripsi at-rest di database/backup sesuai kemampuan provider; token WhatsApp per tenant dienkripsi atau disimpan dalam secret manager dengan kontrol least privilege dan rotasi.
-- **NFR-SEC-03 MUST:** tidak ada rahasia dalam source, git, browser, URL, log, error monitoring, atau output health. Rahasia uji dan produksi terpisah.
-- **NFR-SEC-04 MUST:** rate limiting login, reset, webhook, AI, dan API mutasi; batas ukuran request; validasi signature; pencegahan replay/idempotensi.
-- **NFR-SEC-05 MUST:** sesi bisa dicabut server-side; password reset token sekali pakai dan berumur pendek; privileged action memerlukan re-authentication.
-- **NFR-SEC-06 MUST:** sebelum peluncuran dilakukan threat modeling, dependency/security scan, pemeriksaan kontrol akses, dan uji penetrasi/assessment yang sesuai skala; temuan kritis/tinggi yang dapat dieksploitasi harus ditutup.
-- **NFR-SEC-07 MUST:** administrator dan support memakai akun individual, MFA sesuai provider, least privilege, dan audit untuk aksi sensitif.
+### Rilis 0
 
-### 8.2 Reliabilitas, performa, dan kapasitas
+- **AC-R0-01:** akun pertama dapat dibuat dan data legacy tanpa owner terikat ke akun tersebut secara atomik.
+- **AC-R0-02:** ketika akun ada, percobaan registrasi password kedua tidak menambah pengguna, sesi, atau mengubah owner data.
+- **AC-R0-03:** OAuth identity baru tidak dapat membuat akun kedua; identity pemilik yang sudah terhubung tetap dapat login.
+- **AC-R0-04:** request tanpa sesi ke route privat mendapat 401; sesi yang dicabut/expired tidak dapat mengakses route.
+- **AC-R0-05:** webhook signature salah/ukuran melebihi batas ditolak; webhook duplikat menghasilkan maksimal satu mutasi.
+- **AC-R0-06:** transaksi tersimpan tetap satu saat pengiriman balasan gagal; retry sukses memperbarui status outbox.
+- **AC-R0-07:** gagal terminal dapat ditemukan dan tidak diakui sebagai balasan terkirim.
+- **AC-R0-08:** restore database terpisah lulus pemeriksaan integritas dan rekonsiliasi sebelum migrasi berisiko.
+- **AC-R0-09:** tidak ada secret/body transaksi dalam log publik, URL, atau file repository.
 
-- **NFR-REL-01 MUST:** webhook menerima dan menyimpan event/job durable dengan p95 ≤ 2 detik saat layanan normal; acknowledgment setelah durable write, bukan setelah respons AI/pesan.
-- **NFR-REL-02 MUST:** setiap pesan/event tidak menghasilkan lebih dari satu transaksi bisnis meski webhook diterima berulang.
-- **NFR-REL-03 MUST:** outbox retry menggunakan backoff dengan batas; job gagal terminal dapat ditemukan, diperbaiki, dan diproses ulang dengan idempotensi.
-- **NFR-PERF-01 SHOULD:** API dashboard p95 ≤ 1 detik pada beban uji 50 request bersamaan per deployment, tenant uji dengan 10.000 transaksi, tanpa query lintas tenant.
-- **NFR-PERF-02 MUST:** load test mengevaluasi antrean webhook 10 event/detik selama 15 menit; kapasitas final ditinjau berdasarkan batas hosting/provider, bukan dianggap otomatis terpenuhi.
-- **NFR-PERF-03 MUST:** koneksi database tidak dibuat berlebihan pada serverless; pool/pooling dan transaksi advisory lock dipilih berdasarkan uji konkurensi multi-tenant. Lock satu kunci global tidak boleh menserialkan semua tenant.
-- **NFR-REL-04 SHOULD:** target availability beta internal 99,5% per bulan, tidak termasuk gangguan upstream yang dijelaskan; tidak menjadi SLA kontraktual sebelum instrumentasi dan operasi membuktikannya.
+### Gerbang Rilis 1
 
-### 8.3 Backup, pemulihan, dan kontinuitas
+- **AC-R1-01:** dua tenant dengan data serupa tidak dapat membaca/mengubah/mengekspor data satu sama lain melalui route, query, job, webhook, cache, atau admin.
+- **AC-R1-02:** seluruh data operasional terkait pelanggan dimiliki tenant; signup tetap tertutup sampai tes matrix lulus.
+- **AC-R1-03:** persetujuan privasi/AI, ekspor, pencabutan integrasi, dukungan dan penghapusan diuji serta kebijakannya disetujui.
 
-- **NFR-BCP-01 MUST:** backup otomatis terjadwal untuk data database dan konfigurasi yang diperlukan; frekuensi, retensi, wilayah, pemilik, serta biaya didokumentasikan.
-- **NFR-BCP-02 MUST:** target pemulihan beta RPO ≤ 24 jam dan RTO ≤ 4 jam.
-- **NFR-BCP-03 MUST:** restore drill dilakukan sebelum beta dan setidaknya per kuartal; drill memeriksa jumlah transaksi, tenants, rencana, relasi, dan kemampuan login/WhatsApp pada lingkungan pemulihan.
-- **NFR-BCP-04 MUST:** backup tidak dianggap valid hanya karena pekerjaan sukses; ada alert kegagalan dan bukti pemulihan.
-- **NFR-BCP-05 MUST:** migrasi skema produksi memiliki backup/snapshot sesuai kebutuhan, prosedur expand-migrate-contract, pemeriksaan pascamigrasi, dan rollback/forward-fix yang disetujui.
+### Gerbang Rilis 2
 
-### 8.4 Privasi, audit, dan observabilitas
+- **AC-R2-01:** webhook pembayaran signature-invalid/replay ditolak; event duplikat/tidak berurutan tidak menggandakan entitlement atau invoice.
+- **AC-R2-02:** siklus sukses, gagal bayar, masa tenggang, pembatalan, refund, dan rekonsiliasi lulus sandbox.
+- **AC-R2-03:** setelah entitlement turun/berakhir, data tidak terhapus dan akses mengikuti kebijakan yang diumumkan.
+- **AC-R2-04:** tidak ada data kartu disimpan; harga, ketentuan, dukungan, dan kewajiban dokumen ditinjau sebelum produksi.
 
-- **NFR-PRIV-01 MUST:** retensi setiap kelas data memiliki owner, tujuan, jangka waktu, mekanisme penghapusan, dan bukti verifikasi.
-- **NFR-PRIV-02 MUST:** data sensitif tidak masuk analytics pihak ketiga tanpa dasar/consent dan tinjauan privasi.
-- **NFR-OBS-01 MUST:** metrik mencakup request/latensi/error per modul, jumlah webhook valid/invalid, antrean/backlog/umur pesan, retry/final failures, DB saturation, provider error/kuota, biaya AI agregat, dan status backup.
-- **NFR-OBS-02 MUST:** alert terarah pada error tingkat layanan tanpa mengirim isi pesan/transaksi ke kanal alert.
-- **NFR-OBS-03 MUST:** request/job memiliki correlation ID yang tidak mengandung nomor telepon atau identifier sensitif; tenant reference di log dipseudonimkan atau dibatasi aksesnya.
-- **NFR-AUD-01 MUST:** audit event append-only untuk autentikasi penting, perubahan integrasi, ekspor, tindakan admin/support, penghapusan, serta mutasi keuangan; retensi dan aksesnya dibatasi.
+## 11. Rencana verifikasi
 
-### 8.5 Aksesibilitas dan kompatibilitas
+1. Jalankan regression/unit suite untuk parser, domain keuangan, autentikasi, repository, dan skema idempoten.
+2. Uji registrasi pertama, registrasi kedua, OAuth identity baru setelah owner ada, dan login identity yang sudah terhubung.
+3. Uji API authorization matrix: tanpa sesi, sesi dicabut, resource ID tidak sah, ekspor, route operasional, health, dan cron.
+4. Uji WhatsApp: signature valid/tidak valid, body limit, pengirim asing, duplikat, retry inbound/outbox, terminal failure, dan replay.
+5. Uji restore database di lingkungan terpisah dan catat rekonsiliasi sebelum migrasi berisiko.
+6. Jalankan lint, typecheck, test, dan build yang disediakan repository sebelum rilis.
+7. Jangan menjalankan tes integrasi produksi atau mengubah database produksi tanpa persetujuan dan prosedur backup/rollback.
 
-- **NFR-UX-01 SHOULD:** dashboard responsif ponsel dan dapat digunakan dengan keyboard/screen reader untuk fungsi utama.
-- **NFR-UX-02 SHOULD:** teks bahasa Indonesia sederhana, error menyatakan cara memperbaiki, dan format tanggal/waktu/IDR konsisten dengan locale tenant.
-- **NFR-COMP-01 MUST:** aplikasi utama mendukung browser modern pada versi yang masih mendapat pembaruan keamanan.
-- **NFR-COMP-02 MUST:** domain tidak mengimpor SDK provider langsung; boundary integrasi diuji kontraknya sehingga provider dapat diganti.
+Rilis R0 ditahan bila akun kedua dapat dibuat, sesi yang dicabut tetap berlaku, ada transaksi duplikat/hilang, secret terekspos, atau restore belum dibuktikan sebelum migrasi berisiko. Rilis R1/R2 tetap tertutup sampai seluruh acceptance criteria tahap terkait lulus.
 
-## 9. API dan kontrak perilaku (logis)
+## 12. Traceability PRD
 
-Route aktual dapat berubah, tetapi kontrak berikut wajib:
-
-| Operasi | Autentikasi | Perilaku |
+| Area PRD | Requirement | Acceptance |
 |---|---|---|
-| Registrasi/login/logout/reset | Publik dengan rate limit atau sesi | Menerbitkan/mencabut sesi individual, tanpa password bersama |
-| Profil dan setup tenant | Sesi + membership | Membaca/mengubah tenant aktif dari server-side context |
-| Dashboard/transaksi/rencana/pos | Sesi + permission + tenant context | Mengembalikan resource tenant sendiri, paginasi dan validasi |
-| Export | Sesi ulang/one-time authorization | Hanya ekspor tenant sendiri; respons no-store; tanpa data tenant lain |
-| Integrasi WhatsApp | Sesi owner + re-auth untuk secret action | Menampilkan metadata/status, bukan secret |
-| Webhook WhatsApp | Signature provider | Resolve tenant dari integration ID dan enqueue durable; payload invalid ditolak |
-| Worker internal | Identitas service/job bertanda tangan | Memproses satu tenant/job; tidak menerima tenant arbitrer dari publik |
-| Health | Status generik publik; detail perlu admin | Tidak menampilkan env presence, jumlah pengguna, host DB, atau rincian exception |
-| Admin | Akun admin individual + MFA + audit | Tenant suspend/restore dan dukungan terbatas |
-| Billing webhook | Signature provider + idempotensi | Memperbarui subscription berdasarkan referensi provider yang diverifikasi |
+| Persiapan pribadi | SRS-ARCH-01–05, FR-AUTH-01–05, FR-FIN-01–05 | AC-R0-01–04 |
+| WhatsApp andal | FR-WA-01–06, NFR-REL-01–02 | AC-R0-05–07 |
+| Backup/migrasi | FR-DB-01–04, NFR-BCP | AC-R0-08 |
+| Privasi/secrets | FR-DATA, NFR-SEC-01–04 | AC-R0-09 |
+| SaaS beta masa depan | FR-AUTH-06, FR-WA-07, FR-DB-05, NFR-SEC-05 | AC-R1 |
+| Billing masa depan | FR-BILL, FR-DB-06, NFR-SEC-06 | AC-R2 |
 
-Format error umum: `{ code, message, requestId }`; detail validasi boleh menyertakan field yang aman. Error internal selalu disanitasi.
+## 13. Keputusan terbuka
 
-## 10. Alur penerimaan pesan secara rinci
-
-1. **Terima:** route membatasi ukuran body dan memverifikasi signature atas byte/body asli.
-2. **Parse envelope:** validasi skema event dengan parser runtime; event status/unsupported diproses sebagai event non-transaksi atau diabaikan secara terukur.
-3. **Resolve integration:** cari integrasi aktif dari ID nomor bisnis penerima; pastikan tenant aktif.
-4. **Authorize sender:** cocokkan nomor pengirim dengan identitas WhatsApp yang terhubung ke tenant. Pesan asing tidak menghasilkan akses maupun balasan yang membocorkan tenant.
-5. **Idempotency:** insert `inbound_event` unique; event yang sudah selesai tidak diproses ulang. Event yang sedang diproses dapat diambil alih setelah lease kedaluwarsa.
-6. **Durable queue:** simpan event/job minimal dan acknowledge webhook. Jangan membuat mutasi keuangan sebelum validasi/konfirmasi.
-7. **Interpretasi:** proses perintah deterministik; AI hanya jika consent aktif. Hasil AI menghasilkan aksi pending berumur pendek.
-8. **Commit:** transaksi, audit event, idempotency result, dan outbox dibuat dalam transaksi yang atomik.
-9. **Deliver:** worker mengirim balasan/outbox. Retry transient dengan batas; error permanent menjadi terminal dengan pemberitahuan/rekonsiliasi.
-10. **Observe:** catat durasi, kategori error, attempt, status akhir, tanpa raw message atau secret.
-
-## 11. Migrasi dari aplikasi satu pemilik
-
-- **MIG-01 MUST:** lakukan inventarisasi jumlah baris, konfigurasi, nomor aktif, pending action, transaksi berlaku/batal, dan rentang tanggal.
-- **MIG-02 MUST:** buat snapshot/backup dan rehearsal migrasi pada clone/staging sebelum database produksi diubah.
-- **MIG-03 MUST:** buat satu tenant legacy dan satu owner terverifikasi untuk pemilik saat ini.
-- **MIG-04 MUST:** tambahkan tenant ID nullable terlebih dahulu, backfill semua record dan relasi ke tenant legacy, lalu validasi tidak ada `NULL`/relasi lintas tenant.
-- **MIG-05 MUST:** migrasikan nomor WhatsApp whitelist menjadi integrasi tenant; kredensial provider tidak disalin dari data global yang tidak sesuai, dan diuji setelah migrasi.
-- **MIG-06 MUST:** ubah repository untuk memerlukan tenant context; aktifkan constraint NOT NULL/foreign key/index sesudah rekonsiliasi.
-- **MIG-07 MUST:** catat rekonsiliasi jumlah transaksi/plan/pos/pending sebelum dan sesudah; total saldo serta hasil laporan periode yang dikenal harus sama.
-- **MIG-08 MUST:** selama beta, signup publik tetap tertutup sampai semua endpoint, UI, worker, ekspor, webhook, health, serta admin menjalankan tenant isolation.
-- **MIG-09 MUST:** siapkan rollback atau forward-fix. Jangan menghapus kolom legacy atau backup sebelum release stabil dan jangka rollback berakhir.
-
-## 12. Acceptance criteria
-
-### Isolasi dan autentikasi
-
-- **AC-TEN-01:** dua tenant A/B mempunyai nama pos, rencana, transaksi, ekspor, dan nomor berbeda; seluruh endpoint A hanya mengembalikan/mengubah data A.
-- **AC-TEN-02:** ubah ID transaksi, pos, ekspor, action pending, membership, atau parameter tenant dari A menjadi ID milik B; respons tidak membocorkan data dan tidak mengubah B.
-- **AC-TEN-03:** query/repository bisnis tidak dapat dipanggil tanpa tenant context; pengujian static/contract mengidentifikasi jalur pengecualian yang disetujui.
-- **AC-AUTH-01:** akun A logout/revoke; cookie lama ditolak server-side pada halaman, API, dan ekspor.
-- **AC-AUTH-02:** rate limit login berlaku, reset token hanya dapat dipakai sekali sebelum kedaluwarsa, dan respons tidak membedakan email tidak ada dengan password salah.
-- **AC-AUTH-03:** aksi perubahan integrasi, ekspor sensitif, dan tutup akun menolak request tanpa re-authentication yang valid.
-
-### Pesan dan idempotensi
-
-- **AC-MSG-01:** signature salah atau body diubah setelah signature dibuat ditolak sebelum enqueue.
-- **AC-MSG-02:** webhook yang sama dikirim 10 kali menghasilkan maksimal satu mutasi transaksi.
-- **AC-MSG-03:** pesan untuk `phone_number_id` tenant A dan pengirim tak dikenal tidak dapat menulis atau membaca data A/B.
-- **AC-MSG-04:** database commit tetapi provider kirim balasan timeout; transaksi tetap satu, outbox berstatus retry, retry sukses memperbarui status.
-- **AC-MSG-05:** kegagalan provider terminal terlihat pada dashboard/alert operasional dan dapat dipulihkan tanpa transaksi ganda.
-- **AC-MSG-06:** burst event valid diakui setelah durable queue tanpa menunggu AI atau Graph API.
-
-### Keuangan dan AI
-
-- **AC-FIN-01:** seluruh skenario regresi mesin uang AC-01—AC-26 yang ada tetap menghasilkan hasil identik untuk tenant legacy.
-- **AC-FIN-02:** satu operasi ubah rencana yang gagal di tengah transaksi tidak meninggalkan versi aktif/selisih parsial.
-- **AC-FIN-03:** pagination/filter transaksi konsisten, tidak menghilangkan record di batas halaman saat ada transaksi baru.
-- **AC-AI-01:** AI default off; tanpa consent, teks bebas tidak pernah dikirim ke provider AI.
-- **AC-AI-02:** nilai AI dengan nominal/date yang tidak didukung teks asal, intent tak dikenal, JSON invalid, atau nominal batas ditolak dan tidak mengubah saldo.
-- **AC-AI-03:** interpretasi sah ditampilkan sebagai preview; tidak ada transaksi sampai pengguna menyetujui preview yang sama sebelum expiry.
-- **AC-AI-04:** retry pesan konfirmasi lama, konfirmasi tenant lain, atau konfirmasi setelah expiry tidak membuat transaksi.
-- **AC-AI-05:** cabut consent langsung menghentikan pemanggilan AI untuk pesan berikutnya dan fallback format baku tetap berfungsi.
-
-### Privasi, ekspor, penghapusan, operasi
-
-- **AC-DATA-01:** ekspor oleh A mengandung data A dan tidak mengandung identifier/record B; file tidak dapat diakses lagi setelah expiry/pemakaian sesuai kebijakan.
-- **AC-DATA-02:** permintaan tutup akun mencabut integrasi dan sesi, menolak pesan baru, membuat job penghapusan idempoten, dan statusnya dapat dilacak.
-- **AC-DATA-03:** prosedur menyatakan jadwal penghapusan dari backup dan log; verifikasi restore tidak mengaktifkan tenant yang telah dihapus tanpa prosedur pemulihan sah.
-- **AC-OPS-01:** alert terbentuk untuk antrean tertua melebihi ambang, gagal terminal, DB unavailable, dan backup gagal; alert tidak mengandung body pesan/secret.
-- **AC-OPS-02:** restore drill memenuhi RPO ≤24 jam dan RTO ≤4 jam serta rekonsiliasi total transaksi per tenant.
-- **AC-MIG-01:** migrasi legacy mempertahankan jumlah record, status pembatalan, hubungan parent/child, tanggal bisnis, versi rencana, dan hasil laporan yang diuji.
-- **AC-ADM-01:** akses support ke detail tenant ditolak tanpa grant terikat kasus dan waktu; grant dan seluruh pembacaan tercatat audit.
-
-## 13. Rencana pengujian
-
-1. Unit regression untuk mesin uang/parser dan batas nominal/tanggal.
-2. Repository contract test berjalan pada Postgres kompatibel, bukan hanya in-memory mock; uji transaksi, FK, unique constraints, dan rollback.
-3. Integration test multi-tenant dengan data serupa pada tenant A/B dan tenant C yang dinonaktifkan.
-4. API authorization matrix untuk setiap route/method/resource, termasuk IDOR, CSRF, expired session, rate limits, ekspor, dan admin.
-5. Webhook contract test untuk signature, payload invalid, event status, duplicate, out-of-order, batch, unknown integration, dan retry.
-6. Worker/outbox test untuk crash sebelum/sesudah send, timeout, 429/5xx, permanent error, lease expiry, dan replay.
-7. AI safety/evaluation dataset berbahasa Indonesia yang mencakup salah ketik, nominal ambigu, angka dalam label, beberapa nominal, tanggal relatif, prompt injection, serta kalimat non-keuangan. Tidak menggunakan data pribadi nyata tanpa persetujuan.
-8. E2E onboarding, setuju AI, cabut AI, catat, koreksi, ekspor, cabut WhatsApp, tutup akun.
-9. Load test dan query plan untuk 10.000 transaksi/tenant serta beban antrean yang ditetapkan NFR.
-10. Backup restore drill, migrasi staging, security review, dan pemeriksaan log/telemetry terhadap rahasia/PII.
-
-Rilis beta ditahan bila ada kegagalan isolasi, transaksi ganda, mutasi tanpa persetujuan AI, secret di log, restore tidak teruji, atau temuan keamanan critical/high yang belum ditangani.
-
-## 14. Traceability PRD ke SRS
-
-| Tujuan/area PRD | Requirement utama | Acceptance |
-|---|---|---|
-| SaaS multi-tenant dan privasi | FR-TEN, FR-AUTH, NFR-SEC | AC-TEN, AC-AUTH |
-| WhatsApp dan status pesan | FR-WA, FR-MSG | AC-MSG |
-| Pencatatan dan koreksi keuangan | FR-FIN | AC-FIN, FR-FIN-01 regression |
-| AI aman dan opt-in | FR-AI | AC-AI |
-| Ekspor/penghapusan | FR-DATA | AC-DATA |
-| Billing dan dukungan | FR-BILL, FR-ADM | AC-ADM; gerbang komersial |
-| Reliabilitas/operasi | NFR-REL, NFR-OBS | AC-OPS |
-| Pemulihan dan migrasi | NFR-BCP, MIG | AC-OPS-02, AC-MIG |
-
-## 15. Ketergantungan dan keputusan sebelum implementasi
-
-- Model identity provider dan strategi migrasi sesi tunggal ke akun individual.
-- Cara onboarding Meta untuk setiap pelanggan, ownership nomor, batas permission, serta rotasi token.
-- Queue/worker yang mendukung retry dan durable jobs di lingkungan hosting target.
-- Secret manager/encryption key management, rotasi, recovery, dan kontrol akses.
-- Billing provider, paket, mata uang, pajak, refund, masa tenggang, dan penghentian layanan.
-- Provider AI, persyaratan retensi/region, mekanisme consent, biaya maksimum, dan dataset evaluasi.
-- Jadwal retensi data, audit, logs, backup, serta penghapusan akhir.
-- Peninjauan legal/privasi, pemasaran, syarat layanan, dan kebutuhan operasional di Indonesia.
-- Target SLO produksi setelah pengukuran beta; target dalam dokumen ini belum otomatis menjadi SLA.
-
+- **R0:** provider/fasilitas backup, retensi dan akses snapshot; target RPO/RTO realistis; status terminal yang perlu ditampilkan; kebutuhan AI pribadi.
+- **R1:** target pasar, isolasi skema/tenant, onboarding Meta, email verification, dukungan, kebijakan privasi/retensi/penghapusan, dan akses admin.
+- **R2:** paket/harga/kuota, gateway, jadwal dan prorata, retry/masa tenggang, pembatalan/refund, invoice/pajak, serta akses ekspor setelah berhenti.
+- Jangan menetapkan harga, SLA, retensi hukum, atau klaim kepatuhan tanpa validasi pihak yang sesuai.

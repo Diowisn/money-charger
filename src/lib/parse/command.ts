@@ -3,7 +3,7 @@ import { extractDate } from "./date";
 import { WADAH, type DebtJenis, type Wadah } from "../types";
 
 export type Cmd =
-  | { k: "bantuan" | "saldo" | "laporan" | "laporan_periode" | "evaluasi" | "ekspor" }
+  | { k: "bantuan" | "saldo" | "aman" | "laporan" | "laporan_periode" | "evaluasi" | "ekspor" }
   | { k: "ya" | "batal" | "setuju" | "tolak" | "hapus_terakhir" }
   | { k: "setup"; tanggal: string | null; saldo: number; tabungan: number; investasi: number }
   | { k: "out"; nominal: number; biayaAdmin: number; uraian: string; tanggal: string | null }
@@ -32,6 +32,7 @@ export type Cmd =
 const SATU_KATA: Record<string, Cmd> = {
   bantuan: { k: "bantuan" },
   saldo: { k: "saldo" },
+  aman: { k: "aman" },
   laporan: { k: "laporan" },
   evaluasi: { k: "evaluasi" },
   ekspor: { k: "ekspor" },

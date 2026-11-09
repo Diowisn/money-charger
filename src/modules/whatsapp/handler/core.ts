@@ -19,7 +19,7 @@ import { konfirmasi, hapusTerakhir, koreksi } from "./koreksi";
 import { evaluasiManual, geser, kelolaPos, setRencana, usulan } from "./rencana";
 import { bonus, catatIn, catatOut, gaji, setup } from "./transaksi";
 import type { Deps, Masuk, SesiApi } from "./types";
-import { pindah, sisa } from "./wadah";
+import { aman, pindah, sisa } from "./wadah";
 
 class Sesi implements SesiApi {
   state!: State;
@@ -110,6 +110,7 @@ class Sesi implements SesiApi {
       case "tarik": return pindah(this, cmd.nominal, cmd.wadah, "saldo", "tarik");
       case "pindah": return pindah(this, cmd.nominal, cmd.dari, cmd.ke, "pindah");
       case "saldo": return teksWadah(hitungWadah(this.state));
+      case "aman": return aman(this);
       case "sisa": return sisa(this, cmd.pos);
       case "debt_add": return debtTambah(this, cmd.jenis, cmd.nominal, cmd.nama, cmd.jatuhTempo);
       case "debt_list": return debtDaftar(this, cmd.jenis);

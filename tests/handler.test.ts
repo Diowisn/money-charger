@@ -543,8 +543,18 @@ describe("laporan, ekspor, bantuan (AC-23)", () => {
     expect(await repo.consumeExport(hash, at("2026-11-02") + 16 * 60_000)).toBe(false);
   });
 
+  it("aman menampilkan batas harian, rata-rata belanja, dan proyeksi saldo", async () => {
+    await kirim("out 25rb kopi", "2026-11-02");
+    const r = (await kirim("aman", "2026-11-02"))!;
+    expect(r).toContain("Sisa aman: Rp");
+    expect(r).toContain("/hari untuk 29 hari (perkiraan 30 hari sejak gaji).");
+    expect(r).toContain("Rata-rata belanja 14 hari:");
+    expect(r).toContain("Status:");
+  });
+
   it("bantuan dan perintah tidak dikenali", async () => {
     expect(await kirim("bantuan", "2026-11-02")).toContain("out 25rb kopi");
+    expect(await kirim("bantuan", "2026-11-02")).toContain("aman");
     expect(await kirim("halo apa kabar", "2026-11-02")).toContain("tidak dikenali");
   });
 });

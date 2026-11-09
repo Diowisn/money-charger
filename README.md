@@ -88,7 +88,7 @@ Untuk percobaan lokal, isi variabel WhatsApp berikut sesuai API Setup Meta: `WA_
 
 ```bash
 npm install
-npm run db:setup     # membuat tabel, mengisi Draft 1 + alias, dan whitelist nomor
+npm run db:setup     # memastikan skema, mencatat baseline v1, seed default, dan whitelist nomor
 npm run lint
 npm run typecheck
 npm test
@@ -164,7 +164,7 @@ Arti hasil penting:
 - `ok: true` berarti konfigurasi dasar, DB, dan whitelist siap; lanjut verifikasi webhook di Meta.
 
 Tanpa `HEALTH_TOKEN`, endpoint ini hanya memberi status ringkas. Isi `HEALTH_TOKEN` untuk
-melihat detail diagnosa; detail hanya bisa dibaca dengan header token.
+melihat detail diagnosa; detail hanya bisa dibaca dengan header token. Health terautentikasi menghitung `inbound_gagal` dan `outbox_gagal`, tanpa mengembalikan payload pesan. Untuk cek manual, gunakan `Invoke-RestMethod` dengan header `X-Health-Token`; jangan masukkan token ke URL atau log terminal yang dibagikan.
 
 #### Retry balasan WhatsApp
 
@@ -175,6 +175,19 @@ worker tiap 10 menit. Isi repository secrets `APP_BASE_URL` dan `CRON_SECRET` un
 Payload job selesai dibersihkan setelah 7 hari, job gagal setelah 30 hari; outbox 30 hari; audit 180 hari.
 
 `Keluar semua` di dashboard mencabut semua sesi dengan menaikkan epoch di database.
+
+#### Backup dan restore melalui Neon
+
+Gunakan Neon Console → **Backup & Restore**. Jangan simpan `RESTORE_DATABASE_URL` atau `RESTORE_CONFIRM` di `.env.local`; keduanya tidak diperlukan untuk alur Console.
+
+- **Buat snapshot:** pilih project dan branch `main`, buka **Backup & Restore** → **Create snapshot**. Pastikan kartu snapshot muncul beserta waktu dan sumber sebelum migrasi skema berisiko. Jadwal otomatis dan retensi bergantung pada paket Neon; label **Upgrade for schedules** berarti jadwal belum dikonfigurasi/tersedia pada paket saat ini.
+- **Drill dari snapshot:** untuk restore point-in-time historis, buat branch baru dari snapshot/waktu yang dipilih agar tidak menimpa `main` atau branch `restore-drill`. Branch `restore-drill` yang sudah ada boleh dipakai untuk uji salinan terkini, tetapi reset dari parent menimpa isi branch itu. Pastikan expiry branch sebelum mulai.
+- **Validasi:** sambungkan aplikasi lokal sementara ke branch drill melalui **Connect** dan URL branch tersebut di `.env.local` lokal saja. Jangan commit atau kirim URL/password. Sebelum `npm run db:setup`, cek lagi host/branch yang dipilih pada Neon dan bahwa terminal memakai URL branch drill; command ini memastikan skema, mencatat baseline v1, seed default, dan whitelist nomor. Periksa login, jumlah transaksi, pos, rencana, relasi, saldo dan laporan periode yang dikenal; bandingkan dengan keadaan yang diharapkan untuk waktu snapshot.
+- **Pemulihan main:** gunakan **Restore from history** atau **Restore from a snapshot** pada branch `main` hanya saat memang ingin mengganti keadaan database produksi. Pilih point-in-time/snapshot dengan teliti dan ikuti konfirmasi Neon; tindakan ini dapat mengubah data aplikasi.
+- **Selesai drill:** catat waktu snapshot, branch yang diuji, hasil hitungan/cek laporan, lalu hapus branch uji bila tidak diperlukan lagi.
+- **Periksa kegagalan pesan:** `jumlah.inbound_gagal` dan `jumlah.outbox_gagal` yang bukan nol menandakan perlu investigasi. Periksa cron GitHub `Process WhatsApp queues`, `CRON_SECRET`, log deployment, dan status provider. Retry otomatis memproses job yang memenuhi jadwal; jangan menghapus atau mengedit record DB secara manual.
+
+Jangan menganggap **Restore from history** sebagai backup terpisah: jendela point-in-time bergantung pada paket. Buat snapshot sebelum perubahan berisiko dan verifikasi fitur/retensi aktual pada project Neon. Pemulihan `main` dari history/snapshot adalah perubahan produksi: pastikan waktu/branch, baca dialog konfirmasi Neon, dan lanjut hanya bila memang ingin database `main` kembali ke titik tersebut.
 
 #### Contoh panggilan WhatsApp Cloud API (PowerShell)
 
@@ -253,11 +266,13 @@ Buka `https://<domain-vercel-anda>/login`, pilih **Daftar akun baru**, lalu isi 
 Isi dashboard:
 
 - **Ringkasan**: sisa uang, rasio terpakai, pendapatan/pengeluaran bulan ini, alokasi per grup, dan detail pos yang bisa dilipat.
+- **Sisa aman**: batas belanja harian dari sisa jatah periode, rata-rata belanja 14 hari, dan perkiraan berapa hari saldo masih cukup.
+- **Perubahan kategori**: kategori yang naik/turun paling besar dibanding bulan lalu di tab Rekap.
 - **Rencana**: slider jatah per pos, Dana Darurat, Tabungan, dan Investasi. Simpan membuat versi rencana baru (versi lama diarsipkan). Opsi "berlaku juga di periode berjalan" menyesuaikan gaji periode aktif dan mencatat selisih ke Saldo.
 - **Transaksi**: catat pengeluaran, pemasukan, gaji, bonus, tarik, dan pindah; hapus transaksi (pembatalan, bukan hapus permanen). Menghapus gaji juga membatalkan alokasi dan selisihnya.
 - **Pos**: tambah pos (langsung masuk rencana aktif), ganti nama, tambah alias, nonaktifkan, dan setup awal sebelum gaji pertama.
 - **Piutang**: catat piutang (orang berutang ke kita) dan utang (kita berutang), bayar sebagian/lunas, atau batalkan.
-- **Target**: buat target tabungan (nama, nominal, target tanggal opsional), tambah tabungan sebagian demi sebagian, otomatis "Tercapai" saat terkumpul mencapai target.
+- **Target**: buat target tabungan (nama, nominal, target tanggal opsional), lihat saran sisihan per bulan/minggu, tambah tabungan sebagian demi sebagian, otomatis "Tercapai" saat terkumpul mencapai target.
 - **Tren pengeluaran**: grafik batang 14 hari terakhir di Ringkasan, lengkap dengan total, rata-rata, dan hari tertinggi.
 - **Asisten**: tanya jawab bebas tentang kondisi keuangan (pos paling boros, sisa uang, saran menabung) yang dijawab dari data dashboard, bukan tebakan.
 
@@ -268,7 +283,7 @@ Saat deploy, jalankan `npm run db:setup` untuk menerapkan skema akun, lalu dafta
 
 ## Perintah chat
 
-Ketik `bantuan` di bot. Contoh: `out 25rb kopi`, `gaji masuk 1.8 juta`, `bonus 200rb`, `saldo`, `sisa jajan`, `laporan`, `evaluasi`, `hapus terakhir`, `ekspor`.
+Ketik `bantuan` di bot. Contoh: `out 25rb kopi`, `gaji masuk 1.8 juta`, `bonus 200rb`, `saldo`, `aman`, `sisa jajan`, `laporan`, `evaluasi`, `hapus terakhir`, `ekspor`.
 
 Perintah tambahan: `piutang 100rb Andi` / `utang 50rb Budi` (catat), `piutang` / `utang` (lihat daftar aktif),
 `bayar piutang Andi 50rb` / `lunasi piutang Andi`; `target 5 juta Laptop Baru` (buat target tabungan), `target`

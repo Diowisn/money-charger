@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { bangunDashboard } from "../src/lib/dashboard";
+import { bangunDashboard, kebutuhanTarget } from "../src/lib/dashboard";
 import { aktifPlan, periodes, totalPlan } from "../src/lib/engine";
 import { MemRepo } from "../src/lib/mem-repo";
 import {
@@ -53,6 +53,29 @@ describe("dashboard", () => {
     expect(d.transaksi).toHaveLength(2);
     expect(d.ringkasan.pengeluaranBulanIni).toBe(50_000);
     expect(d.grup[0].terpakai).toBe(50_000);
+  });
+
+  it("menghitung sisa aman harian dari jatah dan rata-rata belanja", async () => {
+    const repo = await repoDenganGaji();
+    const d = bangunDashboard(await repo.load(), HARI);
+    expect(d.sisaAman).not.toBeNull();
+    expect(d.sisaAman).toMatchObject({ hariTersisa: 26, perkiraan: true, rataHarian: 0, habisDalamHari: null });
+    expect(d.sisaAman!.perHari).toBeGreaterThan(0);
+  });
+
+  it("membandingkan pengeluaran kategori dengan bulan sebelumnya", async () => {
+    const repo = await repoDenganGaji();
+    const pos = (await repo.load()).subPosts[0];
+    await tambahTransaksi(repo, HARI, { tipe: "out", nominal: 30_000, tanggal: "2025-12-20", subPostId: pos.id });
+    await tambahTransaksi(repo, HARI, { tipe: "out", nominal: 50_000, tanggal: HARI, subPostId: pos.id });
+    const d = bangunDashboard(await repo.load(), HARI);
+    expect(d.perubahanKategori[0]).toMatchObject({ nama: pos.nama, sekarang: 50_000, sebelumnya: 30_000, delta: 20_000 });
+  });
+
+  it("menghitung kebutuhan tabungan target per bulan dan minggu", () => {
+    expect(kebutuhanTarget(1_200_000, "2026-04-15", HARI)).toEqual({ perBulan: 400_000, perMinggu: 93_000 });
+    expect(kebutuhanTarget(500_000, null, HARI)).toEqual({ perBulan: null, perMinggu: null });
+    expect(kebutuhanTarget(0, "2026-04-15", HARI)).toEqual({ perBulan: null, perMinggu: null });
   });
 
   it("menghitung pengeluaran periode awal terhadap rencana aktif", async () => {

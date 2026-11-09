@@ -1,4 +1,5 @@
-import { hitungPeriode, hitungWadah, periodes } from "@/lib/engine";
+import { hitungPeriode, hitungWadah, periodes, planById, totalPlan } from "@/lib/engine";
+import { hitungSisaAman, hitungTrenPengeluaran } from "@/lib/dashboard";
 import { rp } from "@/lib/format";
 import { daftarPilihan, norm } from "@/lib/parse/pos";
 import { teksWadah } from "@/lib/report";
@@ -12,6 +13,26 @@ export async function pindah(s: SesiApi, nominal: number, dari: Wadah, ke: Wadah
   await s.r.insertTx(buatTx({ tipe, nominal, wadahAsal: dari, wadahTujuan: ke, tanggal: s.today, waMessageId: s.msg.id }));
   await s.muat();
   return `${tipe === "tarik" ? "Ditarik" : "Dipindahkan"} ${rp(nominal)} dari ${dari} ke ${ke}.\n${teksWadah(hitungWadah(s.state))}`;
+}
+
+export function aman(s: SesiApi): string {
+  const ps = periodes(s.state);
+  if (!ps.length) return "Belum ada periode berjalan. Catat gaji dulu agar batas aman harian bisa dihitung.";
+  const aktif = ps[ps.length - 1];
+  const h = hitungPeriode(s.state, ps, aktif);
+  const w = hitungWadah(s.state);
+  const plan = planById(s.state, aktif.planId);
+  const tren = hitungTrenPengeluaran(s.state, s.today);
+  const hasil = hitungSisaAman(Math.max(0, totalPlan(plan) - h.terpakaiTotal), w.saldo, s.today, aktif.start, aktif.end, tren);
+  if (!hasil) return "Belum ada periode berjalan. Catat gaji dulu agar batas aman harian bisa dihitung.";
+  const status = hasil.perHari >= hasil.rataHarian ? "Aman" : "Ketat";
+  const baris = [
+    `Sisa aman: ${rp(hasil.perHari)}/hari untuk ${hasil.hariTersisa} hari${hasil.perkiraan ? " (perkiraan 30 hari sejak gaji)" : ""}.`,
+    `Rata-rata belanja 14 hari: ${rp(hasil.rataHarian)}/hari.`,
+  ];
+  if (hasil.habisDalamHari !== null) baris.push(`Saldo ${rp(w.saldo)} cukup sekitar ${hasil.habisDalamHari} hari (${hasil.habisTanggal}).`);
+  baris.push(`Status: ${status}.`);
+  return baris.join("\n");
 }
 
 export function sisa(s: SesiApi, pos: string): string {

@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { NextRequest } from "next/server";
+import { sanitasiDetailAudit } from "@/lib/audit";
 import { retryOutbox } from "@/modules/outbox/controller";
 import { terimaEmail } from "@/modules/email/controller";
 import { health } from "@/modules/health/controller";
@@ -20,6 +21,11 @@ afterEach(() => {
 });
 
 describe("proteksi endpoint operasional", () => {
+  it("menghapus isi dan field sensitif dari detail audit", () => {
+    expect(sanitasiDetailAudit({ jenis: "text", pesanId: "wamid.123", nomor: "628123456789", pesan: "out 20rb kopi", token: "secret" })).toEqual({ jenis: "text", pesanId: "wamid.123" });
+    expect(sanitasiDetailAudit({ jenis: "x".repeat(200) })).toEqual({ jenis: "x".repeat(120) });
+  });
+
   it("menolak secret email di query string", async () => {
     process.env.EMAIL_INBOUND_SECRET = "secret-uji";
     const req = new NextRequest("https://app.example/api/email/inbound?secret=secret-uji", {

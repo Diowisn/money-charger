@@ -87,6 +87,29 @@ export function Rekap({ data, navigasi }: { data: DashboardData; navigasi: (tab:
         </div>
       </section>
 
+      <section className="kartu rekap-kategori">
+        <div className="baris-antara">
+          <h2>Perubahan Kategori</h2>
+          <span className="muted kecil">
+            vs {labelBulan(mundurBulan(Number(bulanIni.slice(0, 4)), Number(bulanIni.slice(5, 7)), 1))}
+          </span>
+        </div>
+        <ul>
+          {data.perubahanKategori.map((item) => (
+            <li key={item.nama}>
+              <span>{item.nama}</span>
+              <span className={item.delta > 0 ? "delta-naik" : "delta-turun"}>
+                {item.delta > 0 ? "+" : ""}
+                {rp(item.delta)}
+              </span>
+            </li>
+          ))}
+          {!data.perubahanKategori.length ? (
+            <li className="muted kecil">Belum ada perubahan pengeluaran yang menonjol.</li>
+          ) : null}
+        </ul>
+      </section>
+
       <section className="kartu rekap-tren">
         <div className="baris-antara">
           <h2>Tren 14 Hari</h2>

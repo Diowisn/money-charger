@@ -75,11 +75,86 @@ export interface GoalView {
   catatan: string | null;
   status: "aktif" | "selesai" | "batal";
   lewatTempo: boolean;
+  perluPerBulan: number | null;
+  perluPerMinggu: number | null;
 }
 
 export interface TrenHari {
   tanggal: string;
   pengeluaran: number;
+}
+
+export interface SisaAman {
+  hariTersisa: number;
+  perHari: number;
+  rataHarian: number;
+  habisDalamHari: number | null;
+  habisTanggal: string | null;
+  perkiraan: boolean;
+}
+
+export interface PerubahanKategori {
+  nama: string;
+  sekarang: number;
+  sebelumnya: number;
+  delta: number;
+}
+
+export function kebutuhanTarget(sisa: number, targetTanggal: string | null, hariIni: string): { perBulan: number | null; perMinggu: number | null } {
+  if (!targetTanggal || sisa <= 0) return { perBulan: null, perMinggu: null };
+  const hari = Math.max(1, diffDays(targetTanggal, hariIni));
+  const bulat = (nilai: number) => Math.ceil(nilai / 1000) * 1000;
+  return {
+    perBulan: bulat(sisa / Math.max(1, Math.ceil(hari / 30))),
+    perMinggu: bulat(sisa / Math.max(1, Math.ceil(hari / 7))),
+  };
+}
+
+export function hitungSisaAman(
+  sisaUang: number,
+  saldo: number,
+  hariIni: string,
+  mulai: string | null,
+  akhir: string | null,
+  tren: TrenHari[],
+): SisaAman | null {
+  if (!mulai) return null;
+  const perkiraan = !akhir;
+  const akhirEfektif = akhir ?? addDays(mulai, 30);
+  const hariTersisa = Math.max(1, diffDays(akhirEfektif, hariIni) + 1);
+  const rataHarian = tren.length ? tren.reduce((s, t) => s + t.pengeluaran, 0) / tren.length : 0;
+  const perHari = Math.max(0, Math.floor(sisaUang / hariTersisa / 1000) * 1000);
+  const habisDalamHari = rataHarian > 0 ? Math.max(0, Math.ceil(saldo / rataHarian)) : null;
+  return {
+    hariTersisa,
+    perHari,
+    rataHarian: Math.round(rataHarian),
+    habisDalamHari,
+    habisTanggal: habisDalamHari === null ? null : addDays(hariIni, habisDalamHari),
+    perkiraan,
+  };
+}
+
+export function hitungPerubahanKategori(state: State, hariIni: string, batas = 5): PerubahanKategori[] {
+  const bulan = hariIni.slice(0, 7);
+  const bulanLalu = addDays(`${bulan}-01`, -1).slice(0, 7);
+  const sekarang = new Map<string, number>();
+  const sebelumnya = new Map<string, number>();
+  for (const t of state.txs) {
+    if (t.status !== "berlaku" || t.tipe !== "out") continue;
+    const nama = namaSubPost(state, t.subPostId) ?? (t.label?.trim() || "Tanpa pos");
+    if (t.tanggal.startsWith(bulan)) sekarang.set(nama, (sekarang.get(nama) ?? 0) + nominalKeluar(t));
+    else if (t.tanggal.startsWith(bulanLalu)) sebelumnya.set(nama, (sebelumnya.get(nama) ?? 0) + nominalKeluar(t));
+  }
+  return [...new Set([...sekarang.keys(), ...sebelumnya.keys()])]
+    .map((nama) => {
+      const kini = sekarang.get(nama) ?? 0;
+      const lalu = sebelumnya.get(nama) ?? 0;
+      return { nama, sekarang: kini, sebelumnya: lalu, delta: kini - lalu };
+    })
+    .filter((item) => item.delta !== 0)
+    .sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta))
+    .slice(0, batas);
 }
 
 export interface DashboardData {
@@ -114,6 +189,8 @@ export interface DashboardData {
   };
   grup: GrupView[];
   tren: TrenHari[];
+  sisaAman: SisaAman | null;
+  perubahanKategori: PerubahanKategori[];
   piutang: DebtView[];
   goals: GoalView[];
   posLain: { dd: number; tabungan: number; investasi: number; ddSisa: number };
@@ -272,21 +349,28 @@ export function bangunDashboard(state: State, hariIni: string): DashboardData {
     .filter((d) => d.status === "aktif" && d.jenis === "utang")
     .reduce((s, d) => s + d.sisa, 0);
 
+  const tren = hitungTrenPengeluaran(state, hariIni);
   const goals: GoalView[] = state.goals
     .filter((g) => g.status !== "batal")
-    .map((g) => ({
-      id: g.id,
-      nama: g.nama,
-      targetNominal: g.targetNominal,
-      terkumpul: g.terkumpul,
-      sisa: Math.max(0, g.targetNominal - g.terkumpul),
-      progres: g.targetNominal ? Math.min(1, g.terkumpul / g.targetNominal) : 0,
-      tanggal: g.tanggal,
-      targetTanggal: g.targetTanggal,
-      catatan: g.catatan,
-      status: g.status,
-      lewatTempo: g.status === "aktif" && Boolean(g.targetTanggal && g.targetTanggal < hariIni),
-    }))
+    .map((g) => {
+      const sisa = Math.max(0, g.targetNominal - g.terkumpul);
+      const perlu = g.status === "aktif" ? kebutuhanTarget(sisa, g.targetTanggal, hariIni) : { perBulan: null, perMinggu: null };
+      return {
+        id: g.id,
+        nama: g.nama,
+        targetNominal: g.targetNominal,
+        terkumpul: g.terkumpul,
+        sisa,
+        progres: g.targetNominal ? Math.min(1, g.terkumpul / g.targetNominal) : 0,
+        tanggal: g.tanggal,
+        targetTanggal: g.targetTanggal,
+        catatan: g.catatan,
+        status: g.status,
+        lewatTempo: g.status === "aktif" && Boolean(g.targetTanggal && g.targetTanggal < hariIni),
+        perluPerBulan: perlu.perBulan,
+        perluPerMinggu: perlu.perMinggu,
+      };
+    })
     .sort((a, b) => {
       if (a.status !== b.status) return a.status === "aktif" ? -1 : 1;
       return a.tanggal < b.tanggal ? 1 : a.tanggal > b.tanggal ? -1 : b.id - a.id;
@@ -325,7 +409,9 @@ export function bangunDashboard(state: State, hariIni: string): DashboardData {
       goalTargetAktif,
     },
     grup,
-    tren: hitungTrenPengeluaran(state, hariIni),
+    tren,
+    sisaAman: hitungSisaAman(Math.max(0, totalRencana - terpakai), wadah.saldo, hariIni, perAktif?.start ?? null, perAktif?.end ?? null, tren),
+    perubahanKategori: hitungPerubahanKategori(state, hariIni),
     piutang,
     goals,
     posLain: {

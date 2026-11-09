@@ -2,35 +2,35 @@
 
 | Atribut | Nilai |
 |---|---|
-| Status | Draft untuk validasi produk |
-| Versi | 1.0 |
-| Tanggal | 4 November 2026 |
+| Status | Draft implementasi bertahap; penggunaan awal pribadi |
+| Versi | 1.1 |
+| Tanggal | 9 November 2026 |
 | Pemilik | Product owner Money-Charger |
 | Dokumen teknis | [SRS](./srs-catatan-keuangan-whatsapp.md) |
-| Model produk | SaaS bersama, multi-tenant |
+| Model produk | Aplikasi pribadi sekarang; SaaS multi-tenant sebagai sasaran masa depan |
 
-> Dokumen ini adalah spesifikasi produk dan rancangan sasaran, bukan klaim bahwa fitur SaaS sudah tersedia. Penentuan kewajiban hukum, kontrak pemroses data, kebijakan Meta, dan pajak harus ditinjau oleh pihak yang kompeten sebelum peluncuran komersial.
+> Dokumen ini memisahkan persiapan yang aman untuk aplikasi pribadi dari fitur yang baru diperlukan saat menerima pelanggan berbayar. Rancangan SaaS adalah sasaran, bukan klaim bahwa fitur tersebut sudah tersedia. Kewajiban hukum, kontrak pemroses data, kebijakan Meta, dan pajak perlu ditinjau sebelum peluncuran komersial.
 
 ## 1. Ringkasan produk
 
-Money-Charger membantu individu mencatat pemasukan dan pengeluaran dalam rupiah melalui WhatsApp, lalu melihat keadaan keuangan dan mengatur anggaran lewat dashboard web. Produk berkembang dari aplikasi untuk satu pemilik menjadi layanan SaaS: banyak pelanggan memakai aplikasi yang sama, tetapi identitas, nomor WhatsApp, konfigurasi, anggaran, transaksi, dan hak akses setiap pelanggan tetap terpisah.
+Money-Charger membantu pemilik mencatat pemasukan dan pengeluaran dalam rupiah melalui WhatsApp, lalu melihat keadaan keuangan dan mengatur anggaran lewat dashboard web. Tahap implementasi saat ini tetap aplikasi pribadi. Arsitektur dan keputusan data dibuat agar transisi ke SaaS berbayar kelak mungkin dilakukan dengan migrasi terencana, bukan dengan mengaktifkan pelanggan di sistem yang belum siap.
 
-Sistem memberi ringkasan pencatatan dan anggaran, bukan rekening bank, layanan pembayaran, pembukuan pajak, atau nasihat investasi. AI hanya membantu memahami teks dan harus tunduk pada aturan validasi serta mekanisme koreksi yang transparan.
+Sistem memberi ringkasan pencatatan dan anggaran, bukan rekening bank, layanan pembayaran, pembukuan pajak, atau nasihat investasi. Jika kelak dipasarkan, AI hanya membantu memahami teks dan harus tunduk pada aturan validasi serta mekanisme koreksi transparan.
 
 ## 2. Latar belakang dan masalah
 
-Versi yang berjalan sekarang telah memiliki pencatatan WhatsApp, mesin anggaran, dashboard, dan ekspor. Arsitektur data serta autentikasi tetap berorientasi satu pemilik: tabel transaksi dan konfigurasi belum dimiliki tenant, nomor yang diizinkan bersifat global, dan dashboard memakai satu password server. Mengundang beberapa pelanggan ke deployment yang sama sebelum memperbaiki hal ini berisiko mencampur atau membocorkan data keuangan mereka.
+Versi berjalan sudah memiliki pencatatan WhatsApp, mesin anggaran, dashboard, autentikasi pengguna, dan ekspor. Namun desain data/integrasi belum boleh dianggap siap untuk banyak pelanggan: sejumlah tabel operasional tidak memiliki pemilik/tenant dan aturan nomor WhatsApp masih memiliki asumsi global. Pemakaian pribadi dapat dilanjutkan, tetapi membuka akses pelanggan luar sebelum audit dan perbaikan isolasi berisiko membocorkan data.
 
-Kebutuhan produk berikutnya bukan sekadar memecah kode ke modul HMVC. Produk komersial juga membutuhkan isolasi tenant, onboarding dan pengelolaan akun, pengiriman pesan yang dapat dipulihkan, kontrol privasi, operasi dukungan, serta cara memigrasikan data awal dengan aman.
+Kebutuhan sekarang adalah membuat aplikasi pribadi aman, andal, dapat dicadangkan, dan mudah dimigrasikan. Kebutuhan komersial—tenant, onboarding pelanggan, dukungan, billing, privasi operasional, serta pemulihan—baru menjadi gerbang wajib jika keputusan membuka layanan dibuat. Refaktor HMVC atau multi-tenant penuh bukan tujuan tersendiri.
 
 ## 3. Tujuan
 
-1. Memungkinkan pelanggan membuat akun dan memakai layanan tanpa berbagi data dengan pelanggan lain.
-2. Mempertahankan kecepatan mencatat transaksi melalui WhatsApp dan memberi dashboard web sebagai tempat meninjau serta mengoreksi catatan.
-3. Menjamin setiap operasi—termasuk webhook, ekspor, tugas latar, dan dukungan admin—terikat pada tenant yang benar.
-4. Mencegah pesan yang sudah dicatat hilang hanya karena balasan WhatsApp gagal dikirim.
-5. Memberi pelanggan transparansi dan kendali atas penggunaan AI, integrasi, ekspor, retensi, serta penghapusan data.
-6. Menyediakan operasi yang bisa dipantau, dipulihkan, dan dikembangkan tanpa mengikat domain ke satu vendor.
+1. Mempertahankan penggunaan pribadi yang aman dan tidak mengganggu catatan keuangan yang sudah ada.
+2. Memudahkan pencatatan via WhatsApp dan peninjauan/koreksi lewat dashboard.
+3. Mencegah transaksi ganda/hilang, serta memastikan kegagalan balasan terlihat dan dapat dipulihkan.
+4. Menyediakan ekspor, backup, pemulihan, dan migrasi data yang dapat diverifikasi.
+5. Menjaga batas autentikasi, secrets, dan akses data agar fondasi siap diaudit sebelum pelanggan luar diizinkan.
+6. Menentukan prasyarat produk, teknis, biaya, dan hukum sebelum paket berbayar diaktifkan.
 
 ## 4. Bukan tujuan (rilis awal)
 
@@ -75,33 +75,48 @@ Mengelola status tenant dan integrasi operasional melalui akses terpisah, terbat
 
 ## 7. Lingkup dan urutan rilis
 
-### Rilis 1 — SaaS beta tertutup (prioritas P0)
+### Rilis 0 — Persiapan aplikasi pribadi (prioritas sekarang)
+
+Tujuan: terus memakai Money-Charger sendiri, sambil mengurangi biaya perubahan bila produk kelak dibuka ke pelanggan. Tidak ada signup publik, billing aktif, atau janji layanan komersial pada tahap ini.
+
+- Pertahankan akun dan data pemilik saat ini; migrasi harus punya snapshot, rekonsiliasi jumlah transaksi/saldo, uji staging, dan rollback.
+- Selesaikan fitur inti pribadi: pemasukan, pengeluaran, pos, anggaran, saldo/wadah, laporan, koreksi, ekspor, dan pencatatan WhatsApp yang andal.
+- Rapikan batas modul untuk identitas pengguna, hak akses, integrasi, dan transaksi. Siapkan pemetaan pemilik/workspace di desain, tetapi jangan menambah abstraksi tenant yang belum dipakai.
+- Pastikan setiap query sensitif terikat ke identitas sesi pemilik; lindungi webhook, ekspor, admin/operasi, dan secrets. Backup serta uji pemulihan wajib.
+- Siapkan entitlement sederhana di domain hanya bila diperlukan untuk memisahkan fitur gratis/berbayar kelak; jangan membuat tabel harga, checkout, payment provider, atau subscription worker sekarang.
+- Tambahkan konfigurasi fitur yang dapat dimatikan dan pencatatan versi skema/migrasi. Hindari hard-code keputusan paket di banyak route.
+- Ukur penggunaan dan biaya WhatsApp, AI, database, dan hosting tanpa merekam isi transaksi di telemetry.
+- Catat keputusan produk terbuka: target pasar, paket, harga, kuota, kebijakan pembatalan/refund, gateway, dan kanal dukungan. Belum perlu diputuskan untuk pemakaian pribadi.
+
+### Rilis 1 — SaaS beta tertutup (hanya setelah keputusan membuka ke pengguna luar)
+
+Gerbang masuk: pemilik menyetujui pilot eksternal; audit isolasi dan keamanan lulus; kebijakan privasi, syarat, dukungan, biaya, dan proses penghapusan siap. Jika gerbang belum dipenuhi, tetap di Rilis 0.
 
 - Registrasi/undangan, login individual, verifikasi email, reset kata sandi, sesi yang dapat dicabut, dan pengelolaan profil dasar.
-- Satu workspace pribadi per pelanggan; model data tetap memakai tenant agar pembagian akses di masa depan tidak memerlukan desain ulang.
+- Tenant/workspace pribadi per pelanggan; otorisasi server-side dan isolasi menyeluruh untuk query, cache, ekspor, laporan, webhook, antrean, dan admin.
 - Onboarding terpandu: zona waktu, tanggal mulai, saldo awal, rencana anggaran, dan penautan nomor WhatsApp.
-- Satu nomor WhatsApp per tenant. Onboarding awal dapat dibantu operator dan harus memakai proses Meta resmi yang disetujui; otomatisasi Embedded Signup bukan prasyarat beta dan merupakan keputusan terbuka.
-- Fitur inti saat ini: pemasukan, gaji, pengeluaran, bonus, pos, rencana, saldo/wadah, laporan, koreksi, ekspor.
-- Riwayat transaksi tenant yang lengkap dengan pencarian/filter dasar dan pagination server-side.
-- Penggunaan AI opsional dengan persetujuan eksplisit, penjelasan pemrosesan, indikator transaksi hasil AI, dan konfirmasi pengguna sebelum transaksi AI dicatat.
-- Idempotensi pesan masuk, outbox untuk balasan, retry, log operasional tersanitasi, serta prosedur dukungan.
-- Ekspor data dan permintaan penutupan akun/penghapusan sesuai kebijakan retensi yang telah ditinjau.
-- Admin internal minimal untuk status tenant/integrasi, tanpa akses rutin ke isi catatan.
-- Pilot terbatas; billing boleh dikelola manual hanya jika syarat, harga, penagihan, dan dukungan dijelaskan sebelum pengguna menyetujui layanan.
+- Satu nomor WhatsApp per tenant melalui proses Meta resmi yang disetujui; Embedded Signup keputusan terpisah.
+- Riwayat transaksi tenant dengan pencarian/filter dasar dan pagination server-side.
+- AI opsional dengan persetujuan eksplisit, penjelasan pemrosesan, indikator sumber, dan konfirmasi untuk hasil ambigu.
+- Idempotensi pesan masuk, outbox, retry, log tersanitasi, pemantauan, dukungan, ekspor, dan penutupan akun.
+- Pilot terbatas; jangan mengaktifkan pembayaran manual tanpa harga, ketentuan, penagihan, dan dukungan yang disampaikan serta disetujui.
 
 ### Rilis 2 — Peluncuran berbayar (P1)
 
-- Integrasi billing/langganan, siklus pembayaran, pajak/nota sesuai tinjauan bisnis dan legal, pembatalan, masa tenggang, dan pembatasan fitur tanpa menghapus data.
-- Onboarding WhatsApp mandiri jika API, persetujuan, serta model kredensial Meta telah divalidasi.
-- Undangan anggota keluarga/workspace bersama dengan peran dan persetujuan pemilik.
-- Pengingat anggaran/notifikasi terjadwal hanya setelah izin, preferensi frekuensi, dan aturan WhatsApp ditinjau.
-- Impor transaksi dengan format yang terdokumentasi.
+Gerbang masuk: pilot memberi bukti kebutuhan dan willingness-to-pay; ekonomi unit diketahui; target pasar, provider, pajak/nota, refund, pembatalan, dukungan, dan ketentuan telah diputuskan serta ditinjau. Rilis ini tidak diperlukan untuk penggunaan pribadi.
+
+- Paket, harga, entitlement, batas pemakaian, checkout, webhook pembayaran terverifikasi, invoice/nota sesuai tinjauan bisnis dan legal.
+- Siklus langganan: aktif, gagal bayar, masa tenggang, ditangguhkan, dibatalkan, kedaluwarsa, refund; idempotensi dan rekonsiliasi transaksi.
+- Portal pelanggan untuk melihat paket/status, memperbarui metode pembayaran melalui provider, mengunduh dokumen, dan membatalkan.
+- Perubahan paket efektif dan prorata ditetapkan secara eksplisit; pembatasan fitur tidak menghapus atau merusak data pelanggan.
+- Admin terbatas untuk melihat status pembayaran dan memperbaiki kasus melalui tindakan audit; jangan simpan data kartu.
+- Uji sandbox dan skenario webhook duplikat/tidak berurutan, timeout, kegagalan provider, refund, serta pemulihan.
+- Onboarding WhatsApp mandiri, anggota bersama, impor, dan notifikasi hanya bila kebutuhan dan kepatuhan sudah divalidasi.
 
 ### Rilis 3 — Pertumbuhan (P2)
 
-- Beberapa nomor/integrasi per tenant, dukungan tambahan format/pesan, bahasa lain, serta laporan lanjutan berdasarkan riset.
-- API publik/mitra hanya bila ada kebutuhan dan model otorisasi/batas penggunaan tersendiri.
-- Fitur AI tambahan setelah evaluasi akurasi, biaya, privasi, dan keselamatan.
+- Beberapa nomor/integrasi per tenant, dukungan format/pesan dan bahasa lain, laporan lanjutan berdasarkan riset.
+- API publik/mitra dan AI tambahan hanya setelah kebutuhan, otorisasi, batas biaya, privasi, dan keselamatan tervalidasi.
 
 ## 8. Alur utama
 
@@ -155,16 +170,15 @@ Mengelola status tenant dan integrasi operasional melalui akses terpisah, terbat
 
 ## 10. Ukuran keberhasilan
 
-Target berikut adalah **gerbang usulan** yang harus divalidasi selama beta, bukan klaim performa saat ini.
+Target berikut usulan, bukan klaim performa saat ini. Tahap pribadi dinilai dari reliabilitas dan keselamatan data; metrik komersial baru berlaku sebelum pilot/penjualan.
 
-- **Isolasi:** 100% tes otorisasi lintas-tenant lulus; tidak ada kebocoran lintas tenant pada pengujian rilis.
-- **Aktivasi:** minimal 80% pengguna beta menyelesaikan setup dan pesan uji dalam satu sesi onboarding (ukur 20 pengguna pertama).
-- **Keberhasilan pencatatan:** minimal 99% pesan berformat baku yang diterima sah tercatat tepat satu kali atau ditolak dengan alasan yang dapat dipahami.
-- **Koreksi:** setiap transaksi AI dapat dikenali sumbernya dan dapat dikoreksi/dibatalkan melalui WhatsApp/dashboard.
-- **Reliabilitas balasan:** minimal 99% balasan terkirim dalam 2 menit ketika API penyedia tersedia; kegagalan terminal terlihat dan tidak hilang diam-diam.
-- **Pemulihan:** uji restore memenuhi RPO 24 jam dan RTO 4 jam sebelum beta eksternal.
-- **Kepuasan:** ukur aktivasi, pengguna aktif mingguan, transaksi gagal/koreksi, tiket dukungan, dan churn; jangan mengoptimalkan jumlah transaksi tanpa mengukur kesalahan.
-- **Ekonomi unit:** biaya infrastruktur, provider pesan, AI, pembayaran, dan dukungan per tenant dipantau sebelum menetapkan harga publik.
+- **Keutuhan data pribadi:** migrasi/restore mempertahankan jumlah transaksi dan hasil saldo terrekonsiliasi; tidak ada kehilangan diam-diam.
+- **Keberhasilan pencatatan:** pesan berformat baku yang sah tercatat tepat satu kali atau ditolak dengan alasan yang dapat dipahami.
+- **Reliabilitas balasan:** status gagal terlihat dan dapat dipulihkan; ukur waktu kirim ketika API provider tersedia.
+- **Pemulihan:** backup terjadwal dan restore berhasil diuji sebelum perubahan skema berisiko.
+- **Keamanan sebelum pelanggan luar:** 100% tes otorisasi lintas-tenant lulus; tidak ada kebocoran lintas tenant pada pengujian rilis.
+- **Pilot:** ukur aktivasi, pengguna aktif, kesalahan/koreksi, tiket dukungan, dan churn; jangan optimalkan jumlah transaksi tanpa mengukur kesalahan.
+- **Ekonomi unit sebelum harga publik:** biaya infrastruktur, provider pesan, AI, pembayaran, dan dukungan per pelanggan terukur; harga dan batas pemakaian menutup biaya serta punya alasan produk.
 
 ## 11. Keamanan, privasi, dan kepercayaan
 
@@ -206,20 +220,34 @@ Keputusan berikut harus ditutup sebelum rilis yang menyentuh area terkait:
 1. **Registrasi:** beta undangan; syarat membuka pendaftaran umum ditetapkan dari hasil onboarding dan dukungan.
 2. **WhatsApp:** awalnya satu nomor milik tenant. Pilih antara onboarding operator-terbantu atau Embedded Signup resmi setelah verifikasi Meta dan kelayakan komersial.
 3. **Anggota:** rilis pertama hanya pemilik tenant; anggota keluarga/kolaborator ditunda sampai model peran dan konflik transaksi dirancang.
-4. **Billing dan harga:** belum ditetapkan. Validasi willingness-to-pay dan biaya unit; pilih payment provider kemudian. Jangan menyimpan data kartu.
+4. **Billing dan harga:** tidak dibutuhkan untuk penggunaan pribadi. Sebelum beta, validasi willingness-to-pay dan biaya unit; sebelum penjualan, putuskan paket, harga, kuota, gateway, jadwal tagihan, prorata, kegagalan bayar, masa tenggang, refund, pembatalan, akses data setelah berhenti, serta dokumen pajak/nota yang relevan. Jangan menyimpan data kartu.
 5. **AI:** opt-in; perlu konfirmasi sebelum mencatat hasil bahasa bebas di produk komersial. Tentukan provider, lokasi pemrosesan, retensi, dan batas biaya setelah tinjauan privasi.
 6. **Retensi:** tetapkan retensi pesan metadata, audit, log, dan backup sebelum syarat privasi dipublikasikan.
 7. **SLA:** target beta 99,5% ketersediaan bulanan adalah sasaran internal awal, bukan komitmen kontraktual sampai terukur dan disetujui.
 8. **Penghapusan:** definisikan masa penundaan, pengecualian yang sah, serta tenggat penghapusan dari backup sebelum implementasi.
 9. **Geografi/hukum:** pastikan target pasar dan lokasi pemrosesan data dengan penasihat yang kompeten.
 
-## 15. Kriteria kesiapan peluncuran beta
+## 15. Kriteria kesiapan per tahap
 
-- Migrasi tenant lulus di lingkungan staging dengan snapshot dan rencana rollback.
-- Uji isolasi lintas tenant lulus untuk seluruh endpoint, model, UI, webhook, queue worker, ekspor, serta admin.
-- Tidak ada route sensitif tanpa autentikasi/otorisasi; login memiliki pembatasan percobaan dan pemulihan aman.
-- Webhook idempoten; kegagalan pengiriman balasan dapat di-retry dan dipantau.
-- Restore database dan pemeriksaan konsistensi transaksi berhasil didemonstrasikan.
-- Persetujuan AI, ekspor, pencabutan integrasi, penghapusan, privasi, dan kanal dukungan diuji.
-- Uji pilot dengan variasi bahasa Indonesia, nominal, tanggal, typo, dan input ambigu selesai; tingkat salah ukur dan diterima product owner.
-- Semua keputusan terbuka yang menjadi prasyarat diputuskan dan dicatat sebelum menjanjikan fitur/retensi/harga kepada pelanggan.
+### Rilis 0 — penggunaan pribadi
+
+- Alur login dan semua route sensitif memerlukan autentikasi/otorisasi yang sesuai.
+- Backup database tersedia; restore dan pemeriksaan konsistensi transaksi berhasil didemonstrasikan.
+- Webhook idempoten; kegagalan balasan tidak menghilangkan transaksi dan dapat ditemukan/dicoba ulang.
+- Migrasi data/schema punya snapshot, hitung rekonsiliasi, serta rollback yang diuji pada staging bila berisiko.
+- Secrets tidak masuk log atau repository; ekspor dan akses data pribadi terbatas pada pemilik.
+
+### Rilis 1 — beta eksternal
+
+- Migrasi tenant lulus di staging dengan snapshot dan rollback.
+- Uji isolasi lintas-tenant lulus untuk endpoint, model, UI, webhook, worker, ekspor, cache, dan admin.
+- Persetujuan AI, ekspor, pencabutan integrasi, penghapusan, kebijakan privasi, dan kanal dukungan diuji.
+- Uji input bahasa Indonesia, nominal, tanggal, typo, serta ambiguitas selesai dan diterima pemilik produk.
+- Keputusan yang menjadi prasyarat pilot telah ditetapkan sebelum janji dibuat kepada pelanggan.
+
+### Rilis 2 — berbayar
+
+- Semua kesiapan beta lulus; alur langganan dan hak akses diuji end-to-end di sandbox.
+- Webhook pembayaran terverifikasi, idempoten, tahan replay, dan dapat direkonsiliasi dengan provider.
+- Kasus sukses/gagal, duplikat, terlambat, refund, pembatalan, masa tenggang, dan perubahan paket diuji.
+- Ketentuan harga, pembayaran, privasi, refund, dukungan, pajak/nota, dan penanganan data setelah berhenti ditinjau sebelum aktivasi produksi.

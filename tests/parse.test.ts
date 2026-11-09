@@ -116,6 +116,7 @@ describe("perintah", () => {
   });
   it("kata tunggal dan bahasa bebas", () => {
     expect(parseCommand("Saldo", t).k).toBe("saldo");
+    expect(parseCommand("aman", t).k).toBe("aman");
     expect(parseCommand("laporan periode", t).k).toBe("laporan_periode");
     expect(parseCommand("hapus terakhir", t).k).toBe("hapus_terakhir");
     expect(parseCommand("tadi beli kopi 25rb pakai gopay", t).k).toBe("bebas");

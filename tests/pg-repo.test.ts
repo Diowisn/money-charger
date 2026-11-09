@@ -37,6 +37,16 @@ beforeAll(async () => {
   };
   await db.exec(readFileSync(path.join(process.cwd(), "db", "schema.sql"), "utf8"));
   await db.exec(readFileSync(path.join(process.cwd(), "db", "schema.sql"), "utf8")); // idempoten
+  await adapter.query(
+    "INSERT INTO schema_version (version, description) VALUES ($1, $2) ON CONFLICT (version) DO NOTHING",
+    [1, "Baseline skema saat ini"],
+  );
+  await adapter.query(
+    "INSERT INTO schema_version (version, description) VALUES ($1, $2) ON CONFLICT (version) DO NOTHING",
+    [1, "Tidak menggandakan marker"],
+  );
+  const versions = await adapter.query("SELECT version FROM schema_version ORDER BY version");
+  expect(versions.rows.map((row) => row.version)).toEqual([1]);
   const user = await adapter.query("INSERT INTO auth_users (email) VALUES ('test@example.com') RETURNING id");
   ownerId = user.rows[0].id;
   repo = new PgRepo(adapter, true, ownerId);
@@ -65,6 +75,13 @@ describe("PgRepo di Postgres sungguhan", () => {
     expect(await repo.firstUserId()).toBe(ownerId);
     expect(await repo.userIdByEmail("TEST@EXAMPLE.COM")).toBe(ownerId);
     expect(await repo.userIdByEmail("lain@example.com")).toBeNull();
+  });
+
+  it("tidak mengizinkan akun kedua mengambil data pribadi pemilik", async () => {
+    const count = await adapter.query("SELECT COUNT(*)::int AS n FROM auth_users");
+    expect(count.rows[0].n).toBe(1);
+    const groups = await adapter.query("SELECT user_id FROM groups WHERE user_id = $1", [ownerId]);
+    expect(groups.rows.length).toBeGreaterThan(0);
   });
 
   it("alur lengkap: setup, gaji, out, bonus, duplikat, whitelist, penutupan periode", async () => {
@@ -100,6 +117,29 @@ describe("PgRepo di Postgres sungguhan", () => {
     const r = await adapter.query("SELECT status, payload FROM inbound_jobs WHERE id = $1", [jobs[0].id]);
     expect(r.rows[0].status).toBe("selesai");
     expect(r.rows[0].payload).toEqual({});
+  });
+
+  it("menandai inbound gagal permanen setelah batas retry", async () => {
+    const pesan = { id: "job-terminal", from: OWNER, type: "text", text: "saldo", timestampMs: at("2026-12-02") };
+    await antreInbound([pesan], adapter);
+    await adapter.query("UPDATE inbound_jobs SET percobaan = 4 WHERE wa_message_id = $1", [pesan.id]);
+    const jobs = await klaimInbound(10, adapter);
+    const job = jobs.find((item) => item.payload.id === pesan.id)!;
+    await selesaikanInbound(job.id, job.percobaan, "Pemrosesan gagal.", adapter);
+    const result = await adapter.query("SELECT status, error FROM inbound_jobs WHERE wa_message_id = $1", [pesan.id]);
+    expect(result.rows[0].status).toBe("gagal");
+    expect(result.rows[0].error).toBe("Pemrosesan gagal.");
+  });
+
+  it("mengubah kegagalan inbound menjadi retry terjadwal", async () => {
+    const pesan = { id: "job-retry", from: OWNER, type: "text", text: "saldo", timestampMs: at("2026-12-03") };
+    await antreInbound([pesan], adapter);
+    const jobs = await klaimInbound(10, adapter);
+    const job = jobs.find((item) => item.payload.id === pesan.id)!;
+    await selesaikanInbound(job.id, job.percobaan, "Pemrosesan gagal.", adapter);
+    const result = await adapter.query("SELECT status, berikutnya_pada > now() AS dijadwalkan FROM inbound_jobs WHERE wa_message_id = $1", [pesan.id]);
+    expect(result.rows[0].status).toBe("menunggu");
+    expect(result.rows[0].dijadwalkan).toBe(true);
   });
 
   it("ekspor sekali pakai dan kedaluwarsa", async () => {

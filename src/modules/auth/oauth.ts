@@ -106,6 +106,10 @@ async function authenticateOAuth(provider: Provider, subject: string, email: str
     if (!userId) {
       const count = await client.query<{ n: number }>("SELECT COUNT(*)::int AS n FROM auth_users");
       const firstUser = count.rows[0].n === 0;
+      if (!firstUser) {
+        await client.query("ROLLBACK");
+        return null;
+      }
       const emailForUser = email || `${provider}+${subject}@users.money-charger.local`;
       const user = await client.query<{ id: string }>("INSERT INTO auth_users (email) VALUES ($1) RETURNING id", [emailForUser]);
       userId = user.rows[0].id;

@@ -99,7 +99,7 @@ export const TEKS_BANTUAN = [
   "- bonus 200rb  (opsional: ke tabungan)",
   "- koreksi nominal 30rb | koreksi pos jajan | koreksi tanggal kemarin",
   "- hapus terakhir",
-  "- saldo | sisa jajan | laporan | laporan periode | evaluasi",
+  "- saldo | aman | sisa jajan | laporan | laporan periode | evaluasi",
   "- set makan 400rb  (tambah: sekarang)",
   "- geser 50rb dari jajan ke bensin",
   "- pos tambah operasional laundry 50rb | pos ganti <lama> <baru> | pos hapus <nama> | pos alias kopi jajan",

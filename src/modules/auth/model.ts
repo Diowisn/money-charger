@@ -20,6 +20,7 @@ export async function daftar(
     if (existing.rowCount) { await client.query("ROLLBACK"); return null; }
     const count = await client.query("SELECT COUNT(*)::int AS n FROM auth_users");
     const firstUser = count.rows[0].n === 0;
+    if (!firstUser) { await client.query("ROLLBACK"); return null; }
     const hash = await hashPassword(password);
     const user = await client.query<{ id: string }>(
       "INSERT INTO auth_users (email,password_hash,nama,telepon,tanggal_lahir) VALUES ($1,$2,$3,$4,$5::date) RETURNING id",

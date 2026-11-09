@@ -16,7 +16,11 @@ async function main() {
 
   const sql = readFileSync(path.join(process.cwd(), "db", "schema.sql"), "utf8");
   await getPool().query(sql);
-  console.log("Skema siap.");
+  await getPool().query(
+    "INSERT INTO schema_version (version, description) VALUES ($1, $2) ON CONFLICT (version) DO NOTHING",
+    [1, "Baseline skema saat ini; tidak merekam riwayat perubahan sebelum versioning diperkenalkan."],
+  );
+  console.log("Skema siap. Baseline skema v1 tercatat.");
 
   const seeded = await new PgRepo().seed(nomor);
   console.log(seeded ? "Draft 1 dan alias bawaan terisi." : "Data bawaan sudah ada, dilewati.");

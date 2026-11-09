@@ -20,9 +20,8 @@ describe("pembatas laju", () => {
     expect(batasi("uji", 1, 1_000, 1_001).boleh).toBe(true);
   });
 
-  it("memakai IP dari x-forwarded-for lebih dulu", () => {
-    expect(ipDariRequest(new Request("https://x", { headers: { "x-forwarded-for": "1.2.3.4, 5.6.7.8" } }))).toBe("1.2.3.4");
-    expect(ipDariRequest(new Request("https://x", { headers: { "x-real-ip": "9.9.9.9" } }))).toBe("9.9.9.9");
+  it("mengabaikan header IP request yang tidak dapat dipercaya", () => {
+    expect(ipDariRequest(new Request("https://x", { headers: { "x-forwarded-for": "1.2.3.4", "x-real-ip": "9.9.9.9" } }))).toBe("lokal");
     expect(ipDariRequest(new Request("https://x"))).toBe("lokal");
   });
 });

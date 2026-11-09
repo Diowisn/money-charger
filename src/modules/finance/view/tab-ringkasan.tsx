@@ -18,6 +18,7 @@ export function Ringkasan({
 }) {
   const r = data.ringkasan;
   const terbaru = data.transaksi.filter((t) => t.status === "berlaku").slice(0, 6);
+  const aman = data.sisaAman;
 
   return (
     <div className="beranda">
@@ -46,6 +47,29 @@ export function Ringkasan({
         </div>
         <SaldoIlustrasi />
       </section>
+
+      {aman ? (
+        <section className="kartu sisa-aman">
+          <div className="baris-antara">
+            <h2>Sisa Aman</h2>
+            <span className={`badge ${aman.perHari >= aman.rataHarian ? "tipe-in" : "tipe-out"}`}>
+              {aman.perHari >= aman.rataHarian ? "Aman" : "Ketat"}
+            </span>
+          </div>
+          <p className="angka-besar">
+            {rp(aman.perHari)}
+            <span className="muted kecil"> /hari</span>
+          </p>
+          <p className="muted kecil">
+            Sisa jatah {rp(r.sisaUang)} untuk {aman.hariTersisa} hari
+            {aman.perkiraan ? " (perkiraan 30 hari sejak gaji)" : ""}.
+          </p>
+          <p className="muted kecil">
+            Rata-rata belanja {rp(aman.rataHarian)}/hari
+            {aman.habisDalamHari !== null ? ` · saldo cukup sekitar ${aman.habisDalamHari} hari` : ""}.
+          </p>
+        </section>
+      ) : null}
 
       <section className="aksi-cepat" aria-label="Aksi cepat">
         <button type="button" onClick={() => catat("in")}>

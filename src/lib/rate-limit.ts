@@ -37,10 +37,8 @@ export function batasi(kunci: string, batas: number, jendelaMs: number, sekarang
   return { boleh: true, sisa: batas - b.jumlah, detikTunggu: 0 };
 }
 
-export function ipDariRequest(req: Request): string {
-  const fwd = req.headers.get("x-forwarded-for");
-  if (fwd) return fwd.split(",")[0].trim();
-  return req.headers.get("x-real-ip")?.trim() || "lokal";
+export function ipDariRequest(_req: Request): string {
+  return "lokal";
 }
 
 export function resetBatasUntukUji(): void {
