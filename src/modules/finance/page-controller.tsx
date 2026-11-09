@@ -1,11 +1,9 @@
 import { redirect } from "next/navigation";
-import { sesiValid, userIdDariSesi } from "@/lib/auth";
+import { userIdDariSesi } from "@/lib/auth";
 import DashboardView from "./dashboard-view";
 import { muatDashboard } from "./model";
 
 export async function dashboardPage() {
-  if (!(await sesiValid())) redirect("/login");
-
   try {
     const userId = await userIdDariSesi();
     if (!userId) redirect("/login");
