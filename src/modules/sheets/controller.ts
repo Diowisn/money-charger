@@ -2,7 +2,7 @@ import type { NextRequest } from "next/server";
 import { bacaBody, galat, ok } from "@/lib/api";
 import { pemilikRequest, tolakPeran } from "@/lib/auth";
 import { AksiError } from "@/lib/web-actions";
-import { simpanSheets, sinkronSheets, statusSheets } from "./model";
+import { putusSheets, simpanSheets, sinkronSheets, statusSheets } from "./model";
 
 export async function getSheets(req: NextRequest) {
   const auth = await pemilikRequest(req);
@@ -28,6 +28,10 @@ export async function postSheets(req: NextRequest) {
     if (body.aksi === "sinkron") {
       const hasil = await sinkronSheets(auth.userId);
       return ok({ data: hasil, pesan: `${hasil.baris} transaksi dikirim ke Google Sheets.` });
+    }
+    if (body.aksi === "putus") {
+      const data = await putusSheets(auth.userId);
+      return ok({ data, pesan: "Koneksi Google Sheets diputuskan." });
     }
     throw new AksiError("Aksi Google Sheets tidak dikenal.");
   } catch (e) {

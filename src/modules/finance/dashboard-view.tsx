@@ -53,6 +53,20 @@ export default function Dashboard({ awal }: { awal: DashboardData }) {
     setData(awal);
   }, [awal]);
 
+  useEffect(() => {
+    const status = new URLSearchParams(window.location.search).get("sheets");
+    if (status !== "ok" && status !== "gagal") return;
+    setTab("laporan");
+    setPesan({
+      jenis: status === "ok" ? "ok" : "error",
+      teks:
+        status === "ok"
+          ? "Google Sheets terhubung. Spreadsheet privat dibuat dan transaksi disalin otomatis."
+          : "Koneksi Google Sheets gagal. Coba hubungkan ulang dari tab Laporan.",
+    });
+    window.history.replaceState({}, "", window.location.pathname);
+  }, []);
+
   const muatUlang = useCallback(async (senyap = true, paksa = false) => {
     if (!paksa && sibukRef.current) return;
     const urutan = ++urutanRef.current;

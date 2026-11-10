@@ -31,7 +31,22 @@ const SUMBER = [
   { nama: 'LinkAja', dari: ['linkaja.id'], subjek: ['Transaksi', 'Pembayaran', 'Notifikasi', 'LinkAja'] },
 ];
 
+function daftarSumber() {
+  if (!Array.isArray(SUMBER)) {
+    Logger.log('SUMBER bukan array; tidak ada sumber yang diproses.');
+    return [];
+  }
+  return SUMBER.filter((s) => {
+    const sah = Boolean(s && Array.isArray(s.dari) && s.dari.length > 0);
+    if (!sah) Logger.log('Entri SUMBER tidak valid, dilewati: ' + JSON.stringify(s));
+    return sah;
+  });
+}
+
 function querySumber(sumber) {
+  if (!sumber || !Array.isArray(sumber.dari)) {
+    throw new Error('querySumber hanya untuk internal. Jalankan pasangTrigger atau prosesEmailTransaksi.');
+  }
   const dari = sumber.dari.map((d) => 'from:' + d).join(' OR ');
   const subjek = (sumber.subjek || [])
     .map((k) => 'subject:' + (k.indexOf(' ') >= 0 ? '"' + k + '"' : k))
@@ -81,7 +96,7 @@ function prosesEmailTransaksi() {
   Logger.log('Akun Gmail: ' + akun);
   let diproses = 0;
 
-  for (const sumber of SUMBER) {
+  for (const sumber of daftarSumber()) {
     if (Date.now() - mulai > CONFIG.BATAS_MENIT * 60 * 1000) {
       Logger.log('Batas waktu tercapai; sumber tersisa diproses pada jadwal berikutnya.');
       break;
@@ -104,7 +119,7 @@ function prosesEmailTransaksi() {
 // Jalankan ini untuk melihat query dan email yang cocok dari setiap bank/e-wallet.
 function debugEmailTransaksi() {
   Logger.log('Akun Gmail aktif: ' + Session.getActiveUser().getEmail());
-  for (const sumber of SUMBER) {
+  for (const sumber of daftarSumber()) {
     const query = querySumber(sumber);
     const hasil = GmailApp.search(query, 0, 5);
     Logger.log('[' + sumber.nama + '] ' + hasil.length + ' thread | ' + query);

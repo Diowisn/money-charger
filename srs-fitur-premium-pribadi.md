@@ -25,9 +25,9 @@ Sudah diimplementasikan:
 - Kolaborasi keluarga: anggota, peran, persetujuan transaksi, nomor WhatsApp anggota.
 - Keamanan: 2FA TOTP, manajemen sesi, ekspor terenkripsi.
 - Integrasi email bank/e-wallet: deteksi penyedia, dompet sumber, dan pos otomatis.
-- Integrasi kalender `.ics` dan sinkron Google Sheets via Apps Script.
+- Integrasi kalender `.ics` dan sinkron Google Sheets via OAuth langsung.
 - Peringatan dalam aplikasi.
-- Skema versi v6 (`workspace_members`, nomor WhatsApp anggota, kolom 2FA).
+- Skema versi v7 (`workspace_members`, nomor WhatsApp anggota, kolom 2FA, `google_sheets`).
 
 ## 2. Arsitektur tambahan
 
@@ -139,7 +139,7 @@ Sudah diimplementasikan:
 ### 2.9 Keamanan dan sesi
 
 - `src/lib/totp.ts`: base32, `kodeTotp`, `verifikasiTotp`, dan `otpauthUri`.
-- Kolom `auth_users.totp_secret` dan `auth_users.totp_aktif` (skema v6).
+- Kolom `auth_users.totp_secret` dan `auth_users.totp_aktif` (skema v6); tabel `google_sheets` (skema v7).
 - `src/modules/profile/model.ts`: `mulai2fa`, `aktifkan2fa`, `matikan2fa`; mematikan 2FA wajib password.
 - Login `masuk` mengembalikan status `2fa`; UI login menampilkan kolom kode 6 digit.
 - `/api/auth/sessions`: daftar sesi aktif milik sendiri (tanpa mengirim ID sesi saat ini ke client) dan cabut sesi lain.
@@ -162,14 +162,17 @@ Sudah diimplementasikan:
 - `src/lib/ics.ts`: pembuat `.ics` (RFC 5545) untuk event all-day, escape teks, lipat baris, dan alarm.
 - `src/modules/kalender/`: `/api/kalender` mengunduh tagihan berulang, jatuh tempo utang/piutang, dan target tabungan 6 bulan ke depan.
 - Kalender langganan: `GET /api/kalender?token=...` memakai token feed (`config.kalender_token`, 32 byte base64url); `POST /api/kalender` mengembalikan URL langganan untuk pemilik yang login. Token dibuat sekali dan dipakai ulang.
-- `src/lib/sheets.ts`: `bangunBarisSheets` (header + transaksi kronologis) dan `validasiUrlSheets` (hanya `https://script.google.com/macros/s/.../exec`).
-- `src/modules/sheets/`: `/api/sheets` menyimpan URL web app dan mengirim salinan penuh transaksi.
+- `src/lib/google-sheets.ts`: refresh access token, buat spreadsheet baru, dan tulis ulang sheet `Transaksi`.
+- `src/lib/google-token.ts`: enkripsi AES-256-GCM refresh token Google sebelum disimpan.
+- `src/modules/sheets/`: `/api/sheets` untuk status, sinkron manual, dan putus koneksi; `/api/sheets/oauth/start` meminta scope `drive.file` lewat callback OAuth Google yang sudah ada.
+- Tabel `google_sheets` menyimpan refresh token terenkripsi, `spreadsheet_id`, `spreadsheet_url`, dan email Google.
+- `src/lib/sheets.ts`: `bangunBarisSheets` (header + transaksi kronologis) dan `validasiUrlSheets` untuk cadangan web app Apps Script.
 - Sinkron otomatis: `prosesSinkronSheets(hariIni)` dipanggil cron `/api/cron/outbox` setelah review bulanan; `sudahSinkronHariIni(terakhir, hariIni)` membatasi maksimal sekali per hari WIB.
 - Pemantauan cron: cron sukses mencatat `config.cron_terakhir` (global, `user_id` NULL); `/api/health` menampilkan `database.cronTerakhir` dan menambah peringatan via `cronBasi` bila belum pernah jalan atau >26 jam.
 - Meter pemakaian: `src/lib/usage.ts` menambah counter `config` global `usage:<YYYY-MM>:<jenis>` (`ai_parse`, `ai_vision`, `ai_insight`) tiap panggilan AI; `pemakaianBulanIni` merangkum counter + hitungan `inbound_messages`/`outbox` bulan berjalan (WIB). Hanya jumlah, tanpa isi pesan/PII; tampil di `/api/health` (butuh `HEALTH_TOKEN`).
-- `scripts/google-sheets.gs`: template web app Apps Script yang menulis ke sheet `Transaksi`; mendukung `SHEETS_WEBHOOK_SECRET` opsional.
-- Status disimpan di `config` (`sheets_url`, `sheets_terakhir`, `kalender_token`), tanpa tabel baru.
-- UI: tombol unduh `.ics` dan salin URL langganan di tab Transaksi otomatis; pengaturan dan sinkron Google Sheets di tab Laporan.
+- `scripts/google-sheets.gs`: cadangan web app Apps Script yang menulis ke sheet `Transaksi`; mendukung `SHEETS_WEBHOOK_SECRET` opsional.
+- Status disimpan di `config` (`sheets_url`, `sheets_terakhir`, `kalender_token`) dan tabel `google_sheets`.
+- UI: tombol unduh `.ics` dan salin URL langganan di tab Transaksi otomatis; hubungkan/sinkron/putus Google Sheets di tab Laporan.
 
 ## 3. Persyaratan fungsional
 
@@ -278,12 +281,12 @@ Sudah diimplementasikan:
 - **FR-INT-01 MUST:** `/api/kalender` hanya dapat diakses pemilik yang login dan mengembalikan `text/calendar`.
 - **FR-INT-02 MUST:** event kalender mencakup tagihan berulang aktif, jatuh tempo utang/piutang aktif, dan target tabungan aktif dalam 6 bulan.
 - **FR-INT-03 MUST:** teks event di-escape dan baris panjang dilipat sesuai RFC 5545.
-- **FR-INT-04 MUST:** URL Google Sheets hanya menerima web app Apps Script HTTPS berakhiran `/exec`.
+- **FR-INT-04 MUST:** koneksi Google Sheets langsung memakai OAuth scope `drive.file` dan redirect URI callback Google yang sudah ada; URL webhook cadangan hanya menerima `https://script.google.com/macros/s/.../exec`.
 - **FR-INT-05 MUST:** sinkron Google Sheets mengirim salinan penuh transaksi dan tidak mengubah data lokal.
-- **FR-INT-06 SHOULD:** sinkron mengirim `SHEETS_WEBHOOK_SECRET` bila dikonfigurasi dan mencatat waktu sinkron terakhir.
+- **FR-INT-06 MUST:** refresh token Google disimpan terenkripsi AES-256-GCM; token tidak pernah dikirim ke client atau log.
 - **FR-INT-07 MUST:** feed kalender bertoken hanya valid untuk token yang tersimpan di `config.kalender_token`; token salah mendapat 401.
 - **FR-INT-08 MUST:** URL langganan hanya dapat diminta pemilik yang login; token tidak pernah dicatat di log.
-- **FR-INT-09 MUST:** sinkron Google Sheets otomatis berjalan maksimal sekali per hari WIB per pengguna dan dilewati bila URL kosong.
+- **FR-INT-09 MUST:** sinkron Google Sheets otomatis berjalan maksimal sekali per hari WIB per pengguna dan dilewati bila belum ada koneksi Google maupun URL webhook.
 - **FR-INT-10 SHOULD:** kegagalan sinkron otomatis satu pengguna tidak menghentikan pengguna lain dan tidak menggagalkan cron.
 - **FR-INT-11 MUST:** cron sukses mencatat `cron_terakhir`; health memperingatkan bila cron belum pernah jalan atau terakhir >26 jam.
 - **FR-INT-12 MUST:** meter pemakaian hanya menyimpan jumlah per bulan per jenis; tidak ada isi pesan, nominal, atau nomor telepon.
@@ -303,7 +306,8 @@ Sudah diimplementasikan:
 - Secret TOTP dan hash token sesi tidak pernah dikirim ke log; daftar sesi tidak mengirim hash token sesi saat ini ke client.
 - Ekspor terenkripsi memakai salt dan IV acak per berkas; password tidak disimpan.
 - Webhook email tetap memakai `EMAIL_INBOUND_SECRET` dan `EMAIL_ALLOWED_SENDERS`; isi email tidak dipercaya untuk `user_id`.
-- URL Google Sheets dibatasi ke `script.google.com` agar server tidak bisa diarahkan ke host sembarang; rahasia webhook tidak disimpan di log.
+- URL webhook Google Sheets dibatasi ke `script.google.com` agar server tidak bisa diarahkan ke host sembarang; rahasia webhook tidak disimpan di log.
+- Koneksi Google Sheets langsung memakai scope `drive.file`; refresh token dienkripsi AES-256-GCM dengan kunci dari `GOOGLE_TOKEN_ENCRYPTION_KEY` atau `GOOGLE_CLIENT_SECRET`, dan tidak pernah dikirim ke client/log.
 - Token feed kalender 32 byte acak (base64url), hanya memberi akses baca `.ics`, dan dapat diganti dengan menghapus `config.kalender_token`.
 
 ## 5. Migrasi
@@ -313,13 +317,15 @@ Sudah diimplementasikan:
 - Skema v4 menambahkan `workspace_members` untuk kolaborasi keluarga.
 - Skema v5 menambahkan `workspace_members.wa_number` dan indeks uniknya.
 - Skema v6 menambahkan `auth_users.totp_secret` dan `auth_users.totp_aktif`.
+- Skema v7 menambahkan `google_sheets` (refresh token Google terenkripsi, spreadsheet, email).
 - Jalankan `npm run db:setup` untuk menerapkan skema idempoten dan dompet utama.
 - Sebelum migrasi berisiko, buat snapshot Neon.
 - Marker versi dicatat di `schema_version`.
 - Digest tidak menambah tabel; status kirim disimpan di `config`.
 - Laporan lanjutan tidak menambah tabel; status dikirim disimpan di `config` (`laporan_aktif`, `laporan_jadwal`, `laporan_terakhir`).
 - Impor email tidak menambah tabel; idempotensi memakai `email:<id>` di `pending_actions`.
-- Kalender dan Google Sheets tidak menambah tabel; status disimpan di `config` (`sheets_url`, `sheets_terakhir`, `kalender_token`).
+- Kalender tidak menambah tabel; token feed dan status disimpan di `config` (`sheets_url`, `sheets_terakhir`, `kalender_token`).
+- Google Sheets langsung menambah tabel `google_sheets` (skema v7); mode webhook tetap memakai `config.sheets_url`.
 
 ## 6. Acceptance criteria
 
@@ -412,13 +418,15 @@ Sudah diimplementasikan:
 - **AC-INT-01:** pengguna belum login mendapat 401 saat membuka `/api/kalender`.
 - **AC-INT-02:** aturan tanggal 31 menghasilkan event pada 30/31 sesuai akhir bulan.
 - **AC-INT-03:** nama tagihan dengan koma/titik koma tampil benar di kalender.
-- **AC-INT-04:** URL `https://example.com/exec` ditolak.
-- **AC-INT-05:** URL `https://script.google.com/macros/s/.../exec` diterima.
+- **AC-INT-04:** URL webhook `https://example.com/exec` ditolak.
+- **AC-INT-05:** URL webhook `https://script.google.com/macros/s/.../exec` diterima.
 - **AC-INT-06:** sinkron mengirim seluruh transaksi dan tidak mengubah data lokal.
+- **AC-INT-14:** setelah OAuth, spreadsheet privat dibuat dan refresh token tersimpan terenkripsi.
+- **AC-INT-15:** `PUTUSKAN` menghapus koneksi/token tetapi tidak menghapus file spreadsheet.
 - **AC-INT-07:** `GET /api/kalender?token=salah` mendapat 401; token valid mendapat `text/calendar` tanpa login.
 - **AC-INT-08:** dua kali `POST /api/kalender` mengembalikan token yang sama.
 - **AC-INT-09:** dua cron pada hari WIB yang sama hanya menjalankan satu sinkron Sheets otomatis per pengguna.
-- **AC-INT-10:** pengguna tanpa `sheets_url` dilewati tanpa error.
+- **AC-INT-10:** pengguna tanpa koneksi Google dan tanpa `sheets_url` dilewati tanpa error.
 - **AC-INT-11:** `cron_terakhir` kosong atau >26 jam memunculkan peringatan di health; cron dalam 26 jam tidak.
 - **AC-INT-12:** counter pemakaian bertambah per panggilan AI dengan kunci `usage:<YYYY-MM>:<jenis>` dan tidak memuat isi pesan.
 - **AC-INT-13:** health tanpa `HEALTH_TOKEN` tidak menampilkan pemakaian; dengan token menampilkan agregat bulan berjalan.
@@ -468,9 +476,10 @@ Sudah diimplementasikan:
 
 - Kalender `.ics` berisi tagihan berulang, jatuh tempo utang/piutang, dan target tabungan 6 bulan.
 - Kalender dapat diunduh manual atau dilanggan via URL bertoken sehingga aplikasi kalender memperbarui sendiri.
-- Google Sheets memakai web app Apps Script; tidak perlu OAuth atau service account.
+- Google Sheets utama memakai OAuth `drive.file`; spreadsheet privat dibuat otomatis tanpa Apps Script.
+- Apps Script tetap tersedia sebagai cadangan bila pengguna tidak ingin memberi scope Drive.
 - Sinkron bersifat salinan penuh (bukan incremental) agar spreadsheet selalu mencerminkan data terbaru.
-- Sinkron berjalan manual (tombol) dan otomatis sekali sehari via cron bila URL tersimpan.
+- Sinkron berjalan manual (tombol) dan otomatis sekali sehari via cron bila koneksi tersimpan.
 
 ## 8. Traceability
 

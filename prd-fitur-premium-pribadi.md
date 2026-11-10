@@ -42,7 +42,7 @@ Membuat Money-Charger terasa seperti aplikasi keuangan kelas berbayar untuk pema
 - **Kolaborasi keluarga**: anggota, peran, anggaran bersama, persetujuan transaksi, nomor WhatsApp anggota.
 - **Keamanan/kepercayaan**: 2FA, manajemen sesi, ekspor terenkripsi.
 - **Integrasi email bank/e-wallet**: deteksi penyedia, dompet sumber, dan pos otomatis dari notifikasi transaksi.
-- **Integrasi lanjutan**: kalender `.ics` (unduh + langganan URL bertoken) dan sinkron Google Sheets via Apps Script (manual + otomatis harian).
+- **Integrasi lanjutan**: kalender `.ics` (unduh + langganan URL bertoken) dan sinkron Google Sheets via OAuth langsung (buat spreadsheet otomatis, manual + harian).
 - **Meter pemakaian**: hitungan panggilan AI (parse/vision/insight) dan pesan WhatsApp per bulan di `/api/health`, tanpa isi pesan.
 - Backup/restore melalui Neon Console, audit log dasar, ekspor CSV.
 
@@ -134,8 +134,9 @@ Membuat Money-Charger terasa seperti aplikasi keuangan kelas berbayar untuk pema
 - Cocokkan dompet sumber dan pos otomatis bila unik; jika ambigu, pakai dompet bawaan dan tanpa pos.
 - Kalender `.ics`: tagihan berulang, jatuh tempo utang/piutang, dan target tabungan 6 bulan ke depan.
 - Kalender langganan: URL feed bertoken agar Google/Apple Calendar memperbarui otomatis tanpa unduh ulang manual.
-- Google Sheets: salin ulang seluruh transaksi ke spreadsheet melalui web app Apps Script; URL dibatasi ke `script.google.com`.
-- Google Sheets otomatis: setelah URL tersimpan, cron menyinkron sekali sehari tanpa klik manual.
+- Google Sheets: hubungkan akun Google sekali; aplikasi membuat spreadsheet privat dan menyalin seluruh transaksi tanpa Apps Script.
+- Google Sheets otomatis: setelah terhubung, cron menyinkron sekali sehari tanpa klik manual.
+- Cadangan Apps Script tetap tersedia bila pengguna tidak ingin memberi akses Google Drive.
 
 ## 5. Di luar lingkup saat ini
 

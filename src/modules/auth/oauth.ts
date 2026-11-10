@@ -1,11 +1,13 @@
 import { randomBytes, timingSafeEqual } from "node:crypto";
 import { NextRequest, NextResponse } from "next/server";
-import { hashToken, AUTH_COOKIE, opsiCookie } from "@/lib/auth";
+import { hashToken, AUTH_COOKIE, opsiCookie, pemilikRequest, tolakPeran } from "@/lib/auth";
 import { getPool, PgRepo } from "@/lib/pg-repo";
+import { simpanKoneksiSheets } from "@/modules/sheets/model";
 
 export type Provider = "google" | "facebook";
 const STATE_COOKIE = "mc_oauth_state";
 const stateAge = 600;
+const GOOGLE_SHEETS_SCOPE = "https://www.googleapis.com/auth/drive.file";
 
 const googleId = () => process.env.GOOGLE_CLIENT_ID?.trim() || "";
 const googleSecret = () => process.env.GOOGLE_CLIENT_SECRET?.trim() || "";
@@ -50,6 +52,46 @@ export async function start(request: NextRequest, provider: Provider) {
   return response;
 }
 
+/** Meminta izin tambahan Google Drive/Sheets tanpa menambah redirect URI baru. */
+export async function startSheets(request: NextRequest) {
+  if (!configured("google") || !callbackBase(request)) return NextResponse.redirect(new URL("/login?error=oauth", request.url));
+  const auth = await pemilikRequest(request);
+  if ("tolak" in auth) return NextResponse.redirect(new URL("/login", request.url));
+  const tolak = tolakPeran(auth, "kelola");
+  if (tolak) return NextResponse.redirect(new URL("/?sheets=gagal", request.url));
+
+  const state = randomBytes(32).toString("base64url");
+  const params = new URLSearchParams({
+    client_id: googleId(),
+    redirect_uri: callbackUrl("google", request),
+    response_type: "code",
+    scope: `openid email profile ${GOOGLE_SHEETS_SCOPE}`,
+    access_type: "offline",
+    prompt: "consent",
+    include_granted_scopes: "true",
+    state,
+  });
+  try {
+    const hasil = await getPool().query<{ email: string }>("SELECT email FROM auth_users WHERE id = $1", [auth.userId]);
+    const email = hasil.rows[0]?.email ?? "";
+    if (email && !email.endsWith(".local")) params.set("login_hint", email);
+  } catch {
+    // login_hint hanya membantu memilih akun; abaikan bila query gagal.
+  }
+
+  const url = new URL("https://accounts.google.com/o/oauth2/v2/auth");
+  url.search = params.toString();
+  const response = NextResponse.redirect(url);
+  response.cookies.set(STATE_COOKIE, `sheets:${state}`, {
+    httpOnly: true,
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+    path: "/api/auth/oauth/google/callback",
+    maxAge: stateAge,
+  });
+  return response;
+}
+
 async function providerProfile(provider: Provider, code: string, request: NextRequest) {
   const redirectUri = callbackUrl(provider, request);
   const tokenUrl = provider === "google" ? "https://oauth2.googleapis.com/token" : "https://graph.facebook.com/v22.0/oauth/access_token";
@@ -66,7 +108,7 @@ async function providerProfile(provider: Provider, code: string, request: NextRe
     cache: "no-store",
   });
   if (!tokenResponse.ok) throw new Error("token exchange failed");
-  const token = await tokenResponse.json() as { access_token?: string };
+  const token = await tokenResponse.json() as { access_token?: string; refresh_token?: string };
   if (!token.access_token) throw new Error("missing access token");
   const profileUrl = provider === "google"
     ? "https://openidconnect.googleapis.com/v1/userinfo"
@@ -76,7 +118,12 @@ async function providerProfile(provider: Provider, code: string, request: NextRe
   const profile = await profileResponse.json() as { sub?: string; id?: string; email?: string; email_verified?: boolean };
   const subject = provider === "google" ? profile.sub : profile.id;
   if (!subject || (provider === "google" && (!profile.email || profile.email_verified !== true))) throw new Error("invalid profile");
-  return { subject, email: profile.email?.trim().toLowerCase() || null };
+  return {
+    subject,
+    email: profile.email?.trim().toLowerCase() || null,
+    accessToken: token.access_token,
+    refreshToken: token.refresh_token ?? null,
+  };
 }
 
 async function authenticateOAuth(provider: Provider, subject: string, email: string | null) {
@@ -142,25 +189,46 @@ async function authenticateOAuth(provider: Provider, subject: string, email: str
 }
 
 export async function callback(request: NextRequest, provider: Provider) {
-  const response = NextResponse.redirect(new URL("/login?error=oauth", request.url));
-  response.cookies.set(STATE_COOKIE, "", { httpOnly: true, sameSite: "lax", secure: process.env.NODE_ENV === "production", path: `/api/auth/oauth/${provider}/callback`, maxAge: 0 });
+  const gagal = NextResponse.redirect(new URL("/login?error=oauth", request.url));
+  const hapusState = { httpOnly: true, sameSite: "lax" as const, secure: process.env.NODE_ENV === "production", path: `/api/auth/oauth/${provider}/callback`, maxAge: 0 };
+  gagal.cookies.set(STATE_COOKIE, "", hapusState);
   try {
-    const expected = request.cookies.get(STATE_COOKIE)?.value;
+    const mentah = request.cookies.get(STATE_COOKIE)?.value;
+    const sheets = Boolean(mentah?.startsWith("sheets:"));
+    const expected = sheets ? mentah?.slice("sheets:".length) : mentah;
     const supplied = request.nextUrl.searchParams.get("state");
-    if (!expected || !supplied) return response;
+    if (!expected || !supplied) return gagal;
     const a = Buffer.from(expected);
     const b = Buffer.from(supplied);
-    if (a.length !== b.length || !timingSafeEqual(a, b)) return response;
+    if (a.length !== b.length || !timingSafeEqual(a, b)) return gagal;
     const code = request.nextUrl.searchParams.get("code");
-    if (!code || !configured(provider) || !callbackBase(request)) return response;
+    if (!code || !configured(provider) || !callbackBase(request)) return gagal;
+
+    if (sheets) {
+      if (provider !== "google") return gagal;
+      const auth = await pemilikRequest(request);
+      if ("tolak" in auth) return NextResponse.redirect(new URL("/login", request.url));
+      if (tolakPeran(auth, "kelola")) return NextResponse.redirect(new URL("/?sheets=gagal", request.url));
+      const profil = await providerProfile(provider, code, request);
+      if (!profil.refreshToken) return NextResponse.redirect(new URL("/?sheets=gagal", request.url));
+      await simpanKoneksiSheets(auth.userId, {
+        refreshToken: profil.refreshToken,
+        accessToken: profil.accessToken,
+        email: profil.email,
+      });
+      const sukses = NextResponse.redirect(new URL("/?sheets=ok", request.url));
+      sukses.cookies.set(STATE_COOKIE, "", hapusState);
+      return sukses;
+    }
+
     const profile = await providerProfile(provider, code, request);
     const token = await authenticateOAuth(provider, profile.subject, profile.email);
-    if (!token) return response;
+    if (!token) return gagal;
     const success = NextResponse.redirect(new URL("/", request.url));
     success.cookies.set(AUTH_COOKIE, token, opsiCookie());
-    success.cookies.set(STATE_COOKIE, "", { httpOnly: true, sameSite: "lax", secure: process.env.NODE_ENV === "production", path: `/api/auth/oauth/${provider}/callback`, maxAge: 0 });
+    success.cookies.set(STATE_COOKIE, "", hapusState);
     return success;
   } catch {
-    return response;
+    return gagal;
   }
 }

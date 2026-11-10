@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { Tombol } from "@/components/tombol";
+import { TautanTombol, Tombol } from "@/components/tombol";
 import type { DashboardData } from "@/lib/dashboard";
 import type { LaporanData } from "@/lib/laporan";
 import { addDays } from "@/lib/parse/date";
@@ -14,8 +14,12 @@ interface Preset {
 }
 
 interface StatusSheets {
+  mode: "google" | "webhook" | null;
   url: string | null;
+  spreadsheetUrl: string | null;
+  email: string | null;
   terakhir: string | null;
+  googleSiap: boolean;
 }
 
 function susunPreset(hariIni: string): Preset[] {
@@ -37,38 +41,40 @@ export function Laporan({ data, kirim, sibuk }: { data: DashboardData; kirim: Ki
   const [laporan, setLaporan] = useState<LaporanData | null>(null);
   const [memuat, setMemuat] = useState(true);
   const [galat, setGalat] = useState<string | null>(null);
-  const [sheets, setSheets] = useState<StatusSheets>({ url: null, terakhir: null });
+  const [sheets, setSheets] = useState<StatusSheets>({
+    mode: null,
+    url: null,
+    spreadsheetUrl: null,
+    email: null,
+    terakhir: null,
+    googleSiap: false,
+  });
   const [urlSheets, setUrlSheets] = useState("");
   const [memuatSheets, setMemuatSheets] = useState(true);
   const [galatSheets, setGalatSheets] = useState<string | null>(null);
 
+  async function muatSheets() {
+    setMemuatSheets(true);
+    try {
+      const res = await fetch("/api/sheets", { cache: "no-store", credentials: "same-origin" });
+      if (res.status === 401) {
+        window.location.href = "/login";
+        return;
+      }
+      const j = (await res.json().catch(() => ({}))) as { ok?: boolean; data?: StatusSheets; error?: string };
+      if (!res.ok || !j.ok || !j.data) throw new Error(j.error ?? "Gagal memuat integrasi.");
+      setSheets(j.data);
+      setUrlSheets(j.data.url ?? "");
+      setGalatSheets(null);
+    } catch (error) {
+      setGalatSheets(error instanceof Error ? error.message : "Gagal memuat integrasi.");
+    } finally {
+      setMemuatSheets(false);
+    }
+  }
+
   useEffect(() => {
-    let aktif = true;
-    fetch("/api/sheets", { cache: "no-store", credentials: "same-origin" })
-      .then(async (res) => {
-        if (res.status === 401) {
-          window.location.href = "/login";
-          return null;
-        }
-        const j = (await res.json().catch(() => ({}))) as { ok?: boolean; data?: StatusSheets; error?: string };
-        if (!res.ok || !j.ok || !j.data) throw new Error(j.error ?? "Gagal memuat integrasi.");
-        return j.data;
-      })
-      .then((hasil) => {
-        if (aktif && hasil) {
-          setSheets(hasil);
-          setUrlSheets(hasil.url ?? "");
-        }
-      })
-      .catch((error) => {
-        if (aktif) setGalatSheets(error instanceof Error ? error.message : "Gagal memuat integrasi.");
-      })
-      .finally(() => {
-        if (aktif) setMemuatSheets(false);
-      });
-    return () => {
-      aktif = false;
-    };
+    void muatSheets();
   }, []);
 
   useEffect(() => {
@@ -115,14 +121,19 @@ export function Laporan({ data, kirim, sibuk }: { data: DashboardData; kirim: Ki
 
   async function simpanSheets() {
     if (await kirim("/api/sheets", "POST", { aksi: "simpan", url: urlSheets })) {
-      setSheets((lama) => ({ ...lama, url: urlSheets.trim() || null }));
-      setGalatSheets(null);
+      await muatSheets();
     }
   }
 
   async function sinkronSheets() {
     if (await kirim("/api/sheets", "POST", { aksi: "sinkron" })) {
-      setSheets((lama) => ({ ...lama, terakhir: new Date().toISOString() }));
+      await muatSheets();
+    }
+  }
+
+  async function putusSheets() {
+    if (await kirim("/api/sheets", "POST", { aksi: "putus" })) {
+      await muatSheets();
     }
   }
 
@@ -367,34 +378,81 @@ export function Laporan({ data, kirim, sibuk }: { data: DashboardData; kirim: Ki
       <section className="kartu laporan-jadwal">
         <div className="baris-antara">
           <h2>Google Sheets</h2>
-          <span className={`badge ${sheets.url ? "hijau" : ""}`}>
-            {memuatSheets ? "Memuat..." : sheets.url ? "Terhubung" : "Belum"}
+          <span className={`badge ${sheets.mode ? "hijau" : ""}`}>
+            {memuatSheets
+              ? "Memuat..."
+              : sheets.mode === "google"
+                ? "Google"
+                : sheets.mode === "webhook"
+                  ? "Webhook"
+                  : "Belum"}
           </span>
         </div>
         <p className="muted kecil">
-          Tempel URL web app Google Apps Script. Setiap sinkron menyalin ulang seluruh transaksi ke sheet
-          &quot;Transaksi&quot;. Setelah URL tersimpan, sinkron juga berjalan otomatis sekali sehari saat cron.
+          {sheets.mode === "google"
+            ? `Tersambung ke ${sheets.email ?? "akun Google"}. Spreadsheet diperbarui otomatis sekali sehari saat cron.`
+            : "Hubungkan akun Google untuk membuat spreadsheet privat dan menyalin seluruh transaksi otomatis. Tidak perlu Apps Script."}
         </p>
-        <div className="form">
-          <label>
-            URL web app Apps Script
-            <input
-              type="url"
-              value={urlSheets}
-              placeholder="https://script.google.com/macros/s/.../exec"
-              onChange={(event) => setUrlSheets(event.target.value)}
-            />
-          </label>
-        </div>
+
+        {sheets.mode === "google" ? (
+          <div className="laporan-jadwal-aksi">
+            {sheets.spreadsheetUrl ? (
+              <TautanTombol varian="sekunder" href={sheets.spreadsheetUrl} target="_blank" rel="noreferrer">
+                Buka spreadsheet
+              </TautanTombol>
+            ) : null}
+            <Tombol disabled={sibuk || memuatSheets} onClick={() => void sinkronSheets()}>
+              Sinkron sekarang
+            </Tombol>
+            <Tombol varian="bahaya" disabled={sibuk || memuatSheets} onClick={() => void putusSheets()}>
+              Putuskan
+            </Tombol>
+          </div>
+        ) : (
+          <>
+            <div className="laporan-jadwal-aksi">
+              {sheets.googleSiap ? (
+                <TautanTombol href="/api/sheets/oauth/start">Hubungkan Google Sheets</TautanTombol>
+              ) : (
+                <span className="muted kecil">Google OAuth belum dikonfigurasi di server.</span>
+              )}
+              {sheets.mode === "webhook" ? (
+                <>
+                  <Tombol disabled={sibuk || memuatSheets} onClick={() => void sinkronSheets()}>
+                    Sinkron sekarang
+                  </Tombol>
+                  <Tombol varian="bahaya" disabled={sibuk || memuatSheets} onClick={() => void putusSheets()}>
+                    Putuskan
+                  </Tombol>
+                </>
+              ) : null}
+            </div>
+            <details>
+              <summary className="muted kecil">Cadangan: web app Apps Script</summary>
+              <p className="muted kecil">
+                Tempel URL web app Apps Script bila tidak ingin memberi akses Google Drive.
+              </p>
+              <div className="form">
+                <label>
+                  URL web app Apps Script
+                  <input
+                    type="url"
+                    value={urlSheets}
+                    placeholder="https://script.google.com/macros/s/.../exec"
+                    onChange={(event) => setUrlSheets(event.target.value)}
+                  />
+                </label>
+              </div>
+              <div className="laporan-jadwal-aksi">
+                <Tombol varian="sekunder" disabled={sibuk || memuatSheets} onClick={() => void simpanSheets()}>
+                  Simpan URL
+                </Tombol>
+              </div>
+            </details>
+          </>
+        )}
+
         {galatSheets ? <p className="pesan-galat">{galatSheets}</p> : null}
-        <div className="laporan-jadwal-aksi">
-          <Tombol varian="sekunder" disabled={sibuk || memuatSheets} onClick={() => void simpanSheets()}>
-            Simpan URL
-          </Tombol>
-          <Tombol disabled={sibuk || memuatSheets || !sheets.url} onClick={() => void sinkronSheets()}>
-            Sinkron sekarang
-          </Tombol>
-        </div>
         <p className="muted kecil">
           {sheets.terakhir
             ? `Sinkron terakhir ${new Date(sheets.terakhir).toLocaleString("id-ID")}`

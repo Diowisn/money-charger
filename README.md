@@ -37,6 +37,8 @@ Acuan: [PRD Money-Charger SaaS](./prd-catatan-keuangan-whatsapp.md) dan [SRS](./
 | `src/modules/sheets/` | Modul HMVC sinkron Google Sheets (`/api/sheets`) |
 | `src/lib/ics.ts` | Pembuat kalender RFC 5545 tanpa dependensi tambahan |
 | `src/lib/sheets.ts` | Penyusun baris spreadsheet dan validasi URL web app Apps Script |
+| `src/lib/google-sheets.ts` | Klien Google Sheets API: refresh token, buat spreadsheet, tulis nilai |
+| `src/lib/google-token.ts` | Enkripsi AES-256-GCM refresh token Google |
 | `src/app/api/` | Adapter Next.js tipis yang meneruskan request ke controller modul |
 | `src/app/page.tsx` | Adapter halaman dashboard Next.js |
 | `src/app/login/` | Halaman masuk, daftar akun, dan tombol Google/Facebook |
@@ -92,12 +94,12 @@ Struktur ini **belum** menjadikan aplikasi multi-pelanggan: autentikasi, whiteli
 
 ### 4. Isi environment
 Salin `.env.example` ke `.env.local` dan isi. `ALLOWED_NUMBERS` adalah nomor pribadi Anda, format `62812...` tanpa plus.
-Isi `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET` dan `FACEBOOK_APP_ID`/`FACEBOOK_APP_SECRET` untuk mengaktifkan tombol login provider. Untuk Facebook boleh memakai `META_APP_ID`/`WA_APP_SECRET` bila memakai aplikasi Meta yang sama. Callback OAuth memakai origin request; `AUTH_CALLBACK_BASE_URL` hanya diperlukan untuk memaksa origin tertentu.
+Isi `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET` dan `FACEBOOK_APP_ID`/`FACEBOOK_APP_SECRET` untuk mengaktifkan tombol login provider. Untuk Facebook boleh memakai `META_APP_ID`/`WA_APP_SECRET` bila memakai aplikasi Meta yang sama. Callback OAuth memakai origin request; `AUTH_CALLBACK_BASE_URL` hanya diperlukan untuk memaksa origin tertentu. Untuk Google Sheets otomatis, tambahkan scope `https://www.googleapis.com/auth/drive.file` di OAuth consent screen dan isi `GOOGLE_TOKEN_ENCRYPTION_KEY` (opsional; bila kosong memakai `GOOGLE_CLIENT_SECRET`).
 Untuk percobaan lokal, isi variabel WhatsApp berikut sesuai API Setup Meta: `WA_PHONE_NUMBER_ID`, `WA_ACCESS_TOKEN`, `WA_APP_SECRET`. Buat sendiri nilai acak untuk `WA_VERIFY_TOKEN`; gunakan nilai yang sama saat mendaftarkan webhook. Versi Graph API bawaan adalah `v25.0`; samakan dengan versi yang ditampilkan Meta.
 
 ```bash
 npm install
-npm run db:setup     # memastikan skema, mencatat baseline v1-v6, seed default, dan whitelist nomor
+npm run db:setup     # memastikan skema, mencatat baseline v1-v7, seed default, dan whitelist nomor
 npm run lint
 npm run typecheck
 npm test
@@ -191,7 +193,7 @@ Gunakan Neon Console → **Backup & Restore**. Jangan simpan `RESTORE_DATABASE_U
 
 - **Buat snapshot:** pilih project dan branch `main`, buka **Backup & Restore** → **Create snapshot**. Pastikan kartu snapshot muncul beserta waktu dan sumber sebelum migrasi skema berisiko. Jadwal otomatis dan retensi bergantung pada paket Neon; label **Upgrade for schedules** berarti jadwal belum dikonfigurasi/tersedia pada paket saat ini.
 - **Drill dari snapshot:** untuk restore point-in-time historis, buat branch baru dari snapshot/waktu yang dipilih agar tidak menimpa `main` atau branch `restore-drill`. Branch `restore-drill` yang sudah ada boleh dipakai untuk uji salinan terkini, tetapi reset dari parent menimpa isi branch itu. Pastikan expiry branch sebelum mulai.
-- **Validasi:** sambungkan aplikasi lokal sementara ke branch drill melalui **Connect** dan URL branch tersebut di `.env.local` lokal saja. Jangan commit atau kirim URL/password. Sebelum `npm run db:setup`, cek lagi host/branch yang dipilih pada Neon dan bahwa terminal memakai URL branch drill; command ini memastikan skema, mencatat baseline v1-v6, seed default, dan whitelist nomor. Periksa login, jumlah transaksi, pos, rencana, relasi, saldo dan laporan periode yang dikenal; bandingkan dengan keadaan yang diharapkan untuk waktu snapshot.
+- **Validasi:** sambungkan aplikasi lokal sementara ke branch drill melalui **Connect** dan URL branch tersebut di `.env.local` lokal saja. Jangan commit atau kirim URL/password. Sebelum `npm run db:setup`, cek lagi host/branch yang dipilih pada Neon dan bahwa terminal memakai URL branch drill; command ini memastikan skema, mencatat baseline v1-v7, seed default, dan whitelist nomor. Periksa login, jumlah transaksi, pos, rencana, relasi, saldo dan laporan periode yang dikenal; bandingkan dengan keadaan yang diharapkan untuk waktu snapshot.
 - **Pemulihan main:** gunakan **Restore from history** atau **Restore from a snapshot** pada branch `main` hanya saat memang ingin mengganti keadaan database produksi. Pilih point-in-time/snapshot dengan teliti dan ikuti konfirmasi Neon; tindakan ini dapat mengubah data aplikasi.
 - **Selesai drill:** catat waktu snapshot, branch yang diuji, hasil hitungan/cek laporan, lalu hapus branch uji bila tidak diperlukan lagi.
 - **Periksa kegagalan pesan:** `jumlah.inbound_gagal` dan `jumlah.outbox_gagal` yang bukan nol menandakan perlu investigasi. Periksa cron GitHub `Process WhatsApp queues`, `CRON_SECRET`, log deployment, dan status provider. Retry otomatis memproses job yang memenuhi jadwal; jangan menghapus atau mengedit record DB secara manual.
@@ -281,16 +283,21 @@ otomatis hanya bila hasilnya tunggal; jika ambigu, transaksi memakai dompet bawa
 
 ### 8. Kalender dan Google Sheets (opsional)
 
-- **Kalender:** tombol **Unduh kalender (.ics)** di tab Transaksi otomatis berisi tagihan berulang, jatuh tempo
-  utang/piutang, dan target tabungan 6 bulan ke depan. Impor file ke Google Calendar, Apple Calendar, atau
-  aplikasi kalender lain.
-- **Google Sheets:** buka tab Laporan, tempel URL web app Apps Script, lalu klik **Sinkron sekarang**.
-  1. Buat Google Sheets baru, buka **Extensions > Apps Script**.
-  2. Tempel isi [`scripts/google-sheets.gs`](./scripts/google-sheets.gs), ganti `SPREADSHEET_ID`.
-  3. **Deploy > New deployment > Web app**, pilih **Execute as: Me** dan **Who has access: Anyone**.
-  4. Salin URL yang berakhiran `/exec` ke dashboard.
-  - Opsional: isi `SHEETS_WEBHOOK_SECRET` di server dan `SECRET` di script agar hanya permintaan bertanda
-    tangan yang diterima.
+- **Kalender:** buka tab **Transaksi otomatis**, bagian **Aturan Saya**. Tombol **Unduh kalender (.ics)** berisi
+  tagihan berulang, jatuh tempo utang/piutang, dan target tabungan 6 bulan ke depan. Tombol **Salin URL langganan**
+  memberi feed bertoken agar Google/Apple Calendar memperbarui sendiri tanpa unduh ulang.
+- **Google Sheets otomatis:** buka tab Laporan > Google Sheets, klik **Hubungkan Google Sheets**, lalu pilih
+  akun Google dan setujui izin Drive. Server membuat spreadsheet privat **Money-Charger** dengan sheet
+  **Transaksi**, mengisi seluruh transaksi, dan menyinkronkan ulang otomatis sekali sehari saat cron.
+  - Aktifkan **Google Sheets API** di Google Cloud project, lalu tambahkan scope
+    `https://www.googleapis.com/auth/drive.file` di OAuth consent screen. Redirect URI tetap
+    `/api/auth/oauth/google/callback`.
+  - Refresh token disimpan terenkripsi. Isi `GOOGLE_TOKEN_ENCRYPTION_KEY` dengan string acak panjang; bila kosong,
+    server memakai `GOOGLE_CLIENT_SECRET` sebagai bahan kunci.
+  - **Putuskan** menghapus koneksi dan token, tetapi tidak menghapus file spreadsheet dari Google Drive.
+- **Cadangan Apps Script:** bila tidak ingin memberi akses Drive, buka bagian **Cadangan: web app Apps Script**
+  di tab Laporan, lalu ikuti langkah di [`scripts/google-sheets.gs`](./scripts/google-sheets.gs).
+  - Opsional: isi `SHEETS_WEBHOOK_SECRET` di server dan `SECRET` di script.
   - Setiap sinkron menyalin ulang seluruh transaksi (bukan incremental), jadi spreadsheet selalu mencerminkan
     data terbaru.
 

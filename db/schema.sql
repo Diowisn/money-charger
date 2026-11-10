@@ -248,6 +248,16 @@ CREATE TABLE IF NOT EXISTS auth_identities (
   UNIQUE (user_id, provider)
 );
 
+CREATE TABLE IF NOT EXISTS google_sheets (
+  user_id          UUID PRIMARY KEY REFERENCES auth_users(id) ON DELETE CASCADE,
+  refresh_token_enc TEXT NOT NULL,
+  spreadsheet_id   TEXT NOT NULL,
+  spreadsheet_url  TEXT NOT NULL,
+  email            TEXT,
+  dibuat_pada      TIMESTAMPTZ NOT NULL DEFAULT now(),
+  diperbarui_pada  TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
 CREATE TABLE IF NOT EXISTS auth_sessions (
   token_hash TEXT PRIMARY KEY,
   user_id    UUID NOT NULL REFERENCES auth_users(id) ON DELETE CASCADE,
