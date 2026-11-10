@@ -1,6 +1,7 @@
 import type { NextRequest } from "next/server";
-import { pemilikRequest } from "@/lib/auth";
+import { pemilikRequest, tolakPeran } from "@/lib/auth";
 import { AksiError } from "@/lib/web-actions";
+import { ajukanTransaksi } from "@/modules/keluarga/model";
 import {
   batalkanDebtFinance,
   batalkanGoalFinance,
@@ -36,6 +37,8 @@ export async function getDashboard(req: NextRequest) {
 export async function postPlan(req: NextRequest) {
   const auth = await pemilikRequest(req);
   if ("tolak" in auth) return auth.tolak;
+  const tolak = tolakPeran(auth, "kelola");
+  if (tolak) return tolak;
   const userId = auth.userId;
   try {
     const body = await bacaBody(req);
@@ -50,9 +53,14 @@ export async function postPlan(req: NextRequest) {
 export async function postTransaction(req: NextRequest) {
   const auth = await pemilikRequest(req);
   if ("tolak" in auth) return auth.tolak;
+  const tolak = tolakPeran(auth, "tulis");
+  if (tolak) return tolak;
   const userId = auth.userId;
   try {
     const body = await bacaBody(req);
+    if (auth.role === "member") {
+      return ok(await ajukanTransaksi(userId, auth.actorId, body));
+    }
     return ok(await tambahTransaksiFinance(body as unknown as Parameters<typeof tambahTransaksiFinance>[0], userId));
   } catch (e) {
     return galat(e);
@@ -75,6 +83,8 @@ export async function deleteTransaction(req: NextRequest) {
 export async function postPosition(req: NextRequest) {
   const auth = await pemilikRequest(req);
   if ("tolak" in auth) return auth.tolak;
+  const tolak = tolakPeran(auth, "kelola");
+  if (tolak) return tolak;
   const userId = auth.userId;
   try {
     const body = await bacaBody(req);
@@ -88,6 +98,8 @@ export async function postPosition(req: NextRequest) {
 export async function postDebt(req: NextRequest) {
   const auth = await pemilikRequest(req);
   if ("tolak" in auth) return auth.tolak;
+  const tolak = tolakPeran(auth, "kelola");
+  if (tolak) return tolak;
   const userId = auth.userId;
   try {
     const body = await bacaBody(req);
@@ -113,6 +125,8 @@ export async function postDebt(req: NextRequest) {
 export async function postGoal(req: NextRequest) {
   const auth = await pemilikRequest(req);
   if ("tolak" in auth) return auth.tolak;
+  const tolak = tolakPeran(auth, "kelola");
+  if (tolak) return tolak;
   const userId = auth.userId;
   try {
     const body = await bacaBody(req);
@@ -137,6 +151,8 @@ export async function postGoal(req: NextRequest) {
 export async function postSetup(req: NextRequest) {
   const auth = await pemilikRequest(req);
   if ("tolak" in auth) return auth.tolak;
+  const tolak = tolakPeran(auth, "kelola");
+  if (tolak) return tolak;
   const userId = auth.userId;
   try {
     const body = await bacaBody(req);
@@ -155,6 +171,8 @@ export async function postSetup(req: NextRequest) {
 export async function postPengaturan(req: NextRequest) {
   const auth = await pemilikRequest(req);
   if ("tolak" in auth) return auth.tolak;
+  const tolak = tolakPeran(auth, "kelola");
+  if (tolak) return tolak;
   try {
     const body = await bacaBody(req);
     if (body.gajiPokok !== undefined) {

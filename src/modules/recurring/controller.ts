@@ -1,11 +1,13 @@
 import type { NextRequest } from "next/server";
-import { pemilikRequest } from "@/lib/auth";
+import { pemilikRequest, tolakPeran } from "@/lib/auth";
 import { AksiError } from "@/lib/web-actions";
 import { tambahAturan, hapusAturan, ubahStatusAturan } from "./model";
 
 export async function postRecurring(req: NextRequest) {
   const auth = await pemilikRequest(req);
   if ("tolak" in auth) return auth.tolak;
+  const tolak = tolakPeran(auth, "kelola");
+  if (tolak) return tolak;
   try {
     const body = (await req.json()) as Record<string, unknown>;
     const aksi = String(body.aksi ?? "");

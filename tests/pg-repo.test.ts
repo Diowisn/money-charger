@@ -74,6 +74,11 @@ describe("PgRepo di Postgres sungguhan", () => {
     expect((await r.load()).config.gajiPokok).toBe(1_800_000);
   });
 
+  it("skema workspace_members tersedia", async () => {
+    const hasil = await adapter.query("SELECT to_regclass('public.workspace_members') AS nama");
+    expect(hasil.rows[0].nama).toBe("workspace_members");
+  });
+
   it("menyimpan dompet dan menautkan transaksi ke dompet", async () => {
     const r = new PgRepo(adapter, true, ownerId);
     const id = await r.addAccount({ nama: "BCA", tipe: "bank", saldoAwal: 50_000 });

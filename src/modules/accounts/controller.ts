@@ -1,12 +1,14 @@
 import type { NextRequest } from "next/server";
 import { bacaBody, galat, ok } from "@/lib/api";
-import { pemilikRequest } from "@/lib/auth";
+import { pemilikRequest, tolakPeran } from "@/lib/auth";
 import { AksiError } from "@/lib/web-actions";
 import { pindahAkunFinance, tambahAkunFinance } from "./model";
 
 export async function postAkun(req: NextRequest) {
   const auth = await pemilikRequest(req);
   if ("tolak" in auth) return auth.tolak;
+  const tolak = tolakPeran(auth, "kelola");
+  if (tolak) return tolak;
   try {
     const body = await bacaBody(req);
     const aksi = String(body.aksi ?? "");

@@ -11,6 +11,7 @@ import { JUDUL_TAB, MENU_IDENTITAS, MENU_SAMPING, TAB_UTAMA, indukTab } from "./
 import { Asisten } from "./view/tab-asisten";
 import { Dompet } from "./view/tab-dompet";
 import { Impor } from "./view/tab-impor";
+import { Keluarga } from "./view/tab-keluarga";
 import { Lainnya } from "./view/tab-lainnya";
 import { Piutang } from "./view/tab-piutang";
 import { Otomatis } from "./view/tab-otomatis";
@@ -376,6 +377,7 @@ export default function Dashboard({ awal }: { awal: DashboardData }) {
           ) : null}
           {tab === "pos" ? <Pos data={data} kirim={kirim} sibuk={sibuk} mintaKonfirmasi={mintaKonfirmasi} /> : null}
           {tab === "dompet" ? <Dompet data={data} kirim={kirim} sibuk={sibuk} /> : null}
+          {tab === "keluarga" ? <Keluarga kirim={kirim} sibuk={sibuk} /> : null}
           {tab === "piutang" ? <Piutang data={data} kirim={kirim} sibuk={sibuk} mintaKonfirmasi={mintaKonfirmasi} /> : null}
           {tab === "target" ? <Target data={data} kirim={kirim} sibuk={sibuk} mintaKonfirmasi={mintaKonfirmasi} /> : null}
           {tab === "otomatis" ? <Otomatis data={data} kirim={kirim} sibuk={sibuk} mintaKonfirmasi={mintaKonfirmasi} /> : null}

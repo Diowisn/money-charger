@@ -1,5 +1,5 @@
 import type { NextRequest } from "next/server";
-import { pemilikRequest } from "@/lib/auth";
+import { pemilikRequest, tolakPeran } from "@/lib/auth";
 import { wibDate } from "@/lib/parse/date";
 import { AksiError } from "@/lib/web-actions";
 import { imporTransaksi } from "./model";
@@ -7,6 +7,8 @@ import { imporTransaksi } from "./model";
 export async function postImport(req: NextRequest) {
   const auth = await pemilikRequest(req);
   if ("tolak" in auth) return auth.tolak;
+  const tolak = tolakPeran(auth, "kelola");
+  if (tolak) return tolak;
   try {
     const body = (await req.json()) as { csv?: unknown };
     const csv = typeof body.csv === "string" ? body.csv : "";

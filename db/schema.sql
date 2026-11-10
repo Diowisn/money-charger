@@ -30,6 +30,22 @@ CREATE TABLE IF NOT EXISTS accounts (
   aktif       BOOLEAN NOT NULL DEFAULT TRUE,
   dibuat_pada TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+CREATE TABLE IF NOT EXISTS workspace_members (
+  id          BIGSERIAL PRIMARY KEY,
+  owner_id    UUID NOT NULL REFERENCES auth_users(id) ON DELETE CASCADE,
+  member_id   UUID NOT NULL REFERENCES auth_users(id) ON DELETE CASCADE,
+  role        TEXT NOT NULL DEFAULT 'member' CHECK (role IN ('admin','member','viewer')),
+  status      TEXT NOT NULL DEFAULT 'aktif' CHECK (status IN ('aktif','nonaktif')),
+  wa_number   TEXT,
+  dibuat_pada TIMESTAMPTZ NOT NULL DEFAULT now(),
+  UNIQUE (owner_id, member_id),
+  CHECK (owner_id <> member_id)
+);
+CREATE INDEX IF NOT EXISTS idx_workspace_members_member ON workspace_members (member_id, status);
+CREATE INDEX IF NOT EXISTS idx_workspace_members_owner ON workspace_members (owner_id, status);
+ALTER TABLE workspace_members ADD COLUMN IF NOT EXISTS wa_number TEXT;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_workspace_members_wa ON workspace_members (wa_number) WHERE wa_number IS NOT NULL;
+
 CREATE INDEX IF NOT EXISTS idx_accounts_user ON accounts (user_id, urutan, id);
 CREATE UNIQUE INDEX IF NOT EXISTS idx_accounts_user_nama ON accounts (user_id, lower(nama)) WHERE user_id IS NOT NULL;
 

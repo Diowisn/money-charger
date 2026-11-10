@@ -1,15 +1,14 @@
 import type { NextRequest } from "next/server";
-import { tolakJikaBelumLogin, userIdDariRequest } from "@/lib/auth";
+import { pemilikRequest } from "@/lib/auth";
 import { bacaBody } from "@/lib/api";
 import { batasi, ipDariRequest } from "@/lib/rate-limit";
 import { galat, ok } from "./view";
 import { tanyaInsight } from "./model";
 
 export async function postInsight(req: NextRequest) {
-  const tolak = await tolakJikaBelumLogin(req);
-  if (tolak) return tolak;
-  const userId = await userIdDariRequest(req);
-  if (!userId) return Response.json({ ok: false, error: "unauthorized" }, { status: 401 });
+  const auth = await pemilikRequest(req);
+  if ("tolak" in auth) return auth.tolak;
+  const userId = auth.userId;
   const batas = batasi(`insight:${ipDariRequest(req)}`, 10, 60_000);
   if (!batas.boleh) {
     return Response.json(

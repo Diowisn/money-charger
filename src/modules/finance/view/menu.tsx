@@ -20,6 +20,7 @@ import type { Tab } from "./tipe";
 export const MENU_LAIN: [Tab, string, (p: { aktif: boolean }) => ReactElement][] = [
   ["pos", "Pos pengeluaran", IkonPos],
   ["dompet", "Dompet & kekayaan", IkonRekap],
+  ["keluarga", "Keluarga & akses", IkonProfil],
   ["piutang", "Piutang & utang", IkonPiutang],
   ["target", "Target tabungan", IkonTarget],
   ["otomatis", "Transaksi otomatis", IkonOtomatis],
@@ -65,6 +66,7 @@ export const JUDUL_TAB: Record<Tab, string> = {
   "ubah-profil": "Edit profil",
   pos: "Pos pengeluaran",
   dompet: "Dompet & kekayaan",
+  keluarga: "Keluarga & akses",
   piutang: "Piutang & utang",
   target: "Target tabungan",
   otomatis: "Transaksi otomatis",

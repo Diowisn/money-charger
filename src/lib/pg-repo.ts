@@ -71,6 +71,20 @@ export class PgRepo implements Repo {
     return r.rows[0]?.id ?? null;
   }
 
+  /** Pemilik workspace untuk nomor WhatsApp anggota, bila terdaftar. */
+  async ownerForWa(wa: string): Promise<string | null> {
+    try {
+      const r = await this.db.query(
+        "SELECT owner_id FROM workspace_members WHERE wa_number = $1 AND status = 'aktif' LIMIT 1",
+        [wa],
+      );
+      return r.rows[0]?.owner_id ?? null;
+    } catch (error) {
+      if ((error as { code?: string }).code === "42P01") return null;
+      throw error;
+    }
+  }
+
   /** Mencocokkan email kotak masuk dengan akun terdaftar (tidak peka huruf besar/kecil). */
   async userIdByEmail(email: string | undefined): Promise<string | null> {
     const alamat = email?.trim().toLowerCase();

@@ -30,6 +30,7 @@ export type Tab =
   | "ubah-profil"
   | "pos"
   | "dompet"
+  | "keluarga"
   | "piutang"
   | "target"
   | "otomatis"

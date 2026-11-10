@@ -28,7 +28,15 @@ async function main() {
     "INSERT INTO schema_version (version, description) VALUES ($1, $2) ON CONFLICT (version) DO NOTHING",
     [3, "Dompet multi-akun (accounts, transactions.account_id)."],
   );
-  console.log("Skema siap. Baseline skema v1, v2, dan v3 tercatat.");
+  await getPool().query(
+    "INSERT INTO schema_version (version, description) VALUES ($1, $2) ON CONFLICT (version) DO NOTHING",
+    [4, "Kolaborasi keluarga (workspace_members)."],
+  );
+  await getPool().query(
+    "INSERT INTO schema_version (version, description) VALUES ($1, $2) ON CONFLICT (version) DO NOTHING",
+    [5, "Nomor WhatsApp anggota keluarga."],
+  );
+  console.log("Skema siap. Baseline skema v1, v2, v3, v4, dan v5 tercatat.");
 
   const seeded = await new PgRepo().seed(nomor);
   console.log(seeded ? "Draft 1 dan alias bawaan terisi." : "Data bawaan sudah ada, dilewati.");

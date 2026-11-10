@@ -39,14 +39,14 @@ Membuat Money-Charger terasa seperti aplikasi keuangan kelas berbayar untuk pema
 - **Multi-dompet dan net worth**: saldo per rekening/e-wallet, transfer antar dompet, kekayaan bersih.
 - **Laporan lanjutan**: periode kustom, cetak/simpan PDF, laporan terjadwal ke WhatsApp/email.
 - **AI Pro**: review bulanan otomatis, tanya jawab seluruh riwayat, deteksi anomali.
+- **Kolaborasi keluarga**: anggota, peran, anggaran bersama, persetujuan transaksi, nomor WhatsApp anggota.
 - Backup/restore melalui Neon Console, audit log dasar, ekspor CSV.
 
 ### Berikutnya, berurutan
 
 1. **Integrasi**: impor email bank/e-wallet yang lebih kaya, Google Sheets, kalender.
-2. **Kolaborasi keluarga**: anggota, peran, anggaran bersama, persetujuan.
-3. **Keamanan/kepercayaan**: 2FA, manajemen sesi, ekspor terenkripsi.
-4. **Mekanik paywall**: hanya jika akan dipublikasikan; tidak diperlukan untuk pemakaian pribadi.
+2. **Keamanan/kepercayaan**: 2FA, manajemen sesi, ekspor terenkripsi.
+3. **Mekanik paywall**: hanya jika akan dipublikasikan; tidak diperlukan untuk pemakaian pribadi.
 
 ## 4. Kebutuhan per fitur
 
@@ -114,7 +114,7 @@ Membuat Money-Charger terasa seperti aplikasi keuangan kelas berbayar untuk pema
 - Deteksi anomali dan kebocoran pengeluaran.
 - Tetap opt-in dan dapat dicabut.
 
-### F-PREM-08 Kolaborasi (berikutnya)
+### F-PREM-08 Kolaborasi
 
 - Anggota keluarga, peran, izin.
 - Anggaran bersama.

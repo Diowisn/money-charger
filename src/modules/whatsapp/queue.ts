@@ -16,7 +16,8 @@ export async function prosesAntreanInbound(
 
   for (const job of jobs) {
     try {
-      const hasil = await tanganiPesan(new PgRepo(undefined, undefined, userId), buatDeps(), job.payload);
+      const pemilik = (await new PgRepo().ownerForWa(job.payload.from)) ?? userId;
+      const hasil = await tanganiPesan(new PgRepo(undefined, undefined, pemilik), buatDeps(), job.payload);
       if (hasil) {
         await catatAudit(`wa:${maskNomor(job.payload.from)}`, "pesan_diproses", {
           jenis: job.payload.type,

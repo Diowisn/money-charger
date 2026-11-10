@@ -22,6 +22,7 @@ Sudah diimplementasikan:
 - Multi-dompet: tabel `accounts`, saldo per dompet, transfer, net worth.
 - Laporan lanjutan: periode kustom, cetak/simpan PDF, laporan terjadwal ke WhatsApp/email.
 - AI Pro: review bulanan otomatis, tanya jawab seluruh riwayat, deteksi anomali.
+- Kolaborasi keluarga: anggota, peran, persetujuan transaksi, nomor WhatsApp anggota.
 - Peringatan dalam aplikasi.
 - Skema versi v3 (laporan tidak menambah tabel).
 
@@ -119,6 +120,17 @@ Sudah diimplementasikan:
 - Status disimpan di `config`: `ai_review_aktif`, `ai_review_terakhir`.
 - Cron `/api/cron/outbox` memanggil review bulanan setelah laporan terjadwal.
 - UI: toggle review di tab Asisten; anomali tampil di tab Wawasan.
+
+### 2.8 Kolaborasi keluarga
+
+- Tabel `workspace_members(owner_id, member_id, role, status, wa_number)`.
+- `pemilikRequest` memetakan sesi anggota ke data pemilik workspace dan mengembalikan peran.
+- Peran: `admin` (kelola penuh), `member` (transaksi diajukan), `viewer` (lihat saja).
+- API `/api/keluarga`: daftar anggota, tambah/ubah peran/hapus, setujui/tolak transaksi.
+- Persetujuan memakai `pending_actions` jenis `persetujuan_transaksi`.
+- Anggaran dan dompet otomatis bersama karena memakai data pemilik yang sama.
+- Nomor WhatsApp anggota masuk `allowed_numbers`; worker memetakan nomor ke pemilik lewat `workspace_members`.
+- UI: `src/modules/finance/view/tab-keluarga.tsx`.
 
 ## 3. Persyaratan fungsional
 
@@ -295,7 +307,7 @@ Sudah diimplementasikan:
 
 ### 7.5 Kolaborasi dan keamanan
 
-- Anggota/workspace hanya jika aplikasi dipublikasikan.
+- Kolaborasi keluarga sudah diimplementasikan (bagian 2.8).
 - 2FA dan manajemen sesi untuk pemilik.
 - Ekspor terenkripsi.
 
@@ -310,4 +322,5 @@ Sudah diimplementasikan:
 | F-PREM-05 | FR-DOM | AC-DOM |
 | F-PREM-06 | FR-LAP | AC-LAP |
 | F-PREM-07 | FR-AI | AC-AI |
-| F-PREM-08-09 | Bagian 7.5 | Belum diimplementasikan |
+| F-PREM-08 | FR-KEL | AC-KEL |
+| F-PREM-09 | Bagian 7.5 | Belum diimplementasikan |

@@ -55,13 +55,35 @@ export async function tolakJikaBelumLogin(req: NextRequest): Promise<Response | 
   return null;
 }
 
+export type PeranWorkspace = "owner" | "admin" | "member" | "viewer";
+
 /** Validasi sesi sekali saja; hasilnya dipakai ulang oleh handler (hemat satu query per request). */
-export async function pemilikRequest(req: NextRequest): Promise<{ userId: string } | { tolak: Response }> {
-  const userId = await userIdDariRequest(req);
-  if (!userId) {
+export async function pemilikRequest(req: NextRequest): Promise<{ userId: string; actorId: string; role: PeranWorkspace } | { tolak: Response }> {
+  const actorId = await userIdDariRequest(req);
+  if (!actorId) {
     return { tolak: Response.json({ ok: false, error: "Sesi habis. Silakan login ulang." }, { status: 401 }) };
   }
-  return { userId };
+  try {
+    const anggota = await getPool().query<{ owner_id: string; role: PeranWorkspace }>(
+      "SELECT owner_id, role FROM workspace_members WHERE member_id = $1 AND status = 'aktif' ORDER BY id LIMIT 1",
+      [actorId],
+    );
+    const row = anggota.rows[0];
+    if (row) return { userId: row.owner_id, actorId, role: row.role };
+  } catch (error) {
+    if ((error as { code?: string }).code !== "42P01") throw error;
+  }
+  return { userId: actorId, actorId, role: "owner" };
+}
+
+export function tolakPeran(auth: { role: PeranWorkspace }, izin: "tulis" | "kelola"): Response | null {
+  if (izin === "kelola" && auth.role !== "owner" && auth.role !== "admin") {
+    return Response.json({ ok: false, error: "Hanya pemilik atau admin yang boleh mengubah pengaturan ini." }, { status: 403 });
+  }
+  if (izin === "tulis" && auth.role === "viewer") {
+    return Response.json({ ok: false, error: "Anggota dengan akses lihat tidak boleh mengubah data." }, { status: 403 });
+  }
+  return null;
 }
 
 export function normalisasiNomorWa(nomor: string): string {
