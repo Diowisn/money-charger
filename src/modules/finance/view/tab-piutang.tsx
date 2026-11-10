@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Tombol } from "@/components/tombol";
 import type { DashboardData } from "@/lib/dashboard";
 import { rp } from "./format";
+import { InputRupiah } from "./input-rupiah";
 import type { Kirim, MintaKonfirmasi } from "./tipe";
 
 export function Piutang({
@@ -88,15 +89,7 @@ export function Piutang({
           </label>
           <label>
             Nominal (Rp)
-            <input
-              type="number"
-              min={1}
-              step={1000}
-              inputMode="numeric"
-              value={nominal}
-              onChange={(e) => setNominal(e.target.value)}
-              placeholder="contoh 100000"
-            />
+            <InputRupiah value={nominal} onChange={setNominal} placeholder="contoh 100.000" />
           </label>
           <label>
             Jatuh tempo (opsional)
@@ -132,13 +125,10 @@ export function Piutang({
                     {d.jatuhTempo ? ` · tempo ${d.jatuhTempo}${d.lewatTempo ? " (lewat)" : ""}` : ""}
                   </p>
                   <div className="baris-tombol" style={{ marginTop: 6 }}>
-                    <input
-                      type="number"
-                      min={1}
-                      step={1000}
+                    <InputRupiah
                       placeholder="Bayar sebagian"
                       value={bayarInput[d.id] ?? ""}
-                      onChange={(e) => setBayarInput((b) => ({ ...b, [d.id]: e.target.value }))}
+                      onChange={(nilai) => setBayarInput((b) => ({ ...b, [d.id]: nilai }))}
                     />
                     <Tombol varian="sekunder" onClick={() => void bayar(d.id, false)} disabled={sibuk}>
                       Bayar

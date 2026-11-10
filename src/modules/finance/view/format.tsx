@@ -19,6 +19,12 @@ export const NAMA_TIPE: Record<string, string> = {
 export const rp = (n: number) => `Rp${Math.round(n).toLocaleString("id-ID")}`;
 export const rpOpsional = (n: number | null) => (n === null ? "—" : rp(n));
 
+/** Angka mentah -> "1.500.000" untuk input rupiah. */
+export function formatAngkaRupiah(nilai: string | number) {
+  const digit = String(nilai).replace(/\D/g, "").replace(/^0+(?=\d)/, "");
+  return digit.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+}
+
 export const LABEL_DETAIL: Record<string, string> = {
   merchant: "Merchant",
   lokasi: "Lokasi",

@@ -2,6 +2,7 @@ import { Tombol } from "@/components/tombol";
 import type { DashboardData, TxView } from "@/lib/dashboard";
 import { BarisInfo } from "./komponen";
 import { KUNCI_UANG_DETAIL, LABEL_DETAIL, NAMA_TIPE, rp, rpOpsional, tanggalPendek } from "./format";
+import { InputRupiah } from "./input-rupiah";
 import type { HasilScan, Konfirmasi } from "./tipe";
 
 export function ScanDialog({
@@ -65,16 +66,16 @@ export function ScanDialog({
         {editScan ? (
           <div className="scan-form">
             <label>Total biaya
-              <input type="number" min="1" step="1" inputMode="numeric" value={hasilScan.nominal} onChange={(event) => setHasilScan({ ...hasilScan, nominal: Number(event.target.value) })} />
+              <InputRupiah value={hasilScan.nominal} onChange={(nominal) => setHasilScan({ ...hasilScan, nominal: Number(nominal) })} />
             </label>
             <label>Pajak
-              <input type="number" min="0" step="1" inputMode="numeric" value={hasilScan.pajak ?? ""} onChange={(event) => setHasilScan({ ...hasilScan, pajak: event.target.value === "" ? null : Number(event.target.value) })} />
+              <InputRupiah value={hasilScan.pajak ?? ""} onChange={(pajak) => setHasilScan({ ...hasilScan, pajak: pajak === "" ? null : Number(pajak) })} />
             </label>
             <label>Dibayar
-              <input type="number" min="0" step="1" inputMode="numeric" value={hasilScan.dibayar ?? ""} onChange={(event) => setHasilScan({ ...hasilScan, dibayar: event.target.value === "" ? null : Number(event.target.value) })} />
+              <InputRupiah value={hasilScan.dibayar ?? ""} onChange={(dibayar) => setHasilScan({ ...hasilScan, dibayar: dibayar === "" ? null : Number(dibayar) })} />
             </label>
             <label>Kembalian
-              <input type="number" min="0" step="1" inputMode="numeric" value={hasilScan.kembalian ?? ""} onChange={(event) => setHasilScan({ ...hasilScan, kembalian: event.target.value === "" ? null : Number(event.target.value) })} />
+              <InputRupiah value={hasilScan.kembalian ?? ""} onChange={(kembalian) => setHasilScan({ ...hasilScan, kembalian: kembalian === "" ? null : Number(kembalian) })} />
             </label>
             <label>Kategori
               <select value={hasilScan.subPos ?? ""} onChange={(event) => setHasilScan({ ...hasilScan, subPos: event.target.value || null })}>

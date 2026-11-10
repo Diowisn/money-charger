@@ -3,6 +3,7 @@ import { Tombol } from "@/components/tombol";
 import type { DashboardData, TxView } from "@/lib/dashboard";
 import { unduhXlsx } from "@/lib/xlsx";
 import { NAMA_TIPE, labelBulan, rp, tanggalPendek } from "./format";
+import { InputRupiah } from "./input-rupiah";
 import type { Kirim, MintaKonfirmasi, Tab } from "./tipe";
 
 export function Transaksi({
@@ -140,15 +141,7 @@ export function Transaksi({
 
           <label>
             Nominal (Rp)
-            <input
-              type="number"
-              min={1}
-              step={1000}
-              inputMode="numeric"
-              value={nominal}
-              onChange={(e) => setNominal(e.target.value)}
-              placeholder="contoh 50000"
-            />
+            <InputRupiah value={nominal} onChange={setNominal} placeholder="contoh 50.000" />
           </label>
 
           <label>
@@ -199,15 +192,7 @@ export function Transaksi({
               {biayaAdminAktif ? (
                 <label>
                   Nominal biaya admin (Rp)
-                  <input
-                    type="number"
-                    min={0}
-                    step={500}
-                    inputMode="numeric"
-                    value={biayaAdmin}
-                    onChange={(e) => setBiayaAdmin(e.target.value)}
-                    placeholder="contoh 2500"
-                  />
+                  <InputRupiah value={biayaAdmin} onChange={setBiayaAdmin} placeholder="contoh 2.500" />
                 </label>
               ) : null}
             </>

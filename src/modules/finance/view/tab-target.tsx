@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Tombol } from "@/components/tombol";
 import type { DashboardData } from "@/lib/dashboard";
 import { rp } from "./format";
+import { InputRupiah } from "./input-rupiah";
 import type { Kirim, MintaKonfirmasi } from "./tipe";
 
 export function Target({
@@ -64,14 +65,10 @@ export function Target({
           </label>
           <label>
             Nominal target (Rp)
-            <input
-              type="number"
-              min={1}
-              step={10000}
-              inputMode="numeric"
+            <InputRupiah
               value={targetNominal}
-              onChange={(e) => setTargetNominal(e.target.value)}
-              placeholder="contoh 5000000"
+              onChange={setTargetNominal}
+              placeholder="contoh 5.000.000"
             />
           </label>
           <label>
@@ -116,13 +113,10 @@ export function Target({
                     </p>
                   ) : null}
                   <div className="baris-tombol" style={{ marginTop: 6 }}>
-                    <input
-                      type="number"
-                      min={1}
-                      step={1000}
+                    <InputRupiah
                       placeholder="Nabung nominal"
                       value={nabungInput[g.id] ?? ""}
-                      onChange={(e) => setNabungInput((b) => ({ ...b, [g.id]: e.target.value }))}
+                      onChange={(nilai) => setNabungInput((b) => ({ ...b, [g.id]: nilai }))}
                     />
                     <Tombol onClick={() => void nabung(g.id)} disabled={sibuk}>
                       Nabung

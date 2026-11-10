@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Tombol } from "@/components/tombol";
 import type { DashboardData } from "@/lib/dashboard";
 import { rp } from "./format";
+import { InputRupiah } from "./input-rupiah";
 import type { Kirim, MintaKonfirmasi } from "./tipe";
 
 export function Otomatis({
@@ -64,7 +65,7 @@ export function Otomatis({
           </label>
           <label>
             Nominal
-            <input type="number" min={1} step={1000} value={nominal} onChange={(e) => setNominal(e.target.value)} placeholder="150000" />
+            <InputRupiah value={nominal} onChange={setNominal} placeholder="150.000" />
           </label>
           <label>
             Tanggal tiap bulan

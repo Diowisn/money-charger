@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { Tombol } from "@/components/tombol";
 import type { DashboardData } from "@/lib/dashboard";
 import { drafRencana, rp } from "./format";
+import { InputRupiah } from "./input-rupiah";
 import type { Kirim } from "./tipe";
 
 export function Rencana({ data, kirim, sibuk }: { data: DashboardData; kirim: Kirim; sibuk: boolean }) {
@@ -61,13 +62,7 @@ export function Rencana({ data, kirim, sibuk }: { data: DashboardData; kirim: Ki
         <div className="form">
           <label>
             Gaji pokok (Rp)
-            <input
-              type="number"
-              min={1}
-              step={10000}
-              value={gajiPokok}
-              onChange={(e) => setGajiPokok(e.target.value)}
-            />
+            <InputRupiah value={gajiPokok} onChange={setGajiPokok} />
           </label>
           <Tombol lebar onClick={() => void simpanGajiPokok()} disabled={sibuk || Number(gajiPokok) < 1}>
             {sibuk ? "Menyimpan..." : "Simpan gaji pokok"}
@@ -91,13 +86,10 @@ export function Rencana({ data, kirim, sibuk }: { data: DashboardData; kirim: Ki
               <div className="slider" key={p.id}>
                 <div className="baris-antara">
                   <span>{p.nama}</span>
-                  <input
+                  <InputRupiah
                     className="angka-input"
-                    type="number"
-                    min={0}
-                    step={10000}
                     value={v}
-                    onChange={(e) => ubah(key, Number(e.target.value))}
+                    onChange={(nilai) => ubah(key, Number(nilai))}
                   />
                 </div>
                 <input
@@ -130,13 +122,10 @@ export function Rencana({ data, kirim, sibuk }: { data: DashboardData; kirim: Ki
           <div className="slider" key={key}>
             <div className="baris-antara">
               <span>{label}</span>
-              <input
+              <InputRupiah
                 className="angka-input"
-                type="number"
-                min={0}
-                step={10000}
                 value={draf[key] ?? 0}
-                onChange={(e) => ubah(key, Number(e.target.value))}
+                onChange={(nilai) => ubah(key, Number(nilai))}
               />
             </div>
           </div>

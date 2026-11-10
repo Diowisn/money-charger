@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Tombol } from "@/components/tombol";
 import type { DashboardData } from "@/lib/dashboard";
 import { rp } from "./format";
+import { InputRupiah } from "./input-rupiah";
 import type { Kirim, MintaKonfirmasi } from "./tipe";
 
 export function Pos({
@@ -110,14 +111,7 @@ export function Pos({
           </label>
           <label>
             Jatah awal (Rp)
-            <input
-              type="number"
-              min={0}
-              step={10000}
-              value={jatah}
-              onChange={(e) => setJatah(e.target.value)}
-              placeholder="0"
-            />
+            <InputRupiah value={jatah} onChange={setJatah} placeholder="0" />
           </label>
           <Tombol lebar onClick={() => void tambah()} disabled={sibuk || !nama}>
             Tambah pos
@@ -199,29 +193,23 @@ export function Pos({
             </label>
             <label>
               Saldo awal (Rp)
-              <input
-                type="number"
-                min={0}
+              <InputRupiah
                 value={setup.saldoAwal}
-                onChange={(e) => setSetup({ ...setup, saldoAwal: e.target.value })}
+                onChange={(saldoAwal) => setSetup({ ...setup, saldoAwal })}
               />
             </label>
             <label>
               Tabungan awal (Rp)
-              <input
-                type="number"
-                min={0}
+              <InputRupiah
                 value={setup.tabunganAwal}
-                onChange={(e) => setSetup({ ...setup, tabunganAwal: e.target.value })}
+                onChange={(tabunganAwal) => setSetup({ ...setup, tabunganAwal })}
               />
             </label>
             <label>
               Investasi awal (Rp)
-              <input
-                type="number"
-                min={0}
+              <InputRupiah
                 value={setup.investasiAwal}
-                onChange={(e) => setSetup({ ...setup, investasiAwal: e.target.value })}
+                onChange={(investasiAwal) => setSetup({ ...setup, investasiAwal })}
               />
             </label>
             <Tombol lebar onClick={() => void simpanSetup()} disabled={sibuk}>
