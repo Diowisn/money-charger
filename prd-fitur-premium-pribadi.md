@@ -43,6 +43,7 @@ Membuat Money-Charger terasa seperti aplikasi keuangan kelas berbayar untuk pema
 - **Keamanan/kepercayaan**: 2FA, manajemen sesi, ekspor terenkripsi.
 - **Integrasi email bank/e-wallet**: deteksi penyedia, dompet sumber, dan pos otomatis dari notifikasi transaksi.
 - **Integrasi lanjutan**: kalender `.ics` (unduh + langganan URL bertoken) dan sinkron Google Sheets via Apps Script (manual + otomatis harian).
+- **Meter pemakaian**: hitungan panggilan AI (parse/vision/insight) dan pesan WhatsApp per bulan di `/api/health`, tanpa isi pesan.
 - Backup/restore melalui Neon Console, audit log dasar, ekspor CSV.
 
 ### Berikutnya, berurutan

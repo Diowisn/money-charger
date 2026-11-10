@@ -7,6 +7,7 @@ import type { DashboardData } from "./dashboard";
 import { nominalKeluar } from "./engine";
 import { diffDays } from "./parse/date";
 import { TURUNAN, type State } from "./types";
+import { catatPemakaian } from "./usage";
 
 export const PERTANYAAN_MAKS = 400;
 
@@ -270,6 +271,7 @@ export function buatGroqInsightClient(env: NodeJS.ProcessEnv = process.env): Ins
 
   return {
     async tanya(pertanyaan, konteks) {
+      void catatPemakaian("ai_insight");
       const r = await sekali(pertanyaan, konteks);
       if (r !== "ulang") return r;
       const r2 = await sekali(pertanyaan, konteks);

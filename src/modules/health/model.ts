@@ -1,4 +1,5 @@
 import { getPool } from "@/lib/pg-repo";
+import { pemakaianBulanIni, type PemakaianBulan } from "@/lib/usage";
 
 const WA_VARS = ["WA_PHONE_NUMBER_ID", "WA_ACCESS_TOKEN", "WA_APP_SECRET", "WA_VERIFY_TOKEN"] as const;
 const SEMUA_VARS = [
@@ -93,6 +94,7 @@ export async function periksaKesiapan() {
     error: null,
   };
 
+  let pemakaian: PemakaianBulan | null = null;
   if (env.DATABASE_URL) {
     try {
       const pool = getPool();
@@ -111,6 +113,11 @@ export async function periksaKesiapan() {
           "SELECT nilai FROM config WHERE user_id IS NULL AND kunci = 'cron_terakhir'",
         );
         db.cronTerakhir = (cron.rows[0]?.nilai as string | undefined) ?? null;
+        try {
+          pemakaian = await pemakaianBulanIni();
+        } catch {
+          pemakaian = null;
+        }
         const hitung = await pool.query(
           `SELECT
              (SELECT COUNT(*) FROM allowed_numbers WHERE aktif)::int AS nomor_aktif,
@@ -158,6 +165,7 @@ export async function periksaKesiapan() {
       ...db,
       hostPooled: host ? host.includes("-pooler") : null,
     },
+    pemakaian,
     peringatan,
   };
 }

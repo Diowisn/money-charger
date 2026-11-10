@@ -5,6 +5,7 @@
  */
 import { parseAmount } from "./parse/amount";
 import { extractDate } from "./parse/date";
+import { catatPemakaian } from "./usage";
 
 export interface StrukRaw {
   intent?: unknown;
@@ -191,6 +192,7 @@ export function buatGroqVisionClient(env: NodeJS.ProcessEnv = process.env): Visi
 
   return {
     async parseReceipt(imageBase64, mimeType, namaSubPos, caption) {
+      void catatPemakaian("ai_vision");
       const r = await sekali(imageBase64, mimeType, namaSubPos, caption);
       if (r !== "ulang") return r;
       const r2 = await sekali(imageBase64, mimeType, namaSubPos, caption); // maksimal 1 percobaan ulang

@@ -4,6 +4,7 @@
  */
 import { parseAmount } from "./parse/amount";
 import { extractDate } from "./parse/date";
+import { catatPemakaian } from "./usage";
 
 export type AiIntent = "out" | "in" | "bonus" | "gaji" | "tidak_jelas";
 
@@ -128,6 +129,7 @@ export function buatGroqClient(env: NodeJS.ProcessEnv = process.env): AiClient |
   return {
     async parse(pesan, nama) {
       // Hanya teks pesan dan nama sub-pos yang dikirim; tidak ada nomor telepon (FR-74).
+      void catatPemakaian("ai_parse");
       for (const modelAktif of models) {
         let r = await sekali(modelAktif, pesan, nama);
         if (r === "model_tidak_ada") continue;

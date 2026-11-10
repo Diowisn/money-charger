@@ -165,6 +165,7 @@ Sudah diimplementasikan:
 - `src/modules/sheets/`: `/api/sheets` menyimpan URL web app dan mengirim salinan penuh transaksi.
 - Sinkron otomatis: `prosesSinkronSheets(hariIni)` dipanggil cron `/api/cron/outbox` setelah review bulanan; `sudahSinkronHariIni(terakhir, hariIni)` membatasi maksimal sekali per hari WIB.
 - Pemantauan cron: cron sukses mencatat `config.cron_terakhir` (global, `user_id` NULL); `/api/health` menampilkan `database.cronTerakhir` dan menambah peringatan via `cronBasi` bila belum pernah jalan atau >26 jam.
+- Meter pemakaian: `src/lib/usage.ts` menambah counter `config` global `usage:<YYYY-MM>:<jenis>` (`ai_parse`, `ai_vision`, `ai_insight`) tiap panggilan AI; `pemakaianBulanIni` merangkum counter + hitungan `inbound_messages`/`outbox` bulan berjalan (WIB). Hanya jumlah, tanpa isi pesan/PII; tampil di `/api/health` (butuh `HEALTH_TOKEN`).
 - `scripts/google-sheets.gs`: template web app Apps Script yang menulis ke sheet `Transaksi`; mendukung `SHEETS_WEBHOOK_SECRET` opsional.
 - Status disimpan di `config` (`sheets_url`, `sheets_terakhir`, `kalender_token`), tanpa tabel baru.
 - UI: tombol unduh `.ics` dan salin URL langganan di tab Transaksi otomatis; pengaturan dan sinkron Google Sheets di tab Laporan.
@@ -280,6 +281,8 @@ Sudah diimplementasikan:
 - **FR-INT-09 MUST:** sinkron Google Sheets otomatis berjalan maksimal sekali per hari WIB per pengguna dan dilewati bila URL kosong.
 - **FR-INT-10 SHOULD:** kegagalan sinkron otomatis satu pengguna tidak menghentikan pengguna lain dan tidak menggagalkan cron.
 - **FR-INT-11 MUST:** cron sukses mencatat `cron_terakhir`; health memperingatkan bila cron belum pernah jalan atau terakhir >26 jam.
+- **FR-INT-12 MUST:** meter pemakaian hanya menyimpan jumlah per bulan per jenis; tidak ada isi pesan, nominal, atau nomor telepon.
+- **FR-INT-13 MUST:** kegagalan mencatat/membaca meter tidak menggagalkan fitur AI maupun health.
 
 ## 4. Keamanan dan integritas
 
@@ -408,6 +411,8 @@ Sudah diimplementasikan:
 - **AC-INT-09:** dua cron pada hari WIB yang sama hanya menjalankan satu sinkron Sheets otomatis per pengguna.
 - **AC-INT-10:** pengguna tanpa `sheets_url` dilewati tanpa error.
 - **AC-INT-11:** `cron_terakhir` kosong atau >26 jam memunculkan peringatan di health; cron dalam 26 jam tidak.
+- **AC-INT-12:** counter pemakaian bertambah per panggilan AI dengan kunci `usage:<YYYY-MM>:<jenis>` dan tidak memuat isi pesan.
+- **AC-INT-13:** health tanpa `HEALTH_TOKEN` tidak menampilkan pemakaian; dengan token menampilkan agregat bulan berjalan.
 
 ## 7. Rencana fitur berikutnya
 
