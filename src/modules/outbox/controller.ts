@@ -5,6 +5,7 @@ import { prosesDigest } from "@/modules/digest/model";
 import { prosesReviewBulanan } from "@/modules/insight/model";
 import { prosesLaporanTerjadwal } from "@/modules/laporan/model";
 import { prosesTransaksiBerulang } from "@/modules/recurring/model";
+import { prosesSinkronSheets } from "@/modules/sheets/model";
 import { prosesAntreanInbound } from "@/modules/whatsapp/queue";
 
 export async function retryOutbox(req: NextRequest) {
@@ -40,8 +41,14 @@ export async function retryOutbox(req: NextRequest) {
     } catch (error) {
       console.error(`Review bulanan gagal: ${error instanceof Error ? error.message : "unknown"}`);
     }
+    let sheets: unknown = null;
+    try {
+      sheets = await prosesSinkronSheets();
+    } catch (error) {
+      console.error(`Sinkron Sheets gagal: ${error instanceof Error ? error.message : "unknown"}`);
+    }
     const outbox = await prosesAntreanOutbox();
-    return Response.json({ ok: true, inbound, outbox, otomatis, digest, laporan, review }, { headers: { "Cache-Control": "no-store" } });
+    return Response.json({ ok: true, inbound, outbox, otomatis, digest, laporan, review, sheets }, { headers: { "Cache-Control": "no-store" } });
   } catch (e) {
     console.error(`Outbox cron gagal: ${e instanceof Error ? e.message : "unknown error"}`);
     return Response.json({ ok: false, error: "Gagal memproses outbox." }, { status: 500 });

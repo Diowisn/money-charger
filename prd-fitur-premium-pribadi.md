@@ -3,7 +3,7 @@
 | Atribut | Nilai |
 |---|---|
 | Status | Aktif; penggunaan pribadi, tanpa paywall |
-| Versi | 1.2 |
+| Versi | 1.3 |
 | Tanggal | 10 November 2026 |
 | Dokumen induk | [PRD utama](./prd-catatan-keuangan-whatsapp.md) |
 | Dokumen teknis | [SRS fitur premium pribadi](./srs-fitur-premium-pribadi.md) |
@@ -42,12 +42,12 @@ Membuat Money-Charger terasa seperti aplikasi keuangan kelas berbayar untuk pema
 - **Kolaborasi keluarga**: anggota, peran, anggaran bersama, persetujuan transaksi, nomor WhatsApp anggota.
 - **Keamanan/kepercayaan**: 2FA, manajemen sesi, ekspor terenkripsi.
 - **Integrasi email bank/e-wallet**: deteksi penyedia, dompet sumber, dan pos otomatis dari notifikasi transaksi.
+- **Integrasi lanjutan**: kalender `.ics` (unduh + langganan URL bertoken) dan sinkron Google Sheets via Apps Script (manual + otomatis harian).
 - Backup/restore melalui Neon Console, audit log dasar, ekspor CSV.
 
 ### Berikutnya, berurutan
 
-1. **Integrasi lanjutan**: Google Sheets dan kalender.
-2. **Mekanik paywall**: hanya jika akan dipublikasikan; tidak diperlukan untuk pemakaian pribadi.
+1. **Mekanik paywall**: hanya jika akan dipublikasikan; tidak diperlukan untuk pemakaian pribadi.
 
 ## 4. Kebutuhan per fitur
 
@@ -131,7 +131,10 @@ Membuat Money-Charger terasa seperti aplikasi keuangan kelas berbayar untuk pema
 
 - Impor email bank/e-wallet: deteksi penyedia (BCA, Mandiri, BRI, BNI, BSI, CIMB, Permata, BTN, GoPay, OVO, DANA, ShopeePay, LinkAja, Jenius, Jago, SeaBank, Blu, Neo).
 - Cocokkan dompet sumber dan pos otomatis bila unik; jika ambigu, pakai dompet bawaan dan tanpa pos.
-- Google Sheets dan kalender menyusul.
+- Kalender `.ics`: tagihan berulang, jatuh tempo utang/piutang, dan target tabungan 6 bulan ke depan.
+- Kalender langganan: URL feed bertoken agar Google/Apple Calendar memperbarui otomatis tanpa unduh ulang manual.
+- Google Sheets: salin ulang seluruh transaksi ke spreadsheet melalui web app Apps Script; URL dibatasi ke `script.google.com`.
+- Google Sheets otomatis: setelah URL tersimpan, cron menyinkron sekali sehari tanpa klik manual.
 
 ## 5. Di luar lingkup saat ini
 

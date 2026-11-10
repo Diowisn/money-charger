@@ -33,6 +33,10 @@ Acuan: [PRD Money-Charger SaaS](./prd-catatan-keuangan-whatsapp.md) dan [SRS](./
 | `src/modules/email/` | Modul HMVC penerima email payroll generik (`/api/email/inbound`) |
 | `src/modules/insight/` | Modul HMVC asisten tanya jawab keuangan (`/api/insight`) |
 | `src/lib/email.ts` | Heuristik ekstraksi nominal, penyedia, dompet, dan deteksi "gaji/payroll" dari teks email |
+| `src/modules/kalender/` | Modul HMVC unduhan kalender `.ics` (`/api/kalender`) |
+| `src/modules/sheets/` | Modul HMVC sinkron Google Sheets (`/api/sheets`) |
+| `src/lib/ics.ts` | Pembuat kalender RFC 5545 tanpa dependensi tambahan |
+| `src/lib/sheets.ts` | Penyusun baris spreadsheet dan validasi URL web app Apps Script |
 | `src/app/api/` | Adapter Next.js tipis yang meneruskan request ke controller modul |
 | `src/app/page.tsx` | Adapter halaman dashboard Next.js |
 | `src/app/login/` | Halaman masuk, daftar akun, dan tombol Google/Facebook |
@@ -232,12 +236,16 @@ BTN, GoPay, OVO, DANA, ShopeePay, LinkAja, Jenius, Jago, SeaBank, Blu, Neo). Dom
 otomatis hanya bila hasilnya tunggal; jika ambigu, transaksi memakai dompet bawaan dan tanpa pos.
 
 1. Isi `EMAIL_INBOUND_SECRET` dengan string acak panjang di `.env.local` dan di Vercel, lalu redeploy.
-   Opsional: isi `EMAIL_ALLOWED_SENDERS=bankbsi.co.id` agar hanya email dari domain itu yang diterima.
+   Opsional: batasi pengirim lewat `EMAIL_ALLOWED_SENDERS`, satu atau beberapa domain dipisah koma, mis.
+   `EMAIL_ALLOWED_SENDERS=bankbsi.co.id,bca.co.id,mandiri.co.id,dana.id,gopay.co.id`. Kosong = semua pengirim.
 2. Jembatan termudah untuk Gmail: buka `script.google.com`, buat project baru, tempel isi
-   [`scripts/gmail-bsi.gs`](./scripts/gmail-bsi.gs), ganti `WEBHOOK_URL` dan `SECRET`, lalu jalankan
-   `pasangTrigger` sekali dan izinkan akses Gmail. Script memeriksa email BSI 24 jam terakhir tiap 5 menit dan
-   meneruskannya ke webhook; email yang sudah pernah dikirim dilewati oleh idempotensi server. Untuk diagnosa,
-   jalankan `debugEmailBsi` (lihat email yang cocok) atau `tesKoneksi` (HTTP 400 berarti secret benar).
+   [`scripts/gmail-transaksi.gs`](./scripts/gmail-transaksi.gs), ganti `WEBHOOK_URL` dan `SECRET`, lalu jalankan
+   `pasangTrigger` sekali dan izinkan akses Gmail. Script memeriksa email 24 jam terakhir tiap 5 menit untuk BSI,
+   BCA, Mandiri, BRI, BNI, CIMB Niaga, Permata, BTN, Jenius, Jago, SeaBank, Blu, Neo, GoPay, OVO, DANA,
+   ShopeePay, dan LinkAja, lalu meneruskannya ke webhook bersama nama `penyedia`. Edit array `SUMBER` untuk
+   menambah/menghapus bank atau e-wallet; `subjek` boleh dikosongkan agar semua email dari domain itu diperiksa.
+   Email yang sudah pernah dikirim dilewati oleh idempotensi server. Untuk diagnosa, jalankan
+   `debugEmailTransaksi` (lihat query dan email yang cocok) atau `tesKoneksi` (HTTP 400 berarti secret benar).
    Alternatif: Resend Inbound, Cloudflare Email Workers, Mailgun Routes, atau Zapier/Make.
 3. Body JSON yang dikenali:
 
@@ -267,6 +275,21 @@ otomatis hanya bila hasilnya tunggal; jika ambigu, transaksi memakai dompet bawa
 
 4. Uji dengan `curl`/Postman sebelum menyambungkan penyedia sungguhan. Email yang sama boleh dikirim ulang:
    `id` yang sama tidak dicatat dua kali.
+
+### 8. Kalender dan Google Sheets (opsional)
+
+- **Kalender:** tombol **Unduh kalender (.ics)** di tab Transaksi otomatis berisi tagihan berulang, jatuh tempo
+  utang/piutang, dan target tabungan 6 bulan ke depan. Impor file ke Google Calendar, Apple Calendar, atau
+  aplikasi kalender lain.
+- **Google Sheets:** buka tab Laporan, tempel URL web app Apps Script, lalu klik **Sinkron sekarang**.
+  1. Buat Google Sheets baru, buka **Extensions > Apps Script**.
+  2. Tempel isi [`scripts/google-sheets.gs`](./scripts/google-sheets.gs), ganti `SPREADSHEET_ID`.
+  3. **Deploy > New deployment > Web app**, pilih **Execute as: Me** dan **Who has access: Anyone**.
+  4. Salin URL yang berakhiran `/exec` ke dashboard.
+  - Opsional: isi `SHEETS_WEBHOOK_SECRET` di server dan `SECRET` di script agar hanya permintaan bertanda
+    tangan yang diterima.
+  - Setiap sinkron menyalin ulang seluruh transaksi (bukan incremental), jadi spreadsheet selalu mencerminkan
+    data terbaru.
 
 ## Dashboard web
 

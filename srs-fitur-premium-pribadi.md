@@ -1,9 +1,9 @@
-﻿# SRS â€” Fitur Premium Pribadi Money-Charger
+?# SRS — Fitur Premium Pribadi Money-Charger
 
 | Atribut | Nilai |
 |---|---|
 | Status | Implementasi bertahap; pemakaian pribadi |
-| Versi | 1.2 |
+| Versi | 1.3 |
 | Tanggal | 10 November 2026 |
 | Terkait PRD | [PRD fitur premium pribadi](./prd-fitur-premium-pribadi.md) |
 | Terkait SRS utama | [SRS utama](./srs-catatan-keuangan-whatsapp.md) |
@@ -25,6 +25,7 @@ Sudah diimplementasikan:
 - Kolaborasi keluarga: anggota, peran, persetujuan transaksi, nomor WhatsApp anggota.
 - Keamanan: 2FA TOTP, manajemen sesi, ekspor terenkripsi.
 - Integrasi email bank/e-wallet: deteksi penyedia, dompet sumber, dan pos otomatis.
+- Integrasi kalender `.ics` dan sinkron Google Sheets via Apps Script.
 - Peringatan dalam aplikasi.
 - Skema versi v6 (`workspace_members`, nomor WhatsApp anggota, kolom 2FA).
 
@@ -74,7 +75,7 @@ Sudah diimplementasikan:
 
 - `src/modules/digest/model.ts`
   - `kunciMinggu(iso)` menghasilkan kunci minggu ISO.
-  - `pesanMingguan(data)` merangkum pengeluaran, sisa anggaran, proyeksi, dan tagihan â‰¤7 hari.
+  - `pesanMingguan(data)` merangkum pengeluaran, sisa anggaran, proyeksi, dan tagihan ≤7 hari.
   - `pesanPeringatan(data)` menyalin peringatan wawasan.
   - `prosesDigest(hariIni)` mengirim melalui outbox dan mencatat status kirim.
 - Cron `/api/cron/outbox` memanggil digest setelah transaksi berulang.
@@ -155,19 +156,31 @@ Sudah diimplementasikan:
 - Input webhook menerima `dompet`/`wallet` dan `penyedia`/`provider` opsional.
 - Tidak ada tabel baru; idempotensi tetap memakai `email:<id>`.
 
+### 2.11 Kalender dan Google Sheets
+
+- `src/lib/ics.ts`: pembuat `.ics` (RFC 5545) untuk event all-day, escape teks, lipat baris, dan alarm.
+- `src/modules/kalender/`: `/api/kalender` mengunduh tagihan berulang, jatuh tempo utang/piutang, dan target tabungan 6 bulan ke depan.
+- Kalender langganan: `GET /api/kalender?token=...` memakai token feed (`config.kalender_token`, 32 byte base64url); `POST /api/kalender` mengembalikan URL langganan untuk pemilik yang login. Token dibuat sekali dan dipakai ulang.
+- `src/lib/sheets.ts`: `bangunBarisSheets` (header + transaksi kronologis) dan `validasiUrlSheets` (hanya `https://script.google.com/macros/s/.../exec`).
+- `src/modules/sheets/`: `/api/sheets` menyimpan URL web app dan mengirim salinan penuh transaksi.
+- Sinkron otomatis: `prosesSinkronSheets(hariIni)` dipanggil cron `/api/cron/outbox` setelah review bulanan; `sudahSinkronHariIni(terakhir, hariIni)` membatasi maksimal sekali per hari WIB.
+- `scripts/google-sheets.gs`: template web app Apps Script yang menulis ke sheet `Transaksi`; mendukung `SHEETS_WEBHOOK_SECRET` opsional.
+- Status disimpan di `config` (`sheets_url`, `sheets_terakhir`, `kalender_token`), tanpa tabel baru.
+- UI: tombol unduh `.ics` dan salin URL langganan di tab Transaksi otomatis; pengaturan dan sinkron Google Sheets di tab Laporan.
+
 ## 3. Persyaratan fungsional
 
-### FR-REC â€” Transaksi berulang
+### FR-REC — Transaksi berulang
 
-- **FR-REC-01 MUST:** aturan aktif dengan tanggal jatuh tempo â‰¤ hari ini diproses cron.
+- **FR-REC-01 MUST:** aturan aktif dengan tanggal jatuh tempo ≤ hari ini diproses cron.
 - **FR-REC-02 MUST:** satu aturan menghasilkan maksimal satu transaksi per `periode` (`YYYY-MM`).
 - **FR-REC-03 MUST:** aturan dengan `mulai` setelah tanggal jatuh tempo bulan berjalan tidak diproses mundur.
-- **FR-REC-04 MUST:** tanggal 29â€“31 dipotong ke akhir bulan sesuai kalender.
+- **FR-REC-04 MUST:** tanggal 29–31 dipotong ke akhir bulan sesuai kalender.
 - **FR-REC-05 MUST:** aturan bisa dijeda/dihapus tanpa menghapus transaksi historis.
 - **FR-REC-06 MUST:** transaksi otomatis memakai pos jika ada dan tetap tunduk pada validasi domain.
 - **FR-REC-07 SHOULD:** kegagalan satu aturan tidak menghentikan aturan lain.
 
-### FR-CSV â€” Impor mutasi
+### FR-CSV — Impor mutasi
 
 - **FR-CSV-01 MUST:** header tanpa `tanggal`, `tipe`, atau `nominal` ditolak sebelum mutasi.
 - **FR-CSV-02 MUST:** baris invalid dicatat sebagai gagal dan tidak menghentikan baris lain.
@@ -178,7 +191,7 @@ Sudah diimplementasikan:
 - **FR-CSV-07 MUST:** impor hanya membuat `out`/`in`; gaji/bonus lewat jalur transaksi biasa.
 - **FR-CSV-08 SHOULD:** pos dicocokkan berdasarkan nama/alias aktif; jika ambigu, transaksi tanpa pos.
 
-### FR-DIG â€” Digest WhatsApp
+### FR-DIG — Digest WhatsApp
 
 - **FR-DIG-01 MUST:** digest membuat baris `outbox`, bukan mengirim langsung.
 - **FR-DIG-02 MUST:** ringkasan mingguan maksimal sekali per minggu ISO.
@@ -186,7 +199,7 @@ Sudah diimplementasikan:
 - **FR-DIG-04 MUST:** digest dapat dimatikan dari pengaturan.
 - **FR-DIG-05 MUST:** recipient hanya nomor aktif di `allowed_numbers`.
 
-### FR-DOM â€” Multi-dompet
+### FR-DOM — Multi-dompet
 
 - **FR-DOM-01 MUST:** dompet punya nama, tipe, saldo awal, dan urutan.
 - **FR-DOM-02 MUST:** saldo dompet dihitung dari transaksi, bukan disimpan.
@@ -195,7 +208,7 @@ Sudah diimplementasikan:
 - **FR-DOM-05 MUST:** transaksi pengeluaran/pemasukan/gaji/bonus dapat memilih dompet.
 - **FR-DOM-06 MUST:** net worth = saldo dompet + tabungan + investasi - utang aktif.
 
-### FR-AI â€” AI Pro
+### FR-AI — AI Pro
 
 - **FR-AI-01 MUST:** tanya jawab memakai agregat seluruh riwayat, bukan hanya transaksi terbaru.
 - **FR-AI-02 MUST:** deteksi anomali hanya tampilan/insight; tidak membuat mutasi.
@@ -203,21 +216,21 @@ Sudah diimplementasikan:
 - **FR-AI-04 MUST:** review bulanan dikirim melalui outbox, bukan langsung.
 - **FR-AI-05 MUST:** tanpa `GROQ_API_KEY`, fitur AI dilewati tanpa menggagalkan cron.
 
-### FR-WS â€” Wawasan dan peringatan
+### FR-WS — Wawasan dan peringatan
 
-- **FR-WS-01 MUST:** skor 0â€“100 dengan label.
+- **FR-WS-01 MUST:** skor 0–100 dengan label.
 - **FR-WS-02 MUST:** proyeksi bulanan dihitung dari pengeluaran bulan berjalan dibagi hari berjalan.
-- **FR-WS-03 MUST:** peringatan anggaran muncul saat rasio â‰¥80%.
-- **FR-WS-04 MUST:** peringatan proyeksi saldo negatif, saldo habis <7 hari, dan tagihan â‰¤7 hari.
+- **FR-WS-03 MUST:** peringatan anggaran muncul saat rasio ≥80%.
+- **FR-WS-04 MUST:** peringatan proyeksi saldo negatif, saldo habis <7 hari, dan tagihan ≤7 hari.
 - **FR-WS-05 MUST:** deteksi langganan hanya tampilan; tidak membuat mutasi.
-- **FR-WS-06 SHOULD:** algoritma langganan memakai minimal 2 bulan, nominal stabil Â±15%, maksimal 2 transaksi/bulan.
+- **FR-WS-06 SHOULD:** algoritma langganan memakai minimal 2 bulan, nominal stabil ±15%, maksimal 2 transaksi/bulan.
 
-### FR-LAP â€” Laporan lanjutan
+### FR-LAP — Laporan lanjutan
 
 - **FR-LAP-01 MUST:** laporan menerima periode kustom `dari`/`sampai` dan menolak tanggal terbalik atau masa depan.
 - **FR-LAP-02 MUST:** ringkasan memisahkan pemasukan, pengeluaran, biaya admin, arus bersih, dan rata-rata harian.
 - **FR-LAP-03 MUST:** transaksi batal dan transaksi turunan tidak dihitung.
-- **FR-LAP-04 MUST:** kategori pengeluaran memakai pos, lalu label, lalu â€œ(Tanpa pos)â€.
+- **FR-LAP-04 MUST:** kategori pengeluaran memakai pos, lalu label, lalu “(Tanpa pos)”.
 - **FR-LAP-05 MUST:** laporan dapat dicetak atau disimpan sebagai PDF dari browser.
 - **FR-LAP-06 MUST:** laporan terjadwal membuat baris `outbox`, bukan mengirim langsung.
 - **FR-LAP-07 MUST:** laporan terjadwal maksimal sekali per kunci periode (minggu ISO/bulan).
@@ -253,6 +266,19 @@ Sudah diimplementasikan:
 - **FR-EML-05 MUST:** email tetap idempoten per `id` dan tidak membuat transaksi ganda.
 - **FR-EML-06 SHOULD:** detail transaksi menyimpan penyedia, dompet, metode, dan status dari email.
 
+### FR-INT - Kalender dan Google Sheets
+
+- **FR-INT-01 MUST:** `/api/kalender` hanya dapat diakses pemilik yang login dan mengembalikan `text/calendar`.
+- **FR-INT-02 MUST:** event kalender mencakup tagihan berulang aktif, jatuh tempo utang/piutang aktif, dan target tabungan aktif dalam 6 bulan.
+- **FR-INT-03 MUST:** teks event di-escape dan baris panjang dilipat sesuai RFC 5545.
+- **FR-INT-04 MUST:** URL Google Sheets hanya menerima web app Apps Script HTTPS berakhiran `/exec`.
+- **FR-INT-05 MUST:** sinkron Google Sheets mengirim salinan penuh transaksi dan tidak mengubah data lokal.
+- **FR-INT-06 SHOULD:** sinkron mengirim `SHEETS_WEBHOOK_SECRET` bila dikonfigurasi dan mencatat waktu sinkron terakhir.
+- **FR-INT-07 MUST:** feed kalender bertoken hanya valid untuk token yang tersimpan di `config.kalender_token`; token salah mendapat 401.
+- **FR-INT-08 MUST:** URL langganan hanya dapat diminta pemilik yang login; token tidak pernah dicatat di log.
+- **FR-INT-09 MUST:** sinkron Google Sheets otomatis berjalan maksimal sekali per hari WIB per pengguna dan dilewati bila URL kosong.
+- **FR-INT-10 SHOULD:** kegagalan sinkron otomatis satu pengguna tidak menghentikan pengguna lain dan tidak menggagalkan cron.
+
 ## 4. Keamanan dan integritas
 
 - Semua API recurring/import/accounts/laporan memakai `pemilikRequest`.
@@ -267,6 +293,8 @@ Sudah diimplementasikan:
 - Secret TOTP dan hash token sesi tidak pernah dikirim ke log; daftar sesi tidak mengirim hash token sesi saat ini ke client.
 - Ekspor terenkripsi memakai salt dan IV acak per berkas; password tidak disimpan.
 - Webhook email tetap memakai `EMAIL_INBOUND_SECRET` dan `EMAIL_ALLOWED_SENDERS`; isi email tidak dipercaya untuk `user_id`.
+- URL Google Sheets dibatasi ke `script.google.com` agar server tidak bisa diarahkan ke host sembarang; rahasia webhook tidak disimpan di log.
+- Token feed kalender 32 byte acak (base64url), hanya memberi akses baca `.ics`, dan dapat diganti dengan menghapus `config.kalender_token`.
 
 ## 5. Migrasi
 
@@ -281,6 +309,7 @@ Sudah diimplementasikan:
 - Digest tidak menambah tabel; status kirim disimpan di `config`.
 - Laporan lanjutan tidak menambah tabel; status dikirim disimpan di `config` (`laporan_aktif`, `laporan_jadwal`, `laporan_terakhir`).
 - Impor email tidak menambah tabel; idempotensi memakai `email:<id>` di `pending_actions`.
+- Kalender dan Google Sheets tidak menambah tabel; status disimpan di `config` (`sheets_url`, `sheets_terakhir`, `kalender_token`).
 
 ## 6. Acceptance criteria
 
@@ -323,14 +352,14 @@ Sudah diimplementasikan:
 
 ### Wawasan
 
-- **AC-WS-01:** skor selalu 0â€“100.
+- **AC-WS-01:** skor selalu 0–100.
 - **AC-WS-02:** proyeksi 310.000 pada hari ke-10 bulan 31 hari = 961.000.
-- **AC-WS-03:** peringatan anggaran muncul pada rasio â‰¥0,8.
+- **AC-WS-03:** peringatan anggaran muncul pada rasio ≥0,8.
 - **AC-WS-04:** langganan dengan 2 bulan nominal sama terdeteksi; transaksi harian tidak.
 
 ### Laporan
 
-- **AC-LAP-01:** periode `2026-11-01`â€“`2026-11-30` menghitung 30 hari dan transaksi di dalam rentang saja.
+- **AC-LAP-01:** periode `2026-11-01`–`2026-11-30` menghitung 30 hari dan transaksi di dalam rentang saja.
 - **AC-LAP-02:** pengeluaran `Rp25.000` dengan biaya admin `Rp2.500` masuk sebagai `Rp27.500`.
 - **AC-LAP-03:** transaksi batal dan `alokasi_gaji` tidak muncul pada ringkasan maupun daftar.
 - **AC-LAP-04:** tombol cetak membuka dialog cetak dan CSS cetak menyembunyikan navigasi.
@@ -363,6 +392,19 @@ Sudah diimplementasikan:
 - **AC-EML-04:** merchant yang sama dengan satu alias pos otomatis memakai pos tersebut.
 - **AC-EML-05:** merchant dengan dua kemungkinan pos dibiarkan tanpa pos, bukan memilih asal.
 - **AC-EML-06:** email yang dikirim ulang dengan `id` sama tidak menambah transaksi.
+
+### Kalender dan Google Sheets
+
+- **AC-INT-01:** pengguna belum login mendapat 401 saat membuka `/api/kalender`.
+- **AC-INT-02:** aturan tanggal 31 menghasilkan event pada 30/31 sesuai akhir bulan.
+- **AC-INT-03:** nama tagihan dengan koma/titik koma tampil benar di kalender.
+- **AC-INT-04:** URL `https://example.com/exec` ditolak.
+- **AC-INT-05:** URL `https://script.google.com/macros/s/.../exec` diterima.
+- **AC-INT-06:** sinkron mengirim seluruh transaksi dan tidak mengubah data lokal.
+- **AC-INT-07:** `GET /api/kalender?token=salah` mendapat 401; token valid mendapat `text/calendar` tanpa login.
+- **AC-INT-08:** dua kali `POST /api/kalender` mengembalikan token yang sama.
+- **AC-INT-09:** dua cron pada hari WIB yang sama hanya menjalankan satu sinkron Sheets otomatis per pengguna.
+- **AC-INT-10:** pengguna tanpa `sheets_url` dilewati tanpa error.
 
 ## 7. Rencana fitur berikutnya
 
@@ -404,7 +446,14 @@ Sudah diimplementasikan:
 
 - Deteksi penyedia dari domain/teks dan pengambilan dompet sumber (bagian 2.10).
 - Pencocokan dompet dan pos hanya bila hasilnya tunggal.
-- Google Sheets dan kalender belum diimplementasikan.
+
+### 7.7 Kalender dan Google Sheets (sudah diimplementasikan)
+
+- Kalender `.ics` berisi tagihan berulang, jatuh tempo utang/piutang, dan target tabungan 6 bulan.
+- Kalender dapat diunduh manual atau dilanggan via URL bertoken sehingga aplikasi kalender memperbarui sendiri.
+- Google Sheets memakai web app Apps Script; tidak perlu OAuth atau service account.
+- Sinkron bersifat salinan penuh (bukan incremental) agar spreadsheet selalu mencerminkan data terbaru.
+- Sinkron berjalan manual (tombol) dan otomatis sekali sehari via cron bila URL tersimpan.
 
 ## 8. Traceability
 
@@ -419,4 +468,4 @@ Sudah diimplementasikan:
 | F-PREM-07 | FR-AI | AC-AI |
 | F-PREM-08 | FR-KEL | AC-KEL |
 | F-PREM-09 | FR-SEC | AC-SEC |
-| F-PREM-10 | FR-EML | AC-EML |
+| F-PREM-10 | FR-EML, FR-INT | AC-EML, AC-INT |

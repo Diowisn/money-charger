@@ -281,7 +281,16 @@ describe("parser email masuk (payroll)", () => {
   it("mengambil tanggal transaksi dari isi email", () => {
     expect(ekstrakTanggalEmail("Tanggal 31-OKT-26 21:16", "2026-11-05")).toBe("2026-10-31");
     expect(ekstrakTanggalEmail("5 November 2026 20.41", "2026-11-05")).toBe("2026-11-05");
+    expect(ekstrakTanggalEmail("Tanggal 2026-11-05 10:00", "2026-11-05")).toBe("2026-11-05");
+    expect(ekstrakTanggalEmail("05/11/26", "2026-11-05")).toBe("2026-11-05");
     expect(ekstrakTanggalEmail("tanpa tanggal", "2026-11-05")).toBeNull();
+  });
+
+  it("mengenali debit/kredit bank lain dan e-wallet", () => {
+    expect(arahEmail("Transaksi Debit BRI", "Penarikan Tunai Rp100.000")).toBe("keluar");
+    expect(arahEmail("Notifikasi BNI", "Setoran Tunai Rp500.000 diterima")).toBe("masuk");
+    expect(arahEmail("Pembayaran QRIS GoPay", "Pembayaran ke Merchant Rp25.000")).toBe("keluar");
+    expect(arahEmail("Pembayaran Diterima", "QRIS masuk Rp75.000")).toBe("masuk");
   });
 
   it("memakai total akhir bila email BSI memuat biaya admin", () => {
@@ -324,6 +333,9 @@ describe("integrasi email bank/e-wallet", () => {
     expect(deteksiPenyediaEmail("noreply@bca.co.id", "", "")).toBe("BCA");
     expect(deteksiPenyediaEmail("", "Notifikasi GoPay", "")).toBe("GoPay");
     expect(deteksiPenyediaEmail("noreply@dana.id", "", "")).toBe("DANA");
+    expect(deteksiPenyediaEmail("noreply@blubybcadigital.co.id", "", "")).toBe("Blu");
+    expect(deteksiPenyediaEmail("noreply@bankneocommerce.co.id", "", "")).toBe("Neo");
+    expect(deteksiPenyediaEmail("noreply@gojek.com", "", "")).toBe("GoPay");
     expect(deteksiPenyediaEmail("", "Dana masuk", "Dana masuk Rp500.000")).toBeNull();
   });
 

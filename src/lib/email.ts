@@ -5,8 +5,8 @@
  */
 
 const KATA_GAJI = /\b(gaji|payroll|salary|upah|thr)\b/i;
-const KATA_MASUK = /\b(incoming|dana masuk|transfer masuk|pemasukan|kredit|credited|payroll|gaji|salary|upah|thr)\b/i;
-const KATA_KELUAR = /\b(qris|pembayaran|payment|debit|pengeluaran|transfer keluar|outgoing)\b/i;
+const KATA_MASUK = /\b(incoming|dana masuk|transfer masuk|pemasukan|kredit|dikreditkan|credited|credit transaction|credit notification|payroll|gaji|salary|upah|thr|setoran|deposit|qris masuk|pembayaran diterima)\b/i;
+const KATA_KELUAR = /\b(qris|pembayaran|payment|debit|debet|debit transaction|pengeluaran|transfer keluar|outgoing|penarikan|withdrawal|tarik tunai|pembelian)\b/i;
 
 export type ArahEmail = "gaji" | "masuk" | "keluar";
 
@@ -28,7 +28,11 @@ const DOMAIN_PENYEDIA: [RegExp, string][] = [
   [/\bjago\.com\b/i, "Jago"],
   [/\bseabank\.co\.id\b/i, "SeaBank"],
   [/\bblu\.id\b/i, "Blu"],
+  [/\bblubybcadigital\.co\.id\b/i, "Blu"],
   [/\bneo\.co\.id\b/i, "Neo"],
+  [/\bbankneocommerce\.co\.id\b/i, "Neo"],
+  [/\bgojek\.com\b/i, "GoPay"],
+  [/\bshopee\.co\.id\b/i, "ShopeePay"],
 ];
 
 const NAMA_PENYEDIA: [RegExp, string][] = [
@@ -40,7 +44,7 @@ const NAMA_PENYEDIA: [RegExp, string][] = [
   [/\b(cimb niaga|cimb)\b/i, "CIMB Niaga"],
   [/\bpermata\s*bank\b|\bbank permata\b/i, "Permata"],
   [/\b(bank btn|btn)\b/i, "BTN"],
-  [/\b(go\s*pay|gopay)\b/i, "GoPay"],
+  [/\b(go\s*pay|gopay|gojek)\b/i, "GoPay"],
   [/\bovo\b/i, "OVO"],
   [/\b(dana indonesia|dompet dana|dana wallet)\b/i, "DANA"],
   [/\b(shopee\s*pay|shopeepay)\b/i, "ShopeePay"],
@@ -48,8 +52,8 @@ const NAMA_PENYEDIA: [RegExp, string][] = [
   [/\bjenius\b/i, "Jenius"],
   [/\bjago\b/i, "Jago"],
   [/\b(sea\s*bank|seabank)\b/i, "SeaBank"],
-  [/\bblu\b/i, "Blu"],
-  [/\bneo\b/i, "Neo"],
+  [/\b(blu by bca digital|blu digital|blu)\b/i, "Blu"],
+  [/\b(bank neo commerce|neo commerce|neo)\b/i, "Neo"],
 ];
 
 /** Mendeteksi bank/e-wallet pengirim dari domain pengirim atau teks email. */
@@ -137,10 +141,10 @@ export interface DetailEmail {
   kembalian: number | null;
 }
 
-const LABEL_TOTAL = ["Total Pembayaran", "Total Biaya", "Total"];
-const LABEL_NOMINAL = ["Nominal Transaksi", "Nominal", "Jumlah", "Amount"];
-const LABEL_ADMIN = ["Biaya Admin", "Biaya Transfer", "Biaya Lainnya", "Biaya Tambahan", "Admin"];
-const LABEL_DOMPET = ["Sumber Dana", "Dari Rekening", "Rekening Sumber", "Rekening", "Dompet", "Wallet", "Akun Sumber", "Akun", "Kartu", "Virtual Account", "VA"];
+const LABEL_TOTAL = ["Total Pembayaran", "Total Biaya", "Total Transaksi", "Total"];
+const LABEL_NOMINAL = ["Nominal Transaksi", "Nominal", "Jumlah Transfer", "Jumlah", "Nilai Transaksi", "Nominal Transfer", "Amount"];
+const LABEL_ADMIN = ["Biaya Admin", "Biaya Transfer", "Biaya Lainnya", "Biaya Tambahan", "Admin", "Fee"];
+const LABEL_DOMPET = ["Sumber Dana", "Sumber Transaksi", "Dari Rekening", "Rekening Sumber", "Rekening", "Dompet", "Wallet", "Akun Sumber", "Akun", "Kartu", "Virtual Account", "VA"];
 const LABEL_METODE = ["Metode Pembayaran", "Metode", "Cara Pembayaran", "Channel", "Jenis Pembayaran"];
 const LABEL_STATUS = ["Status Transaksi", "Status"];
 
@@ -236,7 +240,13 @@ function ambilLabel(teks: string, label: string): string | null {
 export function labelEmail(subjek: string, teks: string, arah: ArahEmail): string | null {
   if (arah === "keluar") {
     const polos = teksPolos(teks);
-    return ambilLabel(polos, "Nama Merchant") ?? ambilLabel(polos, "Merchant") ?? ambilLabel(polos, "Jenis Transaksi");
+    return (
+      ambilLabel(polos, "Nama Merchant") ??
+      ambilLabel(polos, "Merchant") ??
+      ambilLabel(polos, "Nama Penerima") ??
+      ambilLabel(polos, "Penerima") ??
+      ambilLabel(polos, "Jenis Transaksi")
+    );
   }
   return (subjek.trim() || null)?.slice(0, 120) ?? null;
 }
@@ -268,8 +278,15 @@ function tanggalSah(tahun: number, bulan: number, hari: number, hariIni: string)
 export function ekstrakTanggalEmail(teks: string, hariIni: string): string | null {
   const polos = teksPolos(teks);
 
+  // 2026-11-05
+  let m = /\b(\d{4})-(\d{1,2})-(\d{1,2})\b/.exec(polos);
+  if (m) {
+    const iso = tanggalSah(Number(m[1]), Number(m[2]), Number(m[3]), hariIni);
+    if (iso) return iso;
+  }
+
   // 31-OKT-26 / 31 Oktober 2026 / 5 November 2026
-  let m = /\b(\d{1,2})[-/ ]([A-Za-z]{3,9})[-/ ](\d{2,4})\b/.exec(polos);
+  m = /\b(\d{1,2})[-/ ]([A-Za-z]{3,9})[-/ ](\d{2,4})\b/.exec(polos);
   if (m) {
     const bulan = BULAN[m[2].toLowerCase()];
     const tahun = m[3].length === 2 ? 2000 + Number(m[3]) : Number(m[3]);
@@ -279,10 +296,11 @@ export function ekstrakTanggalEmail(teks: string, hariIni: string): string | nul
     }
   }
 
-  // 05/11/2026 atau 05-11-2026
-  m = /\b(\d{1,2})[/-](\d{1,2})[/-](\d{4})\b/.exec(polos);
+  // 05/11/2026, 05-11-2026, atau 05/11/26
+  m = /\b(\d{1,2})[/-](\d{1,2})[/-](\d{2,4})\b/.exec(polos);
   if (m) {
-    const iso = tanggalSah(Number(m[3]), Number(m[2]), Number(m[1]), hariIni);
+    const tahun = m[3].length === 2 ? 2000 + Number(m[3]) : Number(m[3]);
+    const iso = tanggalSah(tahun, Number(m[2]), Number(m[1]), hariIni);
     if (iso) return iso;
   }
 

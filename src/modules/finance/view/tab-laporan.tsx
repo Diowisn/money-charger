@@ -13,6 +13,11 @@ interface Preset {
   sampai: string;
 }
 
+interface StatusSheets {
+  url: string | null;
+  terakhir: string | null;
+}
+
 function susunPreset(hariIni: string): Preset[] {
   const [tahun, bulan] = hariIni.split("-").map(Number);
   const awalBulanIni = `${hariIni.slice(0, 7)}-01`;
@@ -32,6 +37,39 @@ export function Laporan({ data, kirim, sibuk }: { data: DashboardData; kirim: Ki
   const [laporan, setLaporan] = useState<LaporanData | null>(null);
   const [memuat, setMemuat] = useState(true);
   const [galat, setGalat] = useState<string | null>(null);
+  const [sheets, setSheets] = useState<StatusSheets>({ url: null, terakhir: null });
+  const [urlSheets, setUrlSheets] = useState("");
+  const [memuatSheets, setMemuatSheets] = useState(true);
+  const [galatSheets, setGalatSheets] = useState<string | null>(null);
+
+  useEffect(() => {
+    let aktif = true;
+    fetch("/api/sheets", { cache: "no-store", credentials: "same-origin" })
+      .then(async (res) => {
+        if (res.status === 401) {
+          window.location.href = "/login";
+          return null;
+        }
+        const j = (await res.json().catch(() => ({}))) as { ok?: boolean; data?: StatusSheets; error?: string };
+        if (!res.ok || !j.ok || !j.data) throw new Error(j.error ?? "Gagal memuat integrasi.");
+        return j.data;
+      })
+      .then((hasil) => {
+        if (aktif && hasil) {
+          setSheets(hasil);
+          setUrlSheets(hasil.url ?? "");
+        }
+      })
+      .catch((error) => {
+        if (aktif) setGalatSheets(error instanceof Error ? error.message : "Gagal memuat integrasi.");
+      })
+      .finally(() => {
+        if (aktif) setMemuatSheets(false);
+      });
+    return () => {
+      aktif = false;
+    };
+  }, []);
 
   useEffect(() => {
     if (dari > sampai) {
@@ -73,6 +111,19 @@ export function Laporan({ data, kirim, sibuk }: { data: DashboardData; kirim: Ki
     setPreset(item.id);
     setDari(item.dari);
     setSampai(item.sampai);
+  }
+
+  async function simpanSheets() {
+    if (await kirim("/api/sheets", "POST", { aksi: "simpan", url: urlSheets })) {
+      setSheets((lama) => ({ ...lama, url: urlSheets.trim() || null }));
+      setGalatSheets(null);
+    }
+  }
+
+  async function sinkronSheets() {
+    if (await kirim("/api/sheets", "POST", { aksi: "sinkron" })) {
+      setSheets((lama) => ({ ...lama, terakhir: new Date().toISOString() }));
+    }
   }
 
   const aktifJadwal = data.pengaturan.laporanAktif;
@@ -311,6 +362,44 @@ export function Laporan({ data, kirim, sibuk }: { data: DashboardData; kirim: Ki
             {aktifJadwal ? "Matikan laporan terjadwal" : "Aktifkan laporan terjadwal"}
           </Tombol>
         </div>
+      </section>
+
+      <section className="kartu laporan-jadwal">
+        <div className="baris-antara">
+          <h2>Google Sheets</h2>
+          <span className={`badge ${sheets.url ? "hijau" : ""}`}>
+            {memuatSheets ? "Memuat..." : sheets.url ? "Terhubung" : "Belum"}
+          </span>
+        </div>
+        <p className="muted kecil">
+          Tempel URL web app Google Apps Script. Setiap sinkron menyalin ulang seluruh transaksi ke sheet
+          &quot;Transaksi&quot;. Setelah URL tersimpan, sinkron juga berjalan otomatis sekali sehari saat cron.
+        </p>
+        <div className="form">
+          <label>
+            URL web app Apps Script
+            <input
+              type="url"
+              value={urlSheets}
+              placeholder="https://script.google.com/macros/s/.../exec"
+              onChange={(event) => setUrlSheets(event.target.value)}
+            />
+          </label>
+        </div>
+        {galatSheets ? <p className="pesan-galat">{galatSheets}</p> : null}
+        <div className="laporan-jadwal-aksi">
+          <Tombol varian="sekunder" disabled={sibuk || memuatSheets} onClick={() => void simpanSheets()}>
+            Simpan URL
+          </Tombol>
+          <Tombol disabled={sibuk || memuatSheets || !sheets.url} onClick={() => void sinkronSheets()}>
+            Sinkron sekarang
+          </Tombol>
+        </div>
+        <p className="muted kecil">
+          {sheets.terakhir
+            ? `Sinkron terakhir ${new Date(sheets.terakhir).toLocaleString("id-ID")}`
+            : "Belum pernah sinkron."}
+        </p>
       </section>
     </div>
   );

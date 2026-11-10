@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Tombol } from "@/components/tombol";
+import { TautanTombol, Tombol } from "@/components/tombol";
 import type { DashboardData } from "@/lib/dashboard";
 import { rp } from "./format";
 import { InputRupiah } from "./input-rupiah";
@@ -21,7 +21,22 @@ export function Otomatis({
   const [hari, setHari] = useState("1");
   const [subPostId, setSubPostId] = useState("");
   const [mulai, setMulai] = useState(data.hariIni);
+  const [pesanKalender, setPesanKalender] = useState<string | null>(null);
   const pos = data.posSemua.filter((p) => p.aktif);
+
+  async function salinLangganan() {
+    setPesanKalender(null);
+    try {
+      const res = await fetch("/api/kalender", { method: "POST", credentials: "same-origin" });
+      const j = (await res.json().catch(() => ({}))) as { ok?: boolean; data?: { url?: string }; error?: string };
+      if (!res.ok || !j.ok || !j.data?.url) throw new Error(j.error ?? "Gagal membuat URL langganan.");
+      const url = new URL(j.data.url, window.location.origin).toString();
+      await navigator.clipboard.writeText(url);
+      setPesanKalender("URL langganan disalin. Tempel di Google Calendar / Apple Calendar (tambah via URL).");
+    } catch (error) {
+      setPesanKalender(error instanceof Error ? error.message : "Gagal menyalin URL langganan.");
+    }
+  }
 
   async function tambah() {
     const berhasil = await kirim("/api/recurring", "POST", {
@@ -91,7 +106,22 @@ export function Otomatis({
       </section>
 
       <section className="kartu">
-        <h2>Aturan Saya</h2>
+        <div className="baris-antara">
+          <h2>Aturan Saya</h2>
+          <div className="baris-tombol">
+            <TautanTombol varian="sekunder" ukuran="kecil" href="/api/kalender" download>
+              Unduh kalender (.ics)
+            </TautanTombol>
+            <Tombol varian="sekunder" ukuran="kecil" onClick={() => void salinLangganan()} disabled={sibuk}>
+              Salin URL langganan
+            </Tombol>
+          </div>
+        </div>
+        <p className="muted kecil">
+          Berisi tagihan berulang, jatuh tempo utang/piutang, dan target tabungan 6 bulan ke depan. URL langganan
+          membuat kalender ikut diperbarui otomatis.
+        </p>
+        {pesanKalender ? <p className="muted kecil">{pesanKalender}</p> : null}
         <ul className="daftar-transaksi">
           {data.otomatis.map((rule) => (
             <li key={rule.id}>
