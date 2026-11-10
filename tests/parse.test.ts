@@ -5,7 +5,9 @@ import { extractDate, wibDate } from "@/lib/parse/date";
 import { rp, splitPesan } from "@/lib/format";
 import { validasiAi } from "@/lib/ai";
 import { normalisasiNominalStruk, validasiStruk } from "@/lib/ai-vision";
-import { arahEmail, ekstrakDetailEmail, ekstrakNominalEmail, ekstrakTanggalEmail, kemungkinanGaji, labelEmail } from "@/lib/email";
+import { arahEmail, deteksiPenyediaEmail, ekstrakDetailEmail, ekstrakDompetEmail, ekstrakNominalEmail, ekstrakTanggalEmail, kemungkinanGaji, labelEmail } from "@/lib/email";
+import { cocokAkun } from "@/lib/parse/dompet";
+import type { Akun } from "@/lib/types";
 
 const v = (t: string) => {
   const r = parseAmount(t);
@@ -314,5 +316,38 @@ describe("parser email masuk (payroll)", () => {
       lokasi: "Kotabaru",
       rrn: "123456789",
     });
+  });
+});
+
+describe("integrasi email bank/e-wallet", () => {
+  it("mendeteksi penyedia dari domain atau teks notifikasi", () => {
+    expect(deteksiPenyediaEmail("noreply@bca.co.id", "", "")).toBe("BCA");
+    expect(deteksiPenyediaEmail("", "Notifikasi GoPay", "")).toBe("GoPay");
+    expect(deteksiPenyediaEmail("noreply@dana.id", "", "")).toBe("DANA");
+    expect(deteksiPenyediaEmail("", "Dana masuk", "Dana masuk Rp500.000")).toBeNull();
+  });
+
+  it("mengambil dompet sumber tanpa menipu frasa Rekening Anda", () => {
+    expect(ekstrakDompetEmail("Sumber Dana\nBCA ****1234")).toBe("BCA ****1234");
+    expect(ekstrakDompetEmail("Rekening Anda\n123456789")).toBeNull();
+    expect(ekstrakDetailEmail("Sumber Dana\nGoPay\nMetode Pembayaran\nQRIS\nStatus\nBerhasil")).toMatchObject({
+      dompet: "GoPay",
+      metode: "QRIS",
+      status: "Berhasil",
+    });
+  });
+
+  it("mencocokkan dompet unik dan mengabaikan yang ambigu/nonaktif", () => {
+    const accounts: Akun[] = [
+      { id: 1, nama: "BCA", tipe: "bank", saldoAwal: 0, urutan: 1, aktif: true },
+      { id: 2, nama: "GoPay", tipe: "ewallet", saldoAwal: 0, urutan: 2, aktif: true },
+      { id: 3, nama: "Mandiri", tipe: "bank", saldoAwal: 0, urutan: 3, aktif: true },
+      { id: 4, nama: "OVO", tipe: "ewallet", saldoAwal: 0, urutan: 4, aktif: false },
+    ];
+    expect(cocokAkun(accounts, ["BCA ****1234"])).toBe(1);
+    expect(cocokAkun(accounts, ["gopay"])).toBe(2);
+    expect(cocokAkun(accounts, ["bank"])).toBeNull();
+    expect(cocokAkun(accounts, ["OVO"])).toBeNull();
+    expect(cocokAkun(accounts, ["tidak ada"])).toBeNull();
   });
 });

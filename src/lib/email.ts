@@ -10,6 +10,57 @@ const KATA_KELUAR = /\b(qris|pembayaran|payment|debit|pengeluaran|transfer kelua
 
 export type ArahEmail = "gaji" | "masuk" | "keluar";
 
+const DOMAIN_PENYEDIA: [RegExp, string][] = [
+  [/\bbca\.co\.id\b/i, "BCA"],
+  [/\bmandiri\.co\.id\b/i, "Mandiri"],
+  [/\bbri\.co\.id\b/i, "BRI"],
+  [/\bbni\.co\.id\b/i, "BNI"],
+  [/\bbsi\.co\.id\b/i, "BSI"],
+  [/\bcimbniaga\.co\.id\b/i, "CIMB Niaga"],
+  [/\bpermatabank\.co\.id\b/i, "Permata"],
+  [/\bbtn\.co\.id\b/i, "BTN"],
+  [/\bgopay\.co\.id\b/i, "GoPay"],
+  [/\bovo\.id\b/i, "OVO"],
+  [/\bdana\.id\b/i, "DANA"],
+  [/\bshopeepay\.co\.id\b/i, "ShopeePay"],
+  [/\blinkaja\.id\b/i, "LinkAja"],
+  [/\bjenius\.com\b/i, "Jenius"],
+  [/\bjago\.com\b/i, "Jago"],
+  [/\bseabank\.co\.id\b/i, "SeaBank"],
+  [/\bblu\.id\b/i, "Blu"],
+  [/\bneo\.co\.id\b/i, "Neo"],
+];
+
+const NAMA_PENYEDIA: [RegExp, string][] = [
+  [/\b(bca|bank central asia)\b/i, "BCA"],
+  [/\b(bank mandiri|mandiri)\b/i, "Mandiri"],
+  [/\b(bank rakyat indonesia|bri)\b/i, "BRI"],
+  [/\b(bank negara indonesia|bni)\b/i, "BNI"],
+  [/\b(bank syariah indonesia|bsi)\b/i, "BSI"],
+  [/\b(cimb niaga|cimb)\b/i, "CIMB Niaga"],
+  [/\bpermata\s*bank\b|\bbank permata\b/i, "Permata"],
+  [/\b(bank btn|btn)\b/i, "BTN"],
+  [/\b(go\s*pay|gopay)\b/i, "GoPay"],
+  [/\bovo\b/i, "OVO"],
+  [/\b(dana indonesia|dompet dana|dana wallet)\b/i, "DANA"],
+  [/\b(shopee\s*pay|shopeepay)\b/i, "ShopeePay"],
+  [/\b(link\s*aja|linkaja)\b/i, "LinkAja"],
+  [/\bjenius\b/i, "Jenius"],
+  [/\bjago\b/i, "Jago"],
+  [/\b(sea\s*bank|seabank)\b/i, "SeaBank"],
+  [/\bblu\b/i, "Blu"],
+  [/\bneo\b/i, "Neo"],
+];
+
+/** Mendeteksi bank/e-wallet pengirim dari domain pengirim atau teks email. */
+export function deteksiPenyediaEmail(dari = "", subjek = "", teks = ""): string | null {
+  const alamat = dari.toLowerCase();
+  for (const [pola, nama] of DOMAIN_PENYEDIA) if (pola.test(alamat)) return nama;
+  const gabung = `${subjek}\n${teks}`;
+  for (const [pola, nama] of NAMA_PENYEDIA) if (pola.test(gabung)) return nama;
+  return null;
+}
+
 /** Mengubah teks email/HTML menjadi teks polos dengan baris yang bisa diandalkan. */
 function teksPolos(teks: string): string {
   return teks
@@ -75,6 +126,9 @@ export interface DetailEmail {
   terminal: string | null;
   noTransaksi: string | null;
   referensi: string | null;
+  dompet: string | null;
+  metode: string | null;
+  status: string | null;
   nominal: number | null;
   biayaAdmin: number | null;
   total: number | null;
@@ -86,6 +140,20 @@ export interface DetailEmail {
 const LABEL_TOTAL = ["Total Pembayaran", "Total Biaya", "Total"];
 const LABEL_NOMINAL = ["Nominal Transaksi", "Nominal", "Jumlah", "Amount"];
 const LABEL_ADMIN = ["Biaya Admin", "Biaya Transfer", "Biaya Lainnya", "Biaya Tambahan", "Admin"];
+const LABEL_DOMPET = ["Sumber Dana", "Dari Rekening", "Rekening Sumber", "Rekening", "Dompet", "Wallet", "Akun Sumber", "Akun", "Kartu", "Virtual Account", "VA"];
+const LABEL_METODE = ["Metode Pembayaran", "Metode", "Cara Pembayaran", "Channel", "Jenis Pembayaran"];
+const LABEL_STATUS = ["Status Transaksi", "Status"];
+
+/** Mengambil petunjuk dompet/rekening sumber; abaikan frasa umum seperti "Rekening Anda". */
+export function ekstrakDompetEmail(teks: string): string | null {
+  const polos = teksPolos(teks);
+  for (const label of LABEL_DOMPET) {
+    const nilai = ambilBaris(polos, label);
+    if (nilai && !/^(anda|nasabah|pengguna|tujuan|penerima)\b/i.test(nilai)) return nilai;
+  }
+  const masker = /(?:[*•x]{2,}\s*\d{2,6}|\d{4}\s*[*•x]{2,}\s*\d{2,4})/i.exec(polos);
+  return masker ? masker[0].replace(/\s+/g, " ").trim() : null;
+}
 
 /**
  * Membaca detail notifikasi transaksi (khususnya BSI/QRIS).
@@ -108,6 +176,9 @@ export function ekstrakDetailEmail(teks: string): DetailEmail {
     terminal: pertamaTeks(polos, ["Terminal", "ID Terminal"]),
     noTransaksi: pertamaTeks(polos, ["No. Transaksi", "Nomor Transaksi", "No Transaksi"]),
     referensi: pertamaTeks(polos, ["Referensi", "No. Referensi", "Nomor Referensi"]),
+    dompet: ekstrakDompetEmail(teks),
+    metode: pertamaTeks(polos, LABEL_METODE),
+    status: pertamaTeks(polos, LABEL_STATUS),
     nominal,
     biayaAdmin,
     total,

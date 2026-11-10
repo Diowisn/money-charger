@@ -70,6 +70,8 @@ export async function postTransaction(req: NextRequest) {
 export async function deleteTransaction(req: NextRequest) {
   const auth = await pemilikRequest(req);
   if ("tolak" in auth) return auth.tolak;
+  const tolak = tolakPeran(auth, "kelola");
+  if (tolak) return tolak;
   const userId = auth.userId;
   try {
     const body = await bacaBody(req);

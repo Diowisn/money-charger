@@ -79,6 +79,18 @@ describe("PgRepo di Postgres sungguhan", () => {
     expect(hasil.rows[0].nama).toBe("workspace_members");
   });
 
+  it("memetakan nomor WhatsApp anggota aktif ke pemilik workspace", async () => {
+    const member = await adapter.query("INSERT INTO auth_users (email) VALUES ('anggota@example.com') RETURNING id");
+    await adapter.query(
+      "INSERT INTO workspace_members (owner_id, member_id, role, wa_number) VALUES ($1, $2, 'member', '628222')",
+      [ownerId, member.rows[0].id],
+    );
+    expect(await new PgRepo(adapter).ownerForWa("628222")).toBe(ownerId);
+    await adapter.query("UPDATE workspace_members SET status = 'nonaktif' WHERE wa_number = '628222'");
+    expect(await new PgRepo(adapter).ownerForWa("628222")).toBeNull();
+    await adapter.query("DELETE FROM auth_users WHERE id = $1", [member.rows[0].id]);
+  });
+
   it("menyimpan dompet dan menautkan transaksi ke dompet", async () => {
     const r = new PgRepo(adapter, true, ownerId);
     const id = await r.addAccount({ nama: "BCA", tipe: "bank", saldoAwal: 50_000 });

@@ -86,6 +86,13 @@ async function authenticateOAuth(provider: Provider, subject: string, email: str
     await client.query("SELECT pg_advisory_xact_lock(72418302)");
     const identity = await client.query<{ user_id: string }>("SELECT user_id FROM auth_identities WHERE provider=$1 AND subject=$2", [provider, subject]);
     let userId = identity.rows[0]?.user_id;
+    if (userId) {
+      const twoFactor = await client.query<{ totp_aktif: boolean }>("SELECT totp_aktif FROM auth_users WHERE id = $1", [userId]);
+      if (twoFactor.rows[0]?.totp_aktif) {
+        await client.query("ROLLBACK");
+        return null;
+      }
+    }
     if (!userId && email) {
       const existingUser = await client.query<{ id: string }>("SELECT id FROM auth_users WHERE email=$1", [email]);
       userId = existingUser.rows[0]?.id;

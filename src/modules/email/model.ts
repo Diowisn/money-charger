@@ -1,8 +1,19 @@
 import { catatAudit } from "@/lib/audit";
-import { arahEmail, ekstrakDetailEmail, ekstrakNominalEmail, ekstrakTanggalEmail, labelEmail } from "@/lib/email";
+import {
+  arahEmail,
+  deteksiPenyediaEmail,
+  ekstrakDetailEmail,
+  ekstrakNominalEmail,
+  ekstrakTanggalEmail,
+  labelEmail,
+  type DetailEmail,
+} from "@/lib/email";
 import { rahasiaCocok as cocokRahasia } from "@/lib/secret";
 import { wibDate } from "@/lib/parse/date";
+import { cocokAkun } from "@/lib/parse/dompet";
+import { cariDalamTeks, cariPersis } from "@/lib/parse/pos";
 import { PgRepo } from "@/lib/pg-repo";
+import type { State } from "@/lib/types";
 import { AksiError, tambahTransaksi } from "@/lib/web-actions";
 
 export class EmailAksiError extends Error {}
@@ -18,6 +29,21 @@ export interface EmailMasuk {
   nominal?: number;
   /** Tanggal transaksi 'YYYY-MM-DD' bila penyedia mengirimkannya (mis. tanggal email). */
   tanggal?: string;
+  /** Nama bank/e-wallet atau dompet sumber bila penyedia mengirimkannya. */
+  dompet?: string;
+  /** Nama bank/e-wallet pengirim bila penyedia mengirimkannya. */
+  penyedia?: string;
+}
+
+function pilihPos(state: State, detail: DetailEmail, label: string | null): number | null {
+  for (const teks of [detail.jenisTransaksi, detail.merchant, label]) {
+    if (!teks) continue;
+    const persis = cariPersis(state, teks);
+    if (persis !== null) return persis;
+    const cocok = cariDalamTeks(state, teks);
+    if (cocok.kind === "satu") return cocok.id;
+  }
+  return null;
 }
 
 export interface HasilEmail {
@@ -71,6 +97,7 @@ export async function prosesEmailMasuk(input: EmailMasuk): Promise<HasilEmail> {
   const arah = arahEmail(input.subjek ?? "", input.teks ?? "");
   const tanggal = tanggalIsoSah(input.tanggal, hariIni) ?? ekstrakTanggalEmail(teksGabung, hariIni) ?? hariIni;
   const detail = ekstrakDetailEmail(teksGabung);
+  const penyedia = input.penyedia ?? deteksiPenyediaEmail(input.dari, input.subjek, input.teks);
 
   const hasil = await repo.transaction(async (tx) => {
     const idInbound = `email:${input.id}`;
@@ -92,6 +119,11 @@ export async function prosesEmailMasuk(input: EmailMasuk): Promise<HasilEmail> {
     }
 
     const label = detail.merchant ?? labelEmail(input.subjek ?? "", input.teks ?? "", arah) ?? (input.subjek ?? "Email masuk").slice(0, 120);
+    const state = await tx.load();
+    const dompet = input.dompet ?? detail.dompet ?? penyedia;
+    const accountId = cocokAkun(state.accounts, [dompet, penyedia, detail.dompet]) ?? undefined;
+    const subPostId = arah === "keluar" ? pilihPos(state, detail, label) : null;
+    const detailFinal = { ...detail, dompet: input.dompet ?? detail.dompet, penyedia, sumber: "email" };
 
     try {
       if (arah === "keluar") {
@@ -100,7 +132,9 @@ export async function prosesEmailMasuk(input: EmailMasuk): Promise<HasilEmail> {
           nominal,
           tanggal,
           label,
-          detail,
+          subPostId,
+          accountId,
+          detail: detailFinal,
         });
         await tx.setInboundResult(idInbound, `out:${hasil.id}`);
         return { dicatat: true, pesan: `Pengeluaran Rp${nominal.toLocaleString("id-ID")} dicatat otomatis dari email "${label}".` };
@@ -112,7 +146,8 @@ export async function prosesEmailMasuk(input: EmailMasuk): Promise<HasilEmail> {
           nominal,
           tanggal,
           label,
-          detail,
+          accountId,
+          detail: detailFinal,
           paksa: true,
         });
         await tx.setInboundResult(idInbound, `gaji:${hasil.id}`);
@@ -124,7 +159,8 @@ export async function prosesEmailMasuk(input: EmailMasuk): Promise<HasilEmail> {
         nominal,
         tanggal,
         label,
-        detail,
+        accountId,
+        detail: detailFinal,
         wadah: "saldo",
       });
       await tx.setInboundResult(idInbound, `in:${hasil.id}`);

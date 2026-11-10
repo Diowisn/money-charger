@@ -24,6 +24,7 @@ Sudah diimplementasikan:
 - AI Pro: review bulanan otomatis, tanya jawab seluruh riwayat, deteksi anomali.
 - Kolaborasi keluarga: anggota, peran, persetujuan transaksi, nomor WhatsApp anggota.
 - Keamanan: 2FA TOTP, manajemen sesi, ekspor terenkripsi.
+- Integrasi email bank/e-wallet: deteksi penyedia, dompet sumber, dan pos otomatis.
 - Peringatan dalam aplikasi.
 - Skema versi v6 (`workspace_members`, nomor WhatsApp anggota, kolom 2FA).
 
@@ -143,6 +144,17 @@ Sudah diimplementasikan:
 - `src/lib/export-enkripsi.ts`: AES-256-GCM + scrypt; `/api/export/encrypted` mengunduh CSV terenkripsi.
 - UI: bagian 2FA, perangkat/sesi, dan ekspor terenkripsi di tab Profil.
 
+### 2.10 Impor email bank/e-wallet
+
+- `src/lib/email.ts`
+  - `deteksiPenyediaEmail(dari, subjek, teks)` mengenali bank/e-wallet dari domain pengirim atau teks.
+  - `ekstrakDompetEmail(teks)` mengambil petunjuk rekening/dompet sumber tanpa menipu frasa "Rekening Anda".
+  - `ekstrakDetailEmail` menambahkan `dompet`, `metode`, dan `status` ke detail transaksi.
+- `src/lib/parse/dompet.ts`: `cocokAkun(accounts, hints)` mencocokkan penyedia/dompet ke dompet aktif; hanya cocok tunggal yang dipakai.
+- `src/modules/email/model.ts` memuat state, memetakan dompet sumber dan pos (nama/alias), lalu mencatat transaksi.
+- Input webhook menerima `dompet`/`wallet` dan `penyedia`/`provider` opsional.
+- Tidak ada tabel baru; idempotensi tetap memakai `email:<id>`.
+
 ## 3. Persyaratan fungsional
 
 ### FR-REC â€” Transaksi berulang
@@ -232,6 +244,15 @@ Sudah diimplementasikan:
 - **FR-SEC-05 MUST:** ekspor terenkripsi memakai AES-256-GCM dengan kunci turunan scrypt dan password minimal 8 karakter.
 - **FR-SEC-06 SHOULD:** pencabutan sesi dicatat di audit tanpa menyimpan token.
 
+### FR-EML - Impor email bank/e-wallet
+
+- **FR-EML-01 MUST:** deteksi penyedia dari domain pengirim lebih diutamakan daripada teks.
+- **FR-EML-02 MUST:** kata umum seperti "dana masuk" tidak boleh disalahartikan sebagai e-wallet DANA.
+- **FR-EML-03 MUST:** dompet sumber hanya dipakai bila cocok tunggal dengan dompet aktif; jika ambigu, pakai dompet bawaan.
+- **FR-EML-04 MUST:** pos hanya dipetakan bila nama/alias pos cocok tunggal dengan merchant/jenis transaksi/label.
+- **FR-EML-05 MUST:** email tetap idempoten per `id` dan tidak membuat transaksi ganda.
+- **FR-EML-06 SHOULD:** detail transaksi menyimpan penyedia, dompet, metode, dan status dari email.
+
 ## 4. Keamanan dan integritas
 
 - Semua API recurring/import/accounts/laporan memakai `pemilikRequest`.
@@ -243,8 +264,9 @@ Sudah diimplementasikan:
 - Semua API keluarga memakai `pemilikRequest` dan `tolakPeran`; `actorId` diambil dari sesi, bukan body.
 - Persetujuan diklaim atomik (`status='diproses'`) agar klik ganda tidak membuat transaksi ganda.
 - Nomor WhatsApp anggota unik dan dipetakan ke pemilik workspace; nomor dicabut saat anggota dihapus.
-- Secret TOTP dan hash token sesi tidak pernah dikirim ke log; daftar sesi mengembalikan hash token hanya untuk sesi sendiri.
+- Secret TOTP dan hash token sesi tidak pernah dikirim ke log; daftar sesi tidak mengirim hash token sesi saat ini ke client.
 - Ekspor terenkripsi memakai salt dan IV acak per berkas; password tidak disimpan.
+- Webhook email tetap memakai `EMAIL_INBOUND_SECRET` dan `EMAIL_ALLOWED_SENDERS`; isi email tidak dipercaya untuk `user_id`.
 
 ## 5. Migrasi
 
@@ -258,6 +280,7 @@ Sudah diimplementasikan:
 - Marker versi dicatat di `schema_version`.
 - Digest tidak menambah tabel; status kirim disimpan di `config`.
 - Laporan lanjutan tidak menambah tabel; status dikirim disimpan di `config` (`laporan_aktif`, `laporan_jadwal`, `laporan_terakhir`).
+- Impor email tidak menambah tabel; idempotensi memakai `email:<id>` di `pending_actions`.
 
 ## 6. Acceptance criteria
 
@@ -332,6 +355,15 @@ Sudah diimplementasikan:
 - **AC-SEC-05:** sesi lain yang dicabut tidak bisa dipakai lagi.
 - **AC-SEC-06:** berkas ekspor terenkripsi hanya bisa didekripsi dengan password yang sama.
 
+### Impor email bank/e-wallet
+
+- **AC-EML-01:** email dari domain `bca.co.id` terdeteksi sebagai BCA.
+- **AC-EML-02:** teks "Dana masuk Rp500.000" tidak terdeteksi sebagai DANA.
+- **AC-EML-03:** transaksi dengan "Sumber Dana: BCA ****1234" masuk ke dompet BCA.
+- **AC-EML-04:** merchant yang sama dengan satu alias pos otomatis memakai pos tersebut.
+- **AC-EML-05:** merchant dengan dua kemungkinan pos dibiarkan tanpa pos, bukan memilih asal.
+- **AC-EML-06:** email yang dikirim ulang dengan `id` sama tidak menambah transaksi.
+
 ## 7. Rencana fitur berikutnya
 
 ### 7.1 Digest WhatsApp (sudah diimplementasikan)
@@ -362,11 +394,17 @@ Sudah diimplementasikan:
 - Tanya jawab seluruh riwayat dengan batas biaya.
 - Deteksi anomali sebagai insight, bukan mutasi.
 
-### 7.5 Kolaborasi dan keamanan (sudah diimplementasikan)
+### 7.5 Keamanan dan paywall (sudah diimplementasikan)
 
-- Kolaborasi keluarga sudah diimplementasikan (bagian 2.8).
 - 2FA TOTP, manajemen sesi, dan ekspor terenkripsi sudah diimplementasikan (bagian 2.9).
+- OAuth tidak melewati pemeriksaan 2FA; akun ber-2FA wajib login dengan password + TOTP.
 - Paywall/billing tetap di luar lingkup selama aplikasi dipakai pribadi.
+
+### 7.6 Impor email bank/e-wallet (sudah diimplementasikan)
+
+- Deteksi penyedia dari domain/teks dan pengambilan dompet sumber (bagian 2.10).
+- Pencocokan dompet dan pos hanya bila hasilnya tunggal.
+- Google Sheets dan kalender belum diimplementasikan.
 
 ## 8. Traceability
 
@@ -381,3 +419,4 @@ Sudah diimplementasikan:
 | F-PREM-07 | FR-AI | AC-AI |
 | F-PREM-08 | FR-KEL | AC-KEL |
 | F-PREM-09 | FR-SEC | AC-SEC |
+| F-PREM-10 | FR-EML | AC-EML |

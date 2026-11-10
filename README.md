@@ -24,13 +24,15 @@ Acuan: [PRD Money-Charger SaaS](./prd-catatan-keuangan-whatsapp.md) dan [SRS](./
 | `src/modules/whatsapp/` | Modul HMVC webhook: controller, model, worker antrean, dan respons |
 | `src/modules/finance/` | Modul HMVC keuangan/dashboard: controller, model, view, dan halaman dashboard |
 | `src/modules/auth/` | Modul HMVC autentikasi dashboard |
-| `src/modules/profile/` | Modul HMVC profil akun: nama, email, foto, password, hapus akun |
-| `src/modules/export/` | Modul HMVC unduh CSV |
+| `src/modules/profile/` | Modul HMVC profil akun: nama, email, foto, password, 2FA, hapus akun |
+| `src/modules/export/` | Modul HMVC unduh CSV dan ekspor terenkripsi |
+| `src/lib/totp.ts` | TOTP 2FA tanpa dependensi tambahan |
+| `src/lib/export-enkripsi.ts` | Enkripsi ekspor AES-256-GCM dengan scrypt |
 | `src/modules/health/` | Modul HMVC diagnosa kesiapan |
 | `src/modules/outbox/` | Endpoint terjaga untuk memproses ulang balasan WhatsApp tertunda |
 | `src/modules/email/` | Modul HMVC penerima email payroll generik (`/api/email/inbound`) |
 | `src/modules/insight/` | Modul HMVC asisten tanya jawab keuangan (`/api/insight`) |
-| `src/lib/email.ts` | Heuristik ekstraksi nominal & deteksi "gaji/payroll" dari teks email |
+| `src/lib/email.ts` | Heuristik ekstraksi nominal, penyedia, dompet, dan deteksi "gaji/payroll" dari teks email |
 | `src/app/api/` | Adapter Next.js tipis yang meneruskan request ke controller modul |
 | `src/app/page.tsx` | Adapter halaman dashboard Next.js |
 | `src/app/login/` | Halaman masuk, daftar akun, dan tombol Google/Facebook |
@@ -88,7 +90,7 @@ Untuk percobaan lokal, isi variabel WhatsApp berikut sesuai API Setup Meta: `WA_
 
 ```bash
 npm install
-npm run db:setup     # memastikan skema, mencatat baseline v1/v2, seed default, dan whitelist nomor
+npm run db:setup     # memastikan skema, mencatat baseline v1-v6, seed default, dan whitelist nomor
 npm run lint
 npm run typecheck
 npm test
@@ -174,7 +176,7 @@ dijalankan setelah respons. Balasan disimpan di outbox; bila Meta gagal, retry m
 worker tiap 10 menit. Isi repository secrets `APP_BASE_URL` dan `CRON_SECRET` untuk mengaktifkannya.
 Payload job selesai dibersihkan setelah 7 hari, job gagal setelah 30 hari; outbox 30 hari; audit 180 hari.
 
-`Keluar semua` di dashboard mencabut semua sesi dengan menaikkan epoch di database.
+`Keluar semua` di dashboard menghapus semua baris sesi akun. Daftar sesi di tab Profil dapat mencabut sesi lain satu per satu; 2FA TOTP opt-in dan ekspor CSV terenkripsi juga tersedia di sana.
 
 #### Backup dan restore melalui Neon
 
@@ -182,7 +184,7 @@ Gunakan Neon Console → **Backup & Restore**. Jangan simpan `RESTORE_DATABASE_U
 
 - **Buat snapshot:** pilih project dan branch `main`, buka **Backup & Restore** → **Create snapshot**. Pastikan kartu snapshot muncul beserta waktu dan sumber sebelum migrasi skema berisiko. Jadwal otomatis dan retensi bergantung pada paket Neon; label **Upgrade for schedules** berarti jadwal belum dikonfigurasi/tersedia pada paket saat ini.
 - **Drill dari snapshot:** untuk restore point-in-time historis, buat branch baru dari snapshot/waktu yang dipilih agar tidak menimpa `main` atau branch `restore-drill`. Branch `restore-drill` yang sudah ada boleh dipakai untuk uji salinan terkini, tetapi reset dari parent menimpa isi branch itu. Pastikan expiry branch sebelum mulai.
-- **Validasi:** sambungkan aplikasi lokal sementara ke branch drill melalui **Connect** dan URL branch tersebut di `.env.local` lokal saja. Jangan commit atau kirim URL/password. Sebelum `npm run db:setup`, cek lagi host/branch yang dipilih pada Neon dan bahwa terminal memakai URL branch drill; command ini memastikan skema, mencatat baseline v1, seed default, dan whitelist nomor. Periksa login, jumlah transaksi, pos, rencana, relasi, saldo dan laporan periode yang dikenal; bandingkan dengan keadaan yang diharapkan untuk waktu snapshot.
+- **Validasi:** sambungkan aplikasi lokal sementara ke branch drill melalui **Connect** dan URL branch tersebut di `.env.local` lokal saja. Jangan commit atau kirim URL/password. Sebelum `npm run db:setup`, cek lagi host/branch yang dipilih pada Neon dan bahwa terminal memakai URL branch drill; command ini memastikan skema, mencatat baseline v1-v6, seed default, dan whitelist nomor. Periksa login, jumlah transaksi, pos, rencana, relasi, saldo dan laporan periode yang dikenal; bandingkan dengan keadaan yang diharapkan untuk waktu snapshot.
 - **Pemulihan main:** gunakan **Restore from history** atau **Restore from a snapshot** pada branch `main` hanya saat memang ingin mengganti keadaan database produksi. Pilih point-in-time/snapshot dengan teliti dan ikuti konfirmasi Neon; tindakan ini dapat mengubah data aplikasi.
 - **Selesai drill:** catat waktu snapshot, branch yang diuji, hasil hitungan/cek laporan, lalu hapus branch uji bila tidak diperlukan lagi.
 - **Periksa kegagalan pesan:** `jumlah.inbound_gagal` dan `jumlah.outbox_gagal` yang bukan nol menandakan perlu investigasi. Periksa cron GitHub `Process WhatsApp queues`, `CRON_SECRET`, log deployment, dan status provider. Retry otomatis memproses job yang memenuhi jadwal; jangan menghapus atau mengedit record DB secara manual.
@@ -225,6 +227,9 @@ Ganti nomor pribadi: ubah `ALLOWED_NUMBERS`, jalankan `npm run db:setup` lagi.
 - **Pemasukan** ke Saldo untuk transfer masuk biasa.
 
 Arah dideteksi dari subjek/isi email. Email yang arahnya tidak dikenali dilewati, bukan dicatat asal-asalan.
+Penyedia bank/e-wallet dideteksi dari domain pengirim atau teks (BCA, Mandiri, BRI, BNI, BSI, CIMB, Permata,
+BTN, GoPay, OVO, DANA, ShopeePay, LinkAja, Jenius, Jago, SeaBank, Blu, Neo). Dompet sumber dan pos dipetakan
+otomatis hanya bila hasilnya tunggal; jika ambigu, transaksi memakai dompet bawaan dan tanpa pos.
 
 1. Isi `EMAIL_INBOUND_SECRET` dengan string acak panjang di `.env.local` dan di Vercel, lalu redeploy.
    Opsional: isi `EMAIL_ALLOWED_SENDERS=bankbsi.co.id` agar hanya email dari domain itu yang diterima.
@@ -244,7 +249,9 @@ Arah dideteksi dari subjek/isi email. Email yang arahnya tidak dikenali dilewati
      "text": "Nominal\n1,800,000.00\nJenis Transaksi\nPayroll",
      "akun": "email-akun-anda@gmail.com",
      "tanggal": "2026-10-31",
-     "nominal": 1800000
+     "nominal": 1800000,
+     "dompet": "BCA ****1234",
+     "penyedia": "BCA"
    }
    ```
 
@@ -255,6 +262,8 @@ Arah dideteksi dari subjek/isi email. Email yang arahnya tidak dikenali dilewati
      lalu angka bergrup; mendukung `Rp 25.925,00` maupun `1,800,000.00`.
    - `tanggal` opsional (`YYYY-MM-DD`). Bila kosong, server mencoba membaca tanggal dari isi email
      (`31-OKT-26`, `5 November 2026`), lalu memakai tanggal hari ini (WIB).
+   - `dompet`/`wallet` dan `penyedia`/`provider` opsional. Bila kosong, server mendeteksi penyedia dan dompet
+     sumber dari isi email. Dompet dipakai hanya jika cocok tunggal dengan dompet aktif.
 
 4. Uji dengan `curl`/Postman sebelum menyambungkan penyedia sungguhan. Email yang sama boleh dikirim ulang:
    `id` yang sama tidak dicatat dua kali.
@@ -272,6 +281,7 @@ Isi dashboard:
 - **Transaksi otomatis**: aturan tagihan/langganan bulanan (nama, nominal, tanggal, pos). Cron yang sama dengan antrean WhatsApp mencatat transaksi pada tanggal jatuh tempo dan tidak menggandakan bulan yang sama.
 - **Impor mutasi CSV**: unggah/tempel CSV dengan kolom `tanggal,tipe,nominal` (opsional `label,pos,biaya_admin,wadah`), lengkap dengan deteksi duplikat.
 - **Laporan**: pilih periode preset atau rentang tanggal kustom, lihat ringkasan pemasukan/pengeluaran per pos dan dompet, lalu cetak atau simpan PDF. Laporan mingguan/bulanan dapat dikirim otomatis ke WhatsApp dan email akun.
+- **Keluarga & akses**: tambah anggota lewat email akun, atur peran admin/anggota/lihat saja, dan setujui atau tolak transaksi yang diajukan anggota. Anggota memakai data, anggaran, dan dompet yang sama; nomor WhatsApp anggota opsional dan otomatis dipetakan ke workspace.
 - **Rencana**: slider jatah per pos, Dana Darurat, Tabungan, dan Investasi. Simpan membuat versi rencana baru (versi lama diarsipkan). Opsi "berlaku juga di periode berjalan" menyesuaikan gaji periode aktif dan mencatat selisih ke Saldo.
 - **Transaksi**: catat pengeluaran, pemasukan, gaji, bonus, tarik, dan pindah; hapus transaksi (pembatalan, bukan hapus permanen). Menghapus gaji juga membatalkan alokasi dan selisihnya.
 - **Pos**: tambah pos (langsung masuk rencana aktif), ganti nama, tambah alias, nonaktifkan, dan setup awal sebelum gaji pertama.
@@ -279,6 +289,7 @@ Isi dashboard:
 - **Target**: buat target tabungan (nama, nominal, target tanggal opsional), lihat saran sisihan per bulan/minggu, tambah tabungan sebagian demi sebagian, otomatis "Tercapai" saat terkumpul mencapai target.
 - **Tren pengeluaran**: grafik batang 14 hari terakhir di Ringkasan, lengkap dengan total, rata-rata, dan hari tertinggi.
 - **Asisten**: tanya jawab bebas tentang kondisi keuangan (pos paling boros, sisa uang, saran menabung) yang dijawab dari data dashboard, bukan tebakan.
+- **Profil & keamanan**: ubah profil dan password, aktifkan 2FA TOTP, lihat/cabut sesi perangkat lain, dan unduh cadangan CSV terenkripsi AES-256-GCM.
 
 Perubahan dari web dan WhatsApp memakai database yang sama. Dashboard menyegarkan data otomatis setiap 5 detik dan saat tab kembali aktif/fokus, jadi transaksi dari WhatsApp muncul tanpa hard reload. Respons dashboard memakai `no-store` agar tidak tertahan cache browser/CDN. Semua API dashboard wajib login; `/api/health` hanya
 memberi status ringkas tanpa `HEALTH_TOKEN`.

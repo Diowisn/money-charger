@@ -41,11 +41,12 @@ Membuat Money-Charger terasa seperti aplikasi keuangan kelas berbayar untuk pema
 - **AI Pro**: review bulanan otomatis, tanya jawab seluruh riwayat, deteksi anomali.
 - **Kolaborasi keluarga**: anggota, peran, anggaran bersama, persetujuan transaksi, nomor WhatsApp anggota.
 - **Keamanan/kepercayaan**: 2FA, manajemen sesi, ekspor terenkripsi.
+- **Integrasi email bank/e-wallet**: deteksi penyedia, dompet sumber, dan pos otomatis dari notifikasi transaksi.
 - Backup/restore melalui Neon Console, audit log dasar, ekspor CSV.
 
 ### Berikutnya, berurutan
 
-1. **Integrasi**: impor email bank/e-wallet yang lebih kaya, Google Sheets, kalender.
+1. **Integrasi lanjutan**: Google Sheets dan kalender.
 2. **Mekanik paywall**: hanya jika akan dipublikasikan; tidak diperlukan untuk pemakaian pribadi.
 
 ## 4. Kebutuhan per fitur
@@ -125,6 +126,12 @@ Membuat Money-Charger terasa seperti aplikasi keuangan kelas berbayar untuk pema
 
 - 2FA TOTP, manajemen sesi, ekspor terenkripsi.
 - Billing, entitlement, trial, invoice, dunning hanya jika dipublikasikan.
+
+### F-PREM-10 Integrasi
+
+- Impor email bank/e-wallet: deteksi penyedia (BCA, Mandiri, BRI, BNI, BSI, CIMB, Permata, BTN, GoPay, OVO, DANA, ShopeePay, LinkAja, Jenius, Jago, SeaBank, Blu, Neo).
+- Cocokkan dompet sumber dan pos otomatis bila unik; jika ambigu, pakai dompet bawaan dan tanpa pos.
+- Google Sheets dan kalender menyusul.
 
 ## 5. Di luar lingkup saat ini
 

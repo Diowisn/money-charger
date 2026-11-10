@@ -28,6 +28,8 @@ export async function terimaEmail(req: NextRequest) {
     akun: typeof body.akun === "string" ? body.akun : undefined,
     nominal: typeof body.nominal === "number" ? body.nominal : undefined,
     tanggal: typeof body.tanggal === "string" ? body.tanggal : undefined,
+    dompet: typeof body.dompet === "string" ? body.dompet : typeof body.wallet === "string" ? body.wallet : undefined,
+    penyedia: typeof body.penyedia === "string" ? body.penyedia : typeof body.provider === "string" ? body.provider : undefined,
   };
 
   try {

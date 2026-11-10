@@ -23,6 +23,7 @@ const TABEL = [
   "auth_sessions",
   "auth_identities",
   "allowed_numbers",
+  "workspace_members",
   "groups",
   "sub_posts",
   "aliases",

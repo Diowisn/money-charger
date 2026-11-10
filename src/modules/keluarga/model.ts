@@ -91,17 +91,22 @@ export async function ubahPeran(ownerId: string, id: number, roleInput: unknown)
 }
 
 export async function hapusAnggota(ownerId: string, id: number) {
-  const lama = await getPool().query<{ wa_number: string | null }>(
-    "SELECT wa_number FROM workspace_members WHERE id = $1 AND owner_id = $2",
+  const lama = await getPool().query<{ member_id: string; wa_number: string | null }>(
+    "SELECT member_id, wa_number FROM workspace_members WHERE id = $1 AND owner_id = $2",
     [id, ownerId],
   );
-  if (!lama.rows[0]) throw new AksiError("Anggota tidak ditemukan.");
+  const anggota = lama.rows[0];
+  if (!anggota) throw new AksiError("Anggota tidak ditemukan.");
   await getPool().query("DELETE FROM workspace_members WHERE id = $1 AND owner_id = $2", [id, ownerId]);
-  const wa = lama.rows[0].wa_number;
-  if (wa) {
+  await getPool().query(
+    `UPDATE pending_actions SET status = 'batal'
+     WHERE jenis = $1 AND status = 'menunggu' AND payload->>'ownerId' = $2 AND payload->>'actorId' = $3`,
+    [JENIS, ownerId, anggota.member_id],
+  );
+  if (anggota.wa_number) {
     await getPool().query(
       "DELETE FROM allowed_numbers WHERE wa_number = $1 AND NOT EXISTS (SELECT 1 FROM workspace_members WHERE wa_number = $1)",
-      [wa],
+      [anggota.wa_number],
     );
   }
   await catatAudit("web", "anggota_dihapus", { id });
@@ -117,27 +122,35 @@ export async function ajukanTransaksi(ownerId: string, actorId: string, body: Re
   return { id, pesan: "Transaksi diajukan dan menunggu persetujuan pemilik." };
 }
 
-async function ambilPersetujuan(ownerId: string, id: number) {
-  const hasil = await getPool().query<{ payload: { ownerId?: string; body?: Record<string, unknown> } }>(
-    `SELECT payload FROM pending_actions
-     WHERE id = $1 AND jenis = $2 AND status = 'menunggu' AND kedaluwarsa_pada > now()`,
-    [id, JENIS],
-  );
-  const row = hasil.rows[0];
-  if (!row || row.payload.ownerId !== ownerId || !row.payload.body) throw new AksiError("Pengajuan tidak ditemukan.");
-  return row.payload.body;
-}
-
 export async function setujuiTransaksi(ownerId: string, id: number) {
-  const body = await ambilPersetujuan(ownerId, id);
-  const hasil = await tambahTransaksiFinance(body as unknown as Parameters<typeof tambahTransaksiFinance>[0], ownerId);
-  await getPool().query("UPDATE pending_actions SET status = 'selesai' WHERE id = $1", [id]);
-  await catatAudit("web", "transaksi_disetujui", { id, transaksi: hasil.id });
-  return hasil;
+  const klaim = await getPool().query<{ body?: Record<string, unknown> }>(
+    `UPDATE pending_actions SET status = 'diproses'
+     WHERE id = $1 AND jenis = $2 AND status = 'menunggu'
+       AND kedaluwarsa_pada > now() AND payload->>'ownerId' = $3
+     RETURNING payload->'body' AS body`,
+    [id, JENIS, ownerId],
+  );
+  const body = klaim.rows[0]?.body;
+  if (!body) throw new AksiError("Pengajuan tidak ditemukan.");
+
+  try {
+    const hasil = await tambahTransaksiFinance(body as unknown as Parameters<typeof tambahTransaksiFinance>[0], ownerId);
+    await getPool().query("UPDATE pending_actions SET status = 'selesai' WHERE id = $1", [id]);
+    await catatAudit("web", "transaksi_disetujui", { id, transaksi: hasil.id });
+    return hasil;
+  } catch (error) {
+    await getPool().query("UPDATE pending_actions SET status = 'menunggu' WHERE id = $1 AND status = 'diproses'", [id]);
+    throw error;
+  }
 }
 
 export async function tolakTransaksi(ownerId: string, id: number) {
-  await ambilPersetujuan(ownerId, id);
-  await getPool().query("UPDATE pending_actions SET status = 'batal' WHERE id = $1", [id]);
+  const hasil = await getPool().query(
+    `UPDATE pending_actions SET status = 'batal'
+     WHERE id = $1 AND jenis = $2 AND status = 'menunggu'
+       AND kedaluwarsa_pada > now() AND payload->>'ownerId' = $3`,
+    [id, JENIS, ownerId],
+  );
+  if (!hasil.rowCount) throw new AksiError("Pengajuan tidak ditemukan.");
   await catatAudit("web", "transaksi_ditolak", { id });
 }
