@@ -2,6 +2,7 @@ import type { ReactElement } from "react";
 import {
   IkonAsisten,
   IkonImpor,
+  IkonLaporan,
   IkonOtomatis,
   IkonPos,
   IkonProfil,
@@ -23,6 +24,7 @@ export const MENU_LAIN: [Tab, string, (p: { aktif: boolean }) => ReactElement][]
   ["target", "Target tabungan", IkonTarget],
   ["otomatis", "Transaksi otomatis", IkonOtomatis],
   ["impor", "Impor mutasi CSV", IkonImpor],
+  ["laporan", "Laporan", IkonLaporan],
   ["asisten", "Asisten keuangan", IkonAsisten],
 ];
 
@@ -30,6 +32,7 @@ export const MENU_SAMPING: [Tab, string, (p: { aktif: boolean }) => ReactElement
   ["ringkasan", "Beranda", IkonRingkasan],
   ["riwayat", "Transaksi", IkonTransaksi],
   ["rekap", "Rekap", IkonRekap],
+  ["laporan", "Laporan", IkonLaporan],
   ["wawasan", "Wawasan", IkonWawasan],
   ["catat", "Catat transaksi", IkonTambah],
   ["rencana", "Rencana bulanan", IkonRencana],
@@ -56,6 +59,7 @@ export const JUDUL_TAB: Record<Tab, string> = {
   catat: "Transaksi",
   riwayat: "Transaksi",
   rekap: "Rekap",
+  laporan: "Laporan",
   wawasan: "Wawasan",
   profil: "Profil saya",
   "ubah-profil": "Edit profil",

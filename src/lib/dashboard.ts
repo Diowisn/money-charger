@@ -256,6 +256,8 @@ export interface DashboardData {
     investasiAwal: number;
     gajiPokok: number;
     digestAktif: boolean;
+    laporanAktif: boolean;
+    laporanJadwal: "mingguan" | "bulanan";
   };
   bolehSetup: boolean;
   rencana: { id: number; nama: string; total: number } | null;
@@ -579,6 +581,8 @@ export function bangunDashboard(state: State, hariIni: string): DashboardData {
       investasiAwal: state.config.investasiAwal,
       gajiPokok: state.config.gajiPokok,
       digestAktif: state.config.digestAktif,
+      laporanAktif: state.config.laporanAktif,
+      laporanJadwal: state.config.laporanJadwal,
     },
     bolehSetup: ps.length === 0,
     rencana: { id: planAktif.id, nama: planAktif.nama, total: totalPlan(planAktif) },

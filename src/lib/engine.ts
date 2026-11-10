@@ -21,6 +21,10 @@ export function parseConfig(m: Record<string, string>): Config {
     digestAktif: m.digest_aktif !== "0",
     digestMinggu: m.digest_minggu ?? null,
     digestHarian: m.digest_harian ?? null,
+    // Laporan terjadwal opt-in agar tidak mengirim pesan tanpa diminta.
+    laporanAktif: m.laporan_aktif === "1",
+    laporanJadwal: m.laporan_jadwal === "mingguan" ? "mingguan" : "bulanan",
+    laporanTerakhir: m.laporan_terakhir ?? null,
   };
 }
 

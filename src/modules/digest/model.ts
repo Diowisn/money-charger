@@ -1,19 +1,10 @@
 import { bangunDashboard, type AturanView, type DashboardData } from "@/lib/dashboard";
 import { rp, tglPendek } from "@/lib/format";
-import { diffDays, wibDate } from "@/lib/parse/date";
+import { diffDays, kunciMinggu, wibDate } from "@/lib/parse/date";
 import { getPool, PgRepo } from "@/lib/pg-repo";
 import { daftarAturan } from "@/modules/recurring/model";
 
-export function kunciMinggu(iso: string): string {
-  const tanggal = new Date(`${iso}T00:00:00Z`);
-  const hari = (tanggal.getUTCDay() + 6) % 7;
-  tanggal.setUTCDate(tanggal.getUTCDate() - hari + 3);
-  const kamisPertama = new Date(Date.UTC(tanggal.getUTCFullYear(), 0, 4));
-  const hariKamis = (kamisPertama.getUTCDay() + 6) % 7;
-  kamisPertama.setUTCDate(kamisPertama.getUTCDate() - hariKamis + 3);
-  const minggu = 1 + Math.round((tanggal.getTime() - kamisPertama.getTime()) / (7 * 86_400_000));
-  return `${tanggal.getUTCFullYear()}-W${String(minggu).padStart(2, "0")}`;
-}
+export { kunciMinggu };
 
 function tagihanTerdekat(data: DashboardData, hariIni: string): AturanView[] {
   return data.otomatis.filter((item) => {

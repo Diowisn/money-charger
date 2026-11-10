@@ -15,6 +15,7 @@ import { Lainnya } from "./view/tab-lainnya";
 import { Piutang } from "./view/tab-piutang";
 import { Otomatis } from "./view/tab-otomatis";
 import { Pos } from "./view/tab-pos";
+import { Laporan } from "./view/tab-laporan";
 import { Profil } from "./view/tab-profil";
 import { Rekap } from "./view/tab-rekap";
 import { Rencana } from "./view/tab-rencana";
@@ -356,6 +357,7 @@ export default function Dashboard({ awal }: { awal: DashboardData }) {
             />
           ) : null}
           {tab === "rekap" ? <Rekap data={data} navigasi={navigasiKe} /> : null}
+          {tab === "laporan" ? <Laporan data={data} kirim={kirim} sibuk={sibuk} /> : null}
           {tab === "wawasan" ? <Wawasan data={data} kirim={kirim} sibuk={sibuk} /> : null}
           {tab === "profil" || tab === "ubah-profil" ? (
             <Profil

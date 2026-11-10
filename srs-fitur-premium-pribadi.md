@@ -3,8 +3,8 @@
 | Atribut | Nilai |
 |---|---|
 | Status | Implementasi bertahap; pemakaian pribadi |
-| Versi | 1.0 |
-| Tanggal | 9 November 2026 |
+| Versi | 1.1 |
+| Tanggal | 10 November 2026 |
 | Terkait PRD | [PRD fitur premium pribadi](./prd-fitur-premium-pribadi.md) |
 | Terkait SRS utama | [SRS utama](./srs-catatan-keuangan-whatsapp.md) |
 
@@ -20,8 +20,9 @@ Sudah diimplementasikan:
 - Impor CSV melalui `/api/import`.
 - Digest WhatsApp mingguan dan peringatan proaktif melalui cron/outbox.
 - Multi-dompet: tabel `accounts`, saldo per dompet, transfer, net worth.
+- Laporan lanjutan: periode kustom, cetak/simpan PDF, laporan terjadwal ke WhatsApp/email.
 - Peringatan dalam aplikasi.
-- Skema versi v3.
+- Skema versi v3 (laporan tidak menambah tabel).
 
 ## 2. Arsitektur tambahan
 
@@ -90,6 +91,22 @@ Sudah diimplementasikan:
 - UI: `src/modules/finance/view/tab-dompet.tsx`; pilihan dompet di form transaksi.
 - Migrasi: `npm run db:setup` membuat dompet utama untuk akun lama.
 
+### 2.6 Laporan lanjutan
+
+- `src/lib/laporan.ts`
+  - `validasiPeriode(dari, sampai, hariIni)` memvalidasi rentang; bawaan bulan berjalan.
+  - `bangunLaporan(state, dari, sampai)` menghasilkan ringkasan, kategori, jenis, transaksi, dan saldo dompet.
+  - `teksLaporan(data)` menyusun teks laporan untuk WhatsApp/email.
+  - `periodeLaporanTerakhir(jadwal, hariIni)` memilih pekan/bulan lengkap terakhir.
+- `src/modules/laporan/model.ts`
+  - `buatLaporan(userId, dari, sampai)` memuat state pemilik dan menyusun laporan.
+  - `prosesLaporanTerjadwal(hariIni)` mengirim laporan ke outbox dan email akun.
+- `src/modules/laporan/controller.ts` + `src/app/api/laporan/route.ts` (`GET /api/laporan`).
+- UI: `src/modules/finance/view/tab-laporan.tsx`; periode preset/kustom, tabel laporan, tombol cetak.
+- Status terjadwal disimpan di `config`: `laporan_aktif`, `laporan_jadwal`, `laporan_terakhir`.
+- Cron `/api/cron/outbox` memanggil laporan terjadwal setelah digest.
+- PDF dihasilkan melalui dialog cetak browser; tidak ada dependensi PDF baru.
+
 ## 3. Persyaratan fungsional
 
 ### FR-REC — Transaksi berulang
@@ -139,9 +156,21 @@ Sudah diimplementasikan:
 - **FR-WS-05 MUST:** deteksi langganan hanya tampilan; tidak membuat mutasi.
 - **FR-WS-06 SHOULD:** algoritma langganan memakai minimal 2 bulan, nominal stabil ±15%, maksimal 2 transaksi/bulan.
 
+### FR-LAP — Laporan lanjutan
+
+- **FR-LAP-01 MUST:** laporan menerima periode kustom `dari`/`sampai` dan menolak tanggal terbalik atau masa depan.
+- **FR-LAP-02 MUST:** ringkasan memisahkan pemasukan, pengeluaran, biaya admin, arus bersih, dan rata-rata harian.
+- **FR-LAP-03 MUST:** transaksi batal dan transaksi turunan tidak dihitung.
+- **FR-LAP-04 MUST:** kategori pengeluaran memakai pos, lalu label, lalu “(Tanpa pos)”.
+- **FR-LAP-05 MUST:** laporan dapat dicetak atau disimpan sebagai PDF dari browser.
+- **FR-LAP-06 MUST:** laporan terjadwal membuat baris `outbox`, bukan mengirim langsung.
+- **FR-LAP-07 MUST:** laporan terjadwal maksimal sekali per kunci periode (minggu ISO/bulan).
+- **FR-LAP-08 MUST:** laporan terjadwal opt-in dan hanya dikirim ke nomor pemilik serta email akun.
+- **FR-LAP-09 SHOULD:** rentang laporan dibatasi maksimal 3 tahun.
+
 ## 4. Keamanan dan integritas
 
-- Semua API recurring/import/accounts memakai `pemilikRequest`.
+- Semua API recurring/import/accounts/laporan memakai `pemilikRequest`.
 - `user_id` aturan berasal dari sesi, bukan body.
 - Query aturan/CSV dibatasi `user_id` pemilik.
 - Tidak ada token/password di log.
@@ -156,6 +185,7 @@ Sudah diimplementasikan:
 - Sebelum migrasi berisiko, buat snapshot Neon.
 - Marker versi dicatat di `schema_version`.
 - Digest tidak menambah tabel; status kirim disimpan di `config`.
+- Laporan lanjutan tidak menambah tabel; status dikirim disimpan di `config` (`laporan_aktif`, `laporan_jadwal`, `laporan_terakhir`).
 
 ## 6. Acceptance criteria
 
@@ -196,6 +226,15 @@ Sudah diimplementasikan:
 - **AC-WS-03:** peringatan anggaran muncul pada rasio ≥0,8.
 - **AC-WS-04:** langganan dengan 2 bulan nominal sama terdeteksi; transaksi harian tidak.
 
+### Laporan
+
+- **AC-LAP-01:** periode `2026-11-01`–`2026-11-30` menghitung 30 hari dan transaksi di dalam rentang saja.
+- **AC-LAP-02:** pengeluaran `Rp25.000` dengan biaya admin `Rp2.500` masuk sebagai `Rp27.500`.
+- **AC-LAP-03:** transaksi batal dan `alokasi_gaji` tidak muncul pada ringkasan maupun daftar.
+- **AC-LAP-04:** tombol cetak membuka dialog cetak dan CSS cetak menyembunyikan navigasi.
+- **AC-LAP-05:** dua cron pada pekan/bulan yang sama hanya membuat satu laporan terjadwal.
+- **AC-LAP-06:** laporan terjadwal mati tidak membuat outbox/email.
+
 ## 7. Rencana fitur berikutnya
 
 ### 7.1 Digest WhatsApp (sudah diimplementasikan)
@@ -213,11 +252,12 @@ Sudah diimplementasikan:
 - Net worth dari akun + tabungan + investasi - utang.
 - Migrasi saldo lama ke akun default.
 
-### 7.3 Laporan lanjutan
+### 7.3 Laporan lanjutan (sudah diimplementasikan)
 
-- Laporan PDF/print dari data dashboard.
-- Periode kustom.
-- Ekspor terjadwal melalui outbox/email.
+- Laporan periode kustom dari data transaksi, bukan hanya 120 transaksi dashboard.
+- Cetak/simpan PDF melalui dialog cetak browser dan CSS cetak.
+- Laporan terjadwal mingguan/bulanan melalui outbox WhatsApp dan email akun.
+- Anti-duplikat per kunci periode di `config.laporan_terakhir`.
 
 ### 7.4 AI Pro
 
@@ -240,4 +280,5 @@ Sudah diimplementasikan:
 | F-PREM-03 | FR-CSV | AC-CSV |
 | F-PREM-04 | FR-DIG | AC-DIG |
 | F-PREM-05 | FR-DOM | AC-DOM |
-| F-PREM-06–09 | Bagian 7 | Belum diimplementasikan |
+| F-PREM-06 | FR-LAP | AC-LAP |
+| F-PREM-07–09 | Bagian 7.4–7.5 | Belum diimplementasikan |

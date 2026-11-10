@@ -136,7 +136,15 @@ export interface Config {
   digestMinggu: string | null;
   /** Tanggal terakhir peringatan harian dikirim. */
   digestHarian: string | null;
+  /** Kirim laporan periode terakhir secara terjadwal (F-PREM-06). */
+  laporanAktif: boolean;
+  /** Frekuensi laporan terjadwal. */
+  laporanJadwal: JadwalLaporan;
+  /** Kunci periode laporan terakhir yang sudah dikirim. */
+  laporanTerakhir: string | null;
 }
+
+export type JadwalLaporan = "mingguan" | "bulanan";
 
 export type DebtJenis = "piutang" | "utang";
 export type DebtStatus = "aktif" | "lunas" | "batal";

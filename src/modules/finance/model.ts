@@ -2,6 +2,7 @@ import { catatAudit } from "@/lib/audit";
 import { bangunDashboard } from "@/lib/dashboard";
 import { wibDate } from "@/lib/parse/date";
 import { PgRepo } from "@/lib/pg-repo";
+import type { JadwalLaporan } from "@/lib/types";
 import { daftarAturan } from "@/modules/recurring/model";
 import { ambilProfil } from "@/modules/profile/model";
 import { pastikanAkunDefault } from "@/modules/accounts/model";
@@ -101,6 +102,17 @@ export async function simpanDigestFinance(aktif: boolean, userId: string) {
     await tx.setConfig("digest_aktif", aktif ? "1" : "0");
   });
   await catatAudit("web", "digest_diubah", { aktif });
+}
+
+export async function simpanLaporanFinance(input: { aktif?: boolean; jadwal?: JadwalLaporan }, userId: string) {
+  await new PgRepo(undefined, undefined, userId).transaction(async (tx) => {
+    const state = await tx.load();
+    const aktif = input.aktif ?? state.config.laporanAktif;
+    const jadwal = input.jadwal ?? state.config.laporanJadwal;
+    await tx.setConfig("laporan_aktif", aktif ? "1" : "0");
+    await tx.setConfig("laporan_jadwal", jadwal);
+  });
+  await catatAudit("web", "laporan_diubah", input);
 }
 
 export async function tambahDebtFinance(input: InputDebt, userId: string) {

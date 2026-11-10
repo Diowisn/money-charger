@@ -103,6 +103,15 @@ export function IkonRekap({ aktif }: { aktif: boolean }) {
   );
 }
 
+export function IkonLaporan({ aktif }: { aktif: boolean }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={aktif ? 2.4 : 1.8}>
+      <path d="M6 3h9l4 4v14H6z" strokeLinejoin="round" />
+      <path d="M14 3v5h5M9 12h6M9 16h6" strokeLinecap="round" />
+    </svg>
+  );
+}
+
 export function IkonProfil({ aktif }: { aktif: boolean }) {
   return (
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={aktif ? 2.4 : 1.8}>

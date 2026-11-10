@@ -3,8 +3,8 @@
 | Atribut | Nilai |
 |---|---|
 | Status | Aktif; penggunaan pribadi, tanpa paywall |
-| Versi | 1.0 |
-| Tanggal | 9 November 2026 |
+| Versi | 1.1 |
+| Tanggal | 10 November 2026 |
 | Dokumen induk | [PRD utama](./prd-catatan-keuangan-whatsapp.md) |
 | Dokumen teknis | [SRS fitur premium pribadi](./srs-fitur-premium-pribadi.md) |
 
@@ -37,16 +37,16 @@ Membuat Money-Charger terasa seperti aplikasi keuangan kelas berbayar untuk pema
 - **Impor mutasi CSV**: out/in, pos, biaya admin, wadah, anti-duplikat berbasis hash.
 - **Digest WhatsApp**: ringkasan mingguan, peringatan anggaran/tagihan, anti-duplikat harian/mingguan, dapat dimatikan.
 - **Multi-dompet dan net worth**: saldo per rekening/e-wallet, transfer antar dompet, kekayaan bersih.
+- **Laporan lanjutan**: periode kustom, cetak/simpan PDF, laporan terjadwal ke WhatsApp/email.
 - Backup/restore melalui Neon Console, audit log dasar, ekspor CSV.
 
 ### Berikutnya, berurutan
 
-1. **Laporan lanjutan**: PDF, periode kustom, laporan terjadwal.
-2. **AI Pro**: review bulanan otomatis, tanya jawab seluruh riwayat, deteksi anomali.
-3. **Integrasi**: impor email bank/e-wallet yang lebih kaya, Google Sheets, kalender.
-4. **Kolaborasi keluarga**: anggota, peran, anggaran bersama, persetujuan.
-5. **Keamanan/kepercayaan**: 2FA, manajemen sesi, ekspor terenkripsi.
-6. **Mekanik paywall**: hanya jika akan dipublikasikan; tidak diperlukan untuk pemakaian pribadi.
+1. **AI Pro**: review bulanan otomatis, tanya jawab seluruh riwayat, deteksi anomali.
+2. **Integrasi**: impor email bank/e-wallet yang lebih kaya, Google Sheets, kalender.
+3. **Kolaborasi keluarga**: anggota, peran, anggaran bersama, persetujuan.
+4. **Keamanan/kepercayaan**: 2FA, manajemen sesi, ekspor terenkripsi.
+5. **Mekanik paywall**: hanya jika akan dipublikasikan; tidak diperlukan untuk pemakaian pribadi.
 
 ## 4. Kebutuhan per fitur
 
@@ -96,11 +96,16 @@ Membuat Money-Charger terasa seperti aplikasi keuangan kelas berbayar untuk pema
 - Transaksi dapat dicatat dari dompet pilihan.
 - Net worth = total saldo dompet + tabungan + investasi - utang.
 
-### F-PREM-06 Laporan lanjutan (berikutnya)
+### F-PREM-06 Laporan lanjutan
 
-- Laporan PDF/print.
-- Periode kustom.
-- Laporan terjadwal ke email/WhatsApp.
+- Laporan periode kustom: pilih rentang tanggal bebas hingga 3 tahun.
+- Ringkasan pemasukan, pengeluaran, biaya admin, arus bersih, dan rata-rata harian.
+- Rincian pengeluaran per pos, per jenis transaksi, saldo dompet, dan daftar transaksi.
+- Cetak atau simpan PDF melalui dialog cetak browser.
+- Laporan terjadwal mingguan/bulanan ke WhatsApp pemilik dan email akun.
+- Laporan terjadwal opt-in, dapat dimatikan, dan anti-duplikat per periode.
+
+**Sukses:** pemilik dapat membuat dan mencetak laporan periode apa pun tanpa menyusun ulang data, dan menerima laporan periode terakhir secara otomatis.
 
 ### F-PREM-07 AI Pro (berikutnya)
 
@@ -134,6 +139,7 @@ Membuat Money-Charger terasa seperti aplikasi keuangan kelas berbayar untuk pema
 - Impor CSV menghasilkan 0 duplikat.
 - Peringatan muncul sebelum saldo/anggaran bermasalah.
 - Waktu input transaksi rutin turun mendekati nol.
+- Laporan periode kustom dapat dicetak dan laporan terjadwal tidak terkirim ganda.
 
 ## 7. Risiko
 

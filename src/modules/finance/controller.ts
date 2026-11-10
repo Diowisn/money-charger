@@ -11,6 +11,7 @@ import {
   nabungGoalFinance,
   simpanDigestFinance,
   simpanGajiPokokFinance,
+  simpanLaporanFinance,
   simpanRencanaFinance,
   simpanSetupFinance,
   tambahDebtFinance,
@@ -161,7 +162,20 @@ export async function postPengaturan(req: NextRequest) {
     if (body.digestAktif !== undefined) {
       await simpanDigestFinance(body.digestAktif === true, auth.userId);
     }
-    if (body.gajiPokok === undefined && body.digestAktif === undefined) {
+    if (body.laporanAktif !== undefined || body.laporanJadwal !== undefined) {
+      const jadwal = body.laporanJadwal;
+      if (jadwal !== undefined && jadwal !== "mingguan" && jadwal !== "bulanan") {
+        throw new AksiError("Jadwal laporan tidak dikenal.");
+      }
+      await simpanLaporanFinance(
+        {
+          aktif: body.laporanAktif === undefined ? undefined : body.laporanAktif === true,
+          jadwal: jadwal as "mingguan" | "bulanan" | undefined,
+        },
+        auth.userId,
+      );
+    }
+    if (body.gajiPokok === undefined && body.digestAktif === undefined && body.laporanAktif === undefined && body.laporanJadwal === undefined) {
       throw new AksiError("Tidak ada perubahan.");
     }
     return ok({ pesan: "Pengaturan diperbarui." });

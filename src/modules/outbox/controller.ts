@@ -2,6 +2,7 @@ import type { NextRequest } from "next/server";
 import { prosesAntreanOutbox } from "@/lib/outbox";
 import { rahasiaCocok } from "@/lib/secret";
 import { prosesDigest } from "@/modules/digest/model";
+import { prosesLaporanTerjadwal } from "@/modules/laporan/model";
 import { prosesTransaksiBerulang } from "@/modules/recurring/model";
 import { prosesAntreanInbound } from "@/modules/whatsapp/queue";
 
@@ -26,8 +27,14 @@ export async function retryOutbox(req: NextRequest) {
     } catch (error) {
       console.error(`Digest gagal: ${error instanceof Error ? error.message : "unknown"}`);
     }
+    let laporan: unknown = null;
+    try {
+      laporan = await prosesLaporanTerjadwal();
+    } catch (error) {
+      console.error(`Laporan terjadwal gagal: ${error instanceof Error ? error.message : "unknown"}`);
+    }
     const outbox = await prosesAntreanOutbox();
-    return Response.json({ ok: true, inbound, outbox, otomatis, digest }, { headers: { "Cache-Control": "no-store" } });
+    return Response.json({ ok: true, inbound, outbox, otomatis, digest, laporan }, { headers: { "Cache-Control": "no-store" } });
   } catch (e) {
     console.error(`Outbox cron gagal: ${e instanceof Error ? e.message : "unknown error"}`);
     return Response.json({ ok: false, error: "Gagal memproses outbox." }, { status: 500 });

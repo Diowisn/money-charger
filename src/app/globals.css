@@ -3586,3 +3586,227 @@ body {
     padding: 20px;
   }
 }
+
+/* ---------- Laporan (F-PREM-06) ---------- */
+.laporan {
+  display: grid;
+  gap: 16px;
+}
+
+.laporan-kontrol {
+  display: grid;
+  gap: 14px;
+}
+
+.laporan-preset {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.chip.aktif {
+  background: var(--aksen-lembut);
+  border-color: var(--aksen);
+  color: var(--aksen);
+}
+
+.laporan-tanggal {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 12px;
+}
+
+.laporan-tanggal label,
+.laporan-jadwal-aksi label {
+  display: grid;
+  gap: 6px;
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 650;
+}
+
+.laporan-tanggal input,
+.laporan-jadwal-aksi select {
+  padding: 9px 10px;
+  border: 1px solid var(--garis);
+  border-radius: 10px;
+  background: var(--kartu-2);
+  color: var(--teks);
+}
+
+.pesan-galat {
+  margin: 0;
+  color: var(--merah);
+  font-size: 0.82rem;
+}
+
+.laporan-isi {
+  display: grid;
+  gap: 16px;
+}
+
+.laporan-kop {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  padding: 4px 2px;
+}
+
+.laporan-kop h2 {
+  margin: 4px 0;
+}
+
+.laporan-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+}
+
+.laporan-metrik .angka {
+  font-size: 1.35rem;
+  margin: 4px 0;
+}
+
+.laporan-metrik .masuk {
+  color: var(--hijau);
+}
+
+.laporan-metrik .keluar {
+  color: var(--merah);
+}
+
+.laporan-tabel {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 12px;
+  font-size: 0.82rem;
+}
+
+.laporan-tabel th,
+.laporan-tabel td {
+  padding: 9px 8px;
+  border-bottom: 1px solid var(--garis);
+  text-align: left;
+  vertical-align: middle;
+}
+
+.laporan-tabel th {
+  color: var(--muted);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.laporan-tabel .kanan {
+  text-align: right;
+}
+
+.laporan-tabel-gulir {
+  overflow-x: auto;
+}
+
+.laporan-porsi {
+  display: inline-block;
+  width: 84px;
+  height: 6px;
+  margin-right: 8px;
+  border-radius: 999px;
+  background: var(--kartu-2);
+  vertical-align: middle;
+  overflow: hidden;
+}
+
+.laporan-porsi i {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--aksen);
+}
+
+.laporan-dompet {
+  list-style: none;
+  margin: 12px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 8px;
+}
+
+.laporan-dompet li {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--kartu-2);
+}
+
+.laporan-jadwal-aksi {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+@media (max-width: 720px) {
+  .laporan-kop {
+    flex-direction: column;
+  }
+}
+
+@media print {
+  .sidebar,
+  .app-header,
+  .bottom-nav,
+  .fab-catat,
+  .fab-menu,
+  .kaki,
+  .toast,
+  .laporan-kontrol,
+  .laporan-jadwal {
+    display: none !important;
+  }
+
+  .app,
+  .app-main,
+  .konten {
+    display: block !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    max-width: none !important;
+    background: #fff !important;
+  }
+
+  .laporan,
+  .laporan-isi {
+    gap: 10px;
+  }
+
+  .laporan-kartu,
+  .laporan-isi .kartu {
+    box-shadow: none !important;
+    border: 1px solid #d1d5db !important;
+    break-inside: avoid;
+  }
+
+  .laporan-kop,
+  .laporan-grid,
+  .laporan-isi .kartu {
+    break-inside: avoid;
+  }
+
+  .laporan-tabel-gulir {
+    overflow: visible !important;
+  }
+
+  .laporan-tabel {
+    font-size: 10px;
+  }
+
+  .laporan-tabel th,
+  .laporan-tabel td {
+    padding: 5px 6px;
+  }
+}
