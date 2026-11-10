@@ -12,6 +12,7 @@ import {
   totalPlan,
 } from "./engine";
 import { rp } from "./format";
+import { deteksiAnomali } from "./insight";
 import { addDays, diffDays } from "./parse/date";
 import { TURUNAN, type ProfilAkun, type State, type Tx, type TxTipe, type Wadah } from "./types";
 
@@ -141,6 +142,7 @@ export interface WawasanData {
   rasioTabungan: number;
   langganan: LanggananView[];
   totalLangganan: number;
+  anomali: string[];
 }
 
 export function kebutuhanTarget(sisa: number, targetTanggal: string | null, hariIni: string): { perBulan: number | null; perMinggu: number | null } {
@@ -258,6 +260,7 @@ export interface DashboardData {
     digestAktif: boolean;
     laporanAktif: boolean;
     laporanJadwal: "mingguan" | "bulanan";
+    aiReviewAktif: boolean;
   };
   bolehSetup: boolean;
   rencana: { id: number; nama: string; total: number } | null;
@@ -496,6 +499,7 @@ export function bangunDashboard(state: State, hariIni: string): DashboardData {
   const bulanDanaDarurat = pengeluaranBulanIni > 0 ? danaDarurat / pengeluaranBulanIni : danaDarurat > 0 ? 3 : 0;
   const skor = hitungSkorKesehatan({ rasioAnggaran, rasioTabungan, bulanDanaDarurat, saldoPositif: wadah.saldo >= 0 });
   const langganan = deteksiLangganan(state);
+  const anomali = deteksiAnomali(state, hariIni);
   const proyeksiPengeluaran = proyeksiPengeluaranBulan(pengeluaranBulanIni, hariIni);
   const proyeksiSaldo = wadah.saldo - Math.max(0, proyeksiPengeluaran - pengeluaranBulanIni);
   const peringatan: string[] = [];
@@ -554,6 +558,7 @@ export function bangunDashboard(state: State, hariIni: string): DashboardData {
       rasioTabungan,
       langganan,
       totalLangganan: langganan.reduce((s, item) => s + item.nominal, 0),
+      anomali,
     },
     dompet: {
       daftar: dompetAkun.daftar,
@@ -583,6 +588,7 @@ export function bangunDashboard(state: State, hariIni: string): DashboardData {
       digestAktif: state.config.digestAktif,
       laporanAktif: state.config.laporanAktif,
       laporanJadwal: state.config.laporanJadwal,
+      aiReviewAktif: state.config.aiReviewAktif,
     },
     bolehSetup: ps.length === 0,
     rencana: { id: planAktif.id, nama: planAktif.nama, total: totalPlan(planAktif) },

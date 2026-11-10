@@ -38,15 +38,15 @@ Membuat Money-Charger terasa seperti aplikasi keuangan kelas berbayar untuk pema
 - **Digest WhatsApp**: ringkasan mingguan, peringatan anggaran/tagihan, anti-duplikat harian/mingguan, dapat dimatikan.
 - **Multi-dompet dan net worth**: saldo per rekening/e-wallet, transfer antar dompet, kekayaan bersih.
 - **Laporan lanjutan**: periode kustom, cetak/simpan PDF, laporan terjadwal ke WhatsApp/email.
+- **AI Pro**: review bulanan otomatis, tanya jawab seluruh riwayat, deteksi anomali.
 - Backup/restore melalui Neon Console, audit log dasar, ekspor CSV.
 
 ### Berikutnya, berurutan
 
-1. **AI Pro**: review bulanan otomatis, tanya jawab seluruh riwayat, deteksi anomali.
-2. **Integrasi**: impor email bank/e-wallet yang lebih kaya, Google Sheets, kalender.
-3. **Kolaborasi keluarga**: anggota, peran, anggaran bersama, persetujuan.
-4. **Keamanan/kepercayaan**: 2FA, manajemen sesi, ekspor terenkripsi.
-5. **Mekanik paywall**: hanya jika akan dipublikasikan; tidak diperlukan untuk pemakaian pribadi.
+1. **Integrasi**: impor email bank/e-wallet yang lebih kaya, Google Sheets, kalender.
+2. **Kolaborasi keluarga**: anggota, peran, anggaran bersama, persetujuan.
+3. **Keamanan/kepercayaan**: 2FA, manajemen sesi, ekspor terenkripsi.
+4. **Mekanik paywall**: hanya jika akan dipublikasikan; tidak diperlukan untuk pemakaian pribadi.
 
 ## 4. Kebutuhan per fitur
 
@@ -107,7 +107,7 @@ Membuat Money-Charger terasa seperti aplikasi keuangan kelas berbayar untuk pema
 
 **Sukses:** pemilik dapat membuat dan mencetak laporan periode apa pun tanpa menyusun ulang data, dan menerima laporan periode terakhir secara otomatis.
 
-### F-PREM-07 AI Pro (berikutnya)
+### F-PREM-07 AI Pro
 
 - Review bulanan otomatis.
 - Tanya jawab atas seluruh riwayat.

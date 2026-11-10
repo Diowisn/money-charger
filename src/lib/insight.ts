@@ -4,6 +4,9 @@
  * engine. AI tidak menghitung nominal sendiri dan tidak menerima nomor telepon.
  */
 import type { DashboardData } from "./dashboard";
+import { nominalKeluar } from "./engine";
+import { diffDays } from "./parse/date";
+import { TURUNAN, type State } from "./types";
 
 export const PERTANYAAN_MAKS = 400;
 
@@ -107,6 +110,112 @@ export function susunKonteksInsight(data: DashboardData): string {
     }
   }
 
+  return baris.join("\n");
+}
+
+function namaPos(state: State, id: number | null, label: string | null): string {
+  return (id === null ? null : state.subPosts.find((s) => s.id === id)?.nama) ?? label?.trim() ?? "(Tanpa pos)";
+}
+
+/** Deteksi anomali konservatif: hanya tampilan, tidak mengubah transaksi. */
+export function deteksiAnomali(state: State, hariIni: string, batas = 4): string[] {
+  const bulanIni = hariIni.slice(0, 7);
+  const perBulan = new Map<string, number>();
+  const kategoriBulan = new Map<string, Map<string, number>>();
+  const pengeluaran = state.txs.filter((t) => t.status === "berlaku" && t.tipe === "out" && !TURUNAN.has(t.tipe));
+
+  for (const t of pengeluaran) {
+    const bulan = t.tanggal.slice(0, 7);
+    const nilai = nominalKeluar(t);
+    perBulan.set(bulan, (perBulan.get(bulan) ?? 0) + nilai);
+    const kategori = kategoriBulan.get(bulan) ?? new Map<string, number>();
+    const nama = namaPos(state, t.subPostId, t.label);
+    kategori.set(nama, (kategori.get(nama) ?? 0) + nilai);
+    kategoriBulan.set(bulan, kategori);
+  }
+
+  const hasil: { teks: string; bobot: number }[] = [];
+  const bulanLalu = [...perBulan.entries()]
+    .filter(([bulan]) => bulan < bulanIni)
+    .sort((a, b) => (a[0] < b[0] ? -1 : 1))
+    .slice(-3)
+    .map(([, total]) => total);
+  const totalIni = perBulan.get(bulanIni) ?? 0;
+  if (bulanLalu.length >= 3 && totalIni > 0) {
+    const rata = bulanLalu.reduce((s, n) => s + n, 0) / bulanLalu.length;
+    if (rata > 0 && totalIni > rata * 1.5 && totalIni - rata >= 100_000) {
+      hasil.push({ teks: `Pengeluaran bulan ini ${rp(totalIni)}, sekitar ${Math.round((totalIni / rata - 1) * 100)}% di atas rata-rata 3 bulan.`, bobot: totalIni - rata });
+    }
+  }
+
+  const kategoriIni = kategoriBulan.get(bulanIni) ?? new Map<string, number>();
+  for (const [nama, total] of kategoriIni) {
+    const lalu = [...kategoriBulan.entries()]
+      .filter(([bulan]) => bulan < bulanIni)
+      .sort((a, b) => (a[0] < b[0] ? -1 : 1))
+      .slice(-3)
+      .map(([, isi]) => isi.get(nama) ?? 0);
+    if (lalu.length < 3 || total < 100_000) continue;
+    const rata = lalu.reduce((s, n) => s + n, 0) / lalu.length;
+    if (rata > 0 && total > rata * 2) {
+      hasil.push({ teks: `${nama} bulan ini ${rp(total)}, lebih dari 2x rata-rata 3 bulan (${rp(Math.round(rata))}).`, bobot: total - rata });
+    }
+  }
+
+  const batas90 = hariIni;
+  const pengeluaran90 = pengeluaran.filter((t) => diffDays(batas90, t.tanggal) <= 90 && diffDays(batas90, t.tanggal) >= 0);
+  if (pengeluaran90.length >= 5) {
+    const rata = pengeluaran90.reduce((s, t) => s + nominalKeluar(t), 0) / pengeluaran90.length;
+    const besar = pengeluaran90
+      .filter((t) => t.tanggal.startsWith(bulanIni) && nominalKeluar(t) > rata * 3 && nominalKeluar(t) >= 500_000)
+      .sort((a, b) => nominalKeluar(b) - nominalKeluar(a))[0];
+    if (besar) {
+      hasil.push({
+        teks: `Transaksi besar ${namaPos(state, besar.subPostId, besar.label)} ${rp(nominalKeluar(besar))} pada ${besar.tanggal}, jauh di atas rata-rata.`,
+        bobot: nominalKeluar(besar),
+      });
+    }
+  }
+
+  return hasil
+    .sort((a, b) => b.bobot - a.bobot)
+    .slice(0, batas)
+    .map((item) => item.teks);
+}
+
+/** Agregat seluruh riwayat untuk tanya jawab AI Pro tanpa mengirim data mentah. */
+export function susunKonteksRiwayat(state: State, data: DashboardData): string {
+  const bulan = new Map<string, { masuk: number; keluar: number; jumlah: number }>();
+  const kategori = new Map<string, number>();
+  for (const t of state.txs) {
+    if (t.status !== "berlaku" || TURUNAN.has(t.tipe)) continue;
+    const kunci = t.tanggal.slice(0, 7);
+    const isi = bulan.get(kunci) ?? { masuk: 0, keluar: 0, jumlah: 0 };
+    isi.jumlah += 1;
+    if (t.tipe === "out") {
+      isi.keluar += nominalKeluar(t);
+      const nama = namaPos(state, t.subPostId, t.label);
+      kategori.set(nama, (kategori.get(nama) ?? 0) + nominalKeluar(t));
+    } else if (t.tipe === "in" || t.tipe === "gaji" || t.tipe === "bonus") {
+      isi.masuk += t.nominal;
+    }
+    bulan.set(kunci, isi);
+  }
+
+  const baris = ["Riwayat seluruh bulan:"];
+  for (const [kunci, isi] of [...bulan.entries()].sort((a, b) => (a[0] < b[0] ? -1 : 1))) {
+    baris.push(`- ${kunci}: masuk ${rp(isi.masuk)}, keluar ${rp(isi.keluar)}, ${isi.jumlah} transaksi`);
+  }
+  const kategoriUrut = [...kategori.entries()].sort((a, b) => b[1] - a[1]).slice(0, 12);
+  if (kategoriUrut.length) {
+    baris.push("Kategori pengeluaran sepanjang riwayat:");
+    for (const [nama, total] of kategoriUrut) baris.push(`- ${nama}: ${rp(total)}`);
+  }
+  const anomali = deteksiAnomali(state, data.hariIni);
+  if (anomali.length) {
+    baris.push("Anomali terdeteksi:");
+    for (const item of anomali) baris.push(`- ${item}`);
+  }
   return baris.join("\n");
 }
 

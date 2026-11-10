@@ -142,6 +142,10 @@ export interface Config {
   laporanJadwal: JadwalLaporan;
   /** Kunci periode laporan terakhir yang sudah dikirim. */
   laporanTerakhir: string | null;
+  /** Kirim review bulanan otomatis dari AI (F-PREM-07). */
+  aiReviewAktif: boolean;
+  /** Bulan terakhir yang review-nya sudah dikirim. */
+  aiReviewTerakhir: string | null;
 }
 
 export type JadwalLaporan = "mingguan" | "bulanan";

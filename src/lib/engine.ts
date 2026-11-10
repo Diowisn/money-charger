@@ -25,6 +25,8 @@ export function parseConfig(m: Record<string, string>): Config {
     laporanAktif: m.laporan_aktif === "1",
     laporanJadwal: m.laporan_jadwal === "mingguan" ? "mingguan" : "bulanan",
     laporanTerakhir: m.laporan_terakhir ?? null,
+    aiReviewAktif: m.ai_review_aktif === "1",
+    aiReviewTerakhir: m.ai_review_terakhir ?? null,
   };
 }
 

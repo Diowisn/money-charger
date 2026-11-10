@@ -9,6 +9,7 @@ import {
   kelolaPos,
   muatDashboard,
   nabungGoalFinance,
+  simpanAiReviewFinance,
   simpanDigestFinance,
   simpanGajiPokokFinance,
   simpanLaporanFinance,
@@ -162,6 +163,9 @@ export async function postPengaturan(req: NextRequest) {
     if (body.digestAktif !== undefined) {
       await simpanDigestFinance(body.digestAktif === true, auth.userId);
     }
+    if (body.aiReviewAktif !== undefined) {
+      await simpanAiReviewFinance(body.aiReviewAktif === true, auth.userId);
+    }
     if (body.laporanAktif !== undefined || body.laporanJadwal !== undefined) {
       const jadwal = body.laporanJadwal;
       if (jadwal !== undefined && jadwal !== "mingguan" && jadwal !== "bulanan") {
@@ -175,7 +179,7 @@ export async function postPengaturan(req: NextRequest) {
         auth.userId,
       );
     }
-    if (body.gajiPokok === undefined && body.digestAktif === undefined && body.laporanAktif === undefined && body.laporanJadwal === undefined) {
+    if (body.gajiPokok === undefined && body.digestAktif === undefined && body.aiReviewAktif === undefined && body.laporanAktif === undefined && body.laporanJadwal === undefined) {
       throw new AksiError("Tidak ada perubahan.");
     }
     return ok({ pesan: "Pengaturan diperbarui." });

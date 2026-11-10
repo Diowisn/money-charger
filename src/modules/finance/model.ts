@@ -104,6 +104,13 @@ export async function simpanDigestFinance(aktif: boolean, userId: string) {
   await catatAudit("web", "digest_diubah", { aktif });
 }
 
+export async function simpanAiReviewFinance(aktif: boolean, userId: string) {
+  await new PgRepo(undefined, undefined, userId).transaction(async (tx) => {
+    await tx.setConfig("ai_review_aktif", aktif ? "1" : "0");
+  });
+  await catatAudit("web", "ai_review_diubah", { aktif });
+}
+
 export async function simpanLaporanFinance(input: { aktif?: boolean; jadwal?: JadwalLaporan }, userId: string) {
   await new PgRepo(undefined, undefined, userId).transaction(async (tx) => {
     const state = await tx.load();

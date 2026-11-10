@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { Tombol } from "@/components/tombol";
+import type { DashboardData } from "@/lib/dashboard";
 import { formatMarkdown } from "./format";
-import type { ChatPesan } from "./tipe";
+import type { ChatPesan, Kirim } from "./tipe";
 
 function JawabanRapi({ teks }: { teks: string }) {
   const isi = teks.replace(/\r\n?/g, "\n").trim();
@@ -44,7 +45,7 @@ const SARAN_TANYA = [
   "Sisa uangku cukup sampai gaji berikutnya?",
 ];
 
-export function Asisten() {
+export function Asisten({ data, kirim, sibuk: sibukAksi }: { data: DashboardData; kirim: Kirim; sibuk: boolean }) {
   const [riwayat, setRiwayat] = useState<ChatPesan[]>([]);
   const [teks, setTeks] = useState("");
   const [sibuk, setSibuk] = useState(false);
@@ -90,8 +91,20 @@ export function Asisten() {
       <section className="kartu">
         <h2>Tanya Asisten</h2>
         <p className="muted">
-          Jawaban memakai data keuangan di dashboard ini. Asisten tidak mengubah transaksi.
+          Jawaban memakai data keuangan dan riwayat transaksi. Asisten tidak mengubah transaksi.
         </p>
+        <div className="baris-antara">
+          <span className="muted kecil">
+            Review bulanan otomatis: {data.pengaturan.aiReviewAktif ? "aktif" : "mati"}
+          </span>
+          <Tombol
+            varian="sekunder"
+            disabled={sibukAksi}
+            onClick={() => void kirim("/api/pengaturan", "POST", { aiReviewAktif: !data.pengaturan.aiReviewAktif })}
+          >
+            {data.pengaturan.aiReviewAktif ? "Matikan review" : "Aktifkan review"}
+          </Tombol>
+        </div>
 
         {riwayat.length === 0 ? (
           <div className="saran-chat">

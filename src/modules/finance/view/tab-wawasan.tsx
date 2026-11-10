@@ -61,6 +61,21 @@ export function Wawasan({ data, kirim, sibuk }: { data: DashboardData; kirim: Ki
       </section>
 
       <section className="kartu">
+        <div className="baris-antara">
+          <h2>Anomali &amp; kebocoran</h2>
+          <span className={`badge ${w.anomali.length ? "tipe-out" : "hijau"}`}>
+            {w.anomali.length ? `${w.anomali.length} temuan` : "Tidak ada"}
+          </span>
+        </div>
+        <ul className="wawasan-daftar">
+          {w.anomali.map((item) => (
+            <li key={item}>{item}</li>
+          ))}
+          {!w.anomali.length ? <li className="muted kecil">Belum ada anomali menonjol.</li> : null}
+        </ul>
+      </section>
+
+      <section className="kartu">
         <h2>Yang perlu diperhatikan</h2>
         <ul className="wawasan-daftar">
           {w.faktor.map((faktor) => (

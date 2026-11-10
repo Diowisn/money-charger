@@ -380,7 +380,7 @@ export default function Dashboard({ awal }: { awal: DashboardData }) {
           {tab === "target" ? <Target data={data} kirim={kirim} sibuk={sibuk} mintaKonfirmasi={mintaKonfirmasi} /> : null}
           {tab === "otomatis" ? <Otomatis data={data} kirim={kirim} sibuk={sibuk} mintaKonfirmasi={mintaKonfirmasi} /> : null}
           {tab === "impor" ? <Impor kirim={kirim} sibuk={sibuk} /> : null}
-          {tab === "asisten" ? <Asisten /> : null}
+          {tab === "asisten" ? <Asisten data={data} kirim={kirim} sibuk={sibuk} /> : null}
           {tab === "lainnya" ? <Lainnya navigasi={navigasiKe} /> : null}
         </main>
 

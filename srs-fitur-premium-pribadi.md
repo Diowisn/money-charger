@@ -1,4 +1,4 @@
-# SRS — Fitur Premium Pribadi Money-Charger
+﻿# SRS â€” Fitur Premium Pribadi Money-Charger
 
 | Atribut | Nilai |
 |---|---|
@@ -21,6 +21,7 @@ Sudah diimplementasikan:
 - Digest WhatsApp mingguan dan peringatan proaktif melalui cron/outbox.
 - Multi-dompet: tabel `accounts`, saldo per dompet, transfer, net worth.
 - Laporan lanjutan: periode kustom, cetak/simpan PDF, laporan terjadwal ke WhatsApp/email.
+- AI Pro: review bulanan otomatis, tanya jawab seluruh riwayat, deteksi anomali.
 - Peringatan dalam aplikasi.
 - Skema versi v3 (laporan tidak menambah tabel).
 
@@ -70,7 +71,7 @@ Sudah diimplementasikan:
 
 - `src/modules/digest/model.ts`
   - `kunciMinggu(iso)` menghasilkan kunci minggu ISO.
-  - `pesanMingguan(data)` merangkum pengeluaran, sisa anggaran, proyeksi, dan tagihan ≤7 hari.
+  - `pesanMingguan(data)` merangkum pengeluaran, sisa anggaran, proyeksi, dan tagihan â‰¤7 hari.
   - `pesanPeringatan(data)` menyalin peringatan wawasan.
   - `prosesDigest(hariIni)` mengirim melalui outbox dan mencatat status kirim.
 - Cron `/api/cron/outbox` memanggil digest setelah transaksi berulang.
@@ -107,19 +108,31 @@ Sudah diimplementasikan:
 - Cron `/api/cron/outbox` memanggil laporan terjadwal setelah digest.
 - PDF dihasilkan melalui dialog cetak browser; tidak ada dependensi PDF baru.
 
+### 2.7 AI Pro
+
+- `src/lib/insight.ts`
+  - `susunKonteksRiwayat(state, data)` merangkum seluruh bulan, kategori, dan anomali tanpa data mentah berlebihan.
+  - `deteksiAnomali(state, hariIni)` mendeteksi lonjakan bulanan/kategori dan transaksi besar.
+- `src/modules/insight/model.ts`
+  - `tanyaInsight` memakai konteks dashboard + seluruh riwayat.
+  - `prosesReviewBulanan(hariIni)` membuat review AI bulan lalu dan mengirim ke outbox.
+- Status disimpan di `config`: `ai_review_aktif`, `ai_review_terakhir`.
+- Cron `/api/cron/outbox` memanggil review bulanan setelah laporan terjadwal.
+- UI: toggle review di tab Asisten; anomali tampil di tab Wawasan.
+
 ## 3. Persyaratan fungsional
 
-### FR-REC — Transaksi berulang
+### FR-REC â€” Transaksi berulang
 
-- **FR-REC-01 MUST:** aturan aktif dengan tanggal jatuh tempo ≤ hari ini diproses cron.
+- **FR-REC-01 MUST:** aturan aktif dengan tanggal jatuh tempo â‰¤ hari ini diproses cron.
 - **FR-REC-02 MUST:** satu aturan menghasilkan maksimal satu transaksi per `periode` (`YYYY-MM`).
 - **FR-REC-03 MUST:** aturan dengan `mulai` setelah tanggal jatuh tempo bulan berjalan tidak diproses mundur.
-- **FR-REC-04 MUST:** tanggal 29–31 dipotong ke akhir bulan sesuai kalender.
+- **FR-REC-04 MUST:** tanggal 29â€“31 dipotong ke akhir bulan sesuai kalender.
 - **FR-REC-05 MUST:** aturan bisa dijeda/dihapus tanpa menghapus transaksi historis.
 - **FR-REC-06 MUST:** transaksi otomatis memakai pos jika ada dan tetap tunduk pada validasi domain.
 - **FR-REC-07 SHOULD:** kegagalan satu aturan tidak menghentikan aturan lain.
 
-### FR-CSV — Impor mutasi
+### FR-CSV â€” Impor mutasi
 
 - **FR-CSV-01 MUST:** header tanpa `tanggal`, `tipe`, atau `nominal` ditolak sebelum mutasi.
 - **FR-CSV-02 MUST:** baris invalid dicatat sebagai gagal dan tidak menghentikan baris lain.
@@ -130,7 +143,7 @@ Sudah diimplementasikan:
 - **FR-CSV-07 MUST:** impor hanya membuat `out`/`in`; gaji/bonus lewat jalur transaksi biasa.
 - **FR-CSV-08 SHOULD:** pos dicocokkan berdasarkan nama/alias aktif; jika ambigu, transaksi tanpa pos.
 
-### FR-DIG — Digest WhatsApp
+### FR-DIG â€” Digest WhatsApp
 
 - **FR-DIG-01 MUST:** digest membuat baris `outbox`, bukan mengirim langsung.
 - **FR-DIG-02 MUST:** ringkasan mingguan maksimal sekali per minggu ISO.
@@ -138,7 +151,7 @@ Sudah diimplementasikan:
 - **FR-DIG-04 MUST:** digest dapat dimatikan dari pengaturan.
 - **FR-DIG-05 MUST:** recipient hanya nomor aktif di `allowed_numbers`.
 
-### FR-DOM — Multi-dompet
+### FR-DOM â€” Multi-dompet
 
 - **FR-DOM-01 MUST:** dompet punya nama, tipe, saldo awal, dan urutan.
 - **FR-DOM-02 MUST:** saldo dompet dihitung dari transaksi, bukan disimpan.
@@ -147,21 +160,29 @@ Sudah diimplementasikan:
 - **FR-DOM-05 MUST:** transaksi pengeluaran/pemasukan/gaji/bonus dapat memilih dompet.
 - **FR-DOM-06 MUST:** net worth = saldo dompet + tabungan + investasi - utang aktif.
 
-### FR-WS — Wawasan dan peringatan
+### FR-AI â€” AI Pro
 
-- **FR-WS-01 MUST:** skor 0–100 dengan label.
+- **FR-AI-01 MUST:** tanya jawab memakai agregat seluruh riwayat, bukan hanya transaksi terbaru.
+- **FR-AI-02 MUST:** deteksi anomali hanya tampilan/insight; tidak membuat mutasi.
+- **FR-AI-03 MUST:** review bulanan opt-in dan maksimal sekali per bulan.
+- **FR-AI-04 MUST:** review bulanan dikirim melalui outbox, bukan langsung.
+- **FR-AI-05 MUST:** tanpa `GROQ_API_KEY`, fitur AI dilewati tanpa menggagalkan cron.
+
+### FR-WS â€” Wawasan dan peringatan
+
+- **FR-WS-01 MUST:** skor 0â€“100 dengan label.
 - **FR-WS-02 MUST:** proyeksi bulanan dihitung dari pengeluaran bulan berjalan dibagi hari berjalan.
-- **FR-WS-03 MUST:** peringatan anggaran muncul saat rasio ≥80%.
-- **FR-WS-04 MUST:** peringatan proyeksi saldo negatif, saldo habis <7 hari, dan tagihan ≤7 hari.
+- **FR-WS-03 MUST:** peringatan anggaran muncul saat rasio â‰¥80%.
+- **FR-WS-04 MUST:** peringatan proyeksi saldo negatif, saldo habis <7 hari, dan tagihan â‰¤7 hari.
 - **FR-WS-05 MUST:** deteksi langganan hanya tampilan; tidak membuat mutasi.
-- **FR-WS-06 SHOULD:** algoritma langganan memakai minimal 2 bulan, nominal stabil ±15%, maksimal 2 transaksi/bulan.
+- **FR-WS-06 SHOULD:** algoritma langganan memakai minimal 2 bulan, nominal stabil Â±15%, maksimal 2 transaksi/bulan.
 
-### FR-LAP — Laporan lanjutan
+### FR-LAP â€” Laporan lanjutan
 
 - **FR-LAP-01 MUST:** laporan menerima periode kustom `dari`/`sampai` dan menolak tanggal terbalik atau masa depan.
 - **FR-LAP-02 MUST:** ringkasan memisahkan pemasukan, pengeluaran, biaya admin, arus bersih, dan rata-rata harian.
 - **FR-LAP-03 MUST:** transaksi batal dan transaksi turunan tidak dihitung.
-- **FR-LAP-04 MUST:** kategori pengeluaran memakai pos, lalu label, lalu “(Tanpa pos)”.
+- **FR-LAP-04 MUST:** kategori pengeluaran memakai pos, lalu label, lalu â€œ(Tanpa pos)â€.
 - **FR-LAP-05 MUST:** laporan dapat dicetak atau disimpan sebagai PDF dari browser.
 - **FR-LAP-06 MUST:** laporan terjadwal membuat baris `outbox`, bukan mengirim langsung.
 - **FR-LAP-07 MUST:** laporan terjadwal maksimal sekali per kunci periode (minggu ISO/bulan).
@@ -219,16 +240,23 @@ Sudah diimplementasikan:
 - **AC-DOM-03:** transaksi tanpa dompet memakai dompet utama.
 - **AC-DOM-04:** net worth mengikuti saldo dompet + tabungan + investasi - utang aktif.
 
+### AI Pro
+
+- **AC-AI-01:** konteks tanya jawab memuat seluruh bulan dan kategori.
+- **AC-AI-02:** lonjakan bulanan/kategori terdeteksi sebagai anomali.
+- **AC-AI-03:** dua cron pada bulan yang sama hanya membuat satu review.
+- **AC-AI-04:** review mati tidak membuat outbox.
+
 ### Wawasan
 
-- **AC-WS-01:** skor selalu 0–100.
+- **AC-WS-01:** skor selalu 0â€“100.
 - **AC-WS-02:** proyeksi 310.000 pada hari ke-10 bulan 31 hari = 961.000.
-- **AC-WS-03:** peringatan anggaran muncul pada rasio ≥0,8.
+- **AC-WS-03:** peringatan anggaran muncul pada rasio â‰¥0,8.
 - **AC-WS-04:** langganan dengan 2 bulan nominal sama terdeteksi; transaksi harian tidak.
 
 ### Laporan
 
-- **AC-LAP-01:** periode `2026-11-01`–`2026-11-30` menghitung 30 hari dan transaksi di dalam rentang saja.
+- **AC-LAP-01:** periode `2026-11-01`â€“`2026-11-30` menghitung 30 hari dan transaksi di dalam rentang saja.
 - **AC-LAP-02:** pengeluaran `Rp25.000` dengan biaya admin `Rp2.500` masuk sebagai `Rp27.500`.
 - **AC-LAP-03:** transaksi batal dan `alokasi_gaji` tidak muncul pada ringkasan maupun daftar.
 - **AC-LAP-04:** tombol cetak membuka dialog cetak dan CSS cetak menyembunyikan navigasi.
@@ -259,7 +287,7 @@ Sudah diimplementasikan:
 - Laporan terjadwal mingguan/bulanan melalui outbox WhatsApp dan email akun.
 - Anti-duplikat per kunci periode di `config.laporan_terakhir`.
 
-### 7.4 AI Pro
+### 7.4 AI Pro (sudah diimplementasikan)
 
 - Review bulanan dari agregat dashboard, bukan data mentah.
 - Tanya jawab seluruh riwayat dengan batas biaya.
@@ -281,4 +309,5 @@ Sudah diimplementasikan:
 | F-PREM-04 | FR-DIG | AC-DIG |
 | F-PREM-05 | FR-DOM | AC-DOM |
 | F-PREM-06 | FR-LAP | AC-LAP |
-| F-PREM-07–09 | Bagian 7.4–7.5 | Belum diimplementasikan |
+| F-PREM-07 | FR-AI | AC-AI |
+| F-PREM-08-09 | Bagian 7.5 | Belum diimplementasikan |
