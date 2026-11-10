@@ -192,31 +192,37 @@ export async function callback(request: NextRequest, provider: Provider) {
   const gagal = NextResponse.redirect(new URL("/login?error=oauth", request.url));
   const hapusState = { httpOnly: true, sameSite: "lax" as const, secure: process.env.NODE_ENV === "production", path: `/api/auth/oauth/${provider}/callback`, maxAge: 0 };
   gagal.cookies.set(STATE_COOKIE, "", hapusState);
+  const gagalSheets = () => {
+    const r = NextResponse.redirect(new URL("/?sheets=gagal", request.url));
+    r.cookies.set(STATE_COOKIE, "", hapusState);
+    return r;
+  };
+  let sheetsIntent = false;
   try {
     const mentah = request.cookies.get(STATE_COOKIE)?.value;
-    const sheets = Boolean(mentah?.startsWith("sheets:"));
-    const expected = sheets ? mentah?.slice("sheets:".length) : mentah;
+    sheetsIntent = Boolean(mentah?.startsWith("sheets:"));
+    const expected = sheetsIntent ? mentah?.slice("sheets:".length) : mentah;
     const supplied = request.nextUrl.searchParams.get("state");
-    if (!expected || !supplied) return gagal;
+    if (!expected || !supplied) return sheetsIntent ? gagalSheets() : gagal;
     const a = Buffer.from(expected);
     const b = Buffer.from(supplied);
-    if (a.length !== b.length || !timingSafeEqual(a, b)) return gagal;
+    if (a.length !== b.length || !timingSafeEqual(a, b)) return sheetsIntent ? gagalSheets() : gagal;
     const code = request.nextUrl.searchParams.get("code");
-    if (!code || !configured(provider) || !callbackBase(request)) return gagal;
+    if (!code || !configured(provider) || !callbackBase(request)) return sheetsIntent ? gagalSheets() : gagal;
 
-    if (sheets) {
-      if (provider !== "google") return gagal;
+    if (sheetsIntent) {
+      if (provider !== "google") return gagalSheets();
       const auth = await pemilikRequest(request);
       if ("tolak" in auth) return NextResponse.redirect(new URL("/login", request.url));
-      if (tolakPeran(auth, "kelola")) return NextResponse.redirect(new URL("/?sheets=gagal", request.url));
+      if (tolakPeran(auth, "kelola")) return gagalSheets();
       const profil = await providerProfile(provider, code, request);
-      if (!profil.refreshToken) return NextResponse.redirect(new URL("/?sheets=gagal", request.url));
-      await simpanKoneksiSheets(auth.userId, {
+      if (!profil.refreshToken) return gagalSheets();
+      const status = await simpanKoneksiSheets(auth.userId, {
         refreshToken: profil.refreshToken,
         accessToken: profil.accessToken,
         email: profil.email,
       });
-      const sukses = NextResponse.redirect(new URL("/?sheets=ok", request.url));
+      const sukses = NextResponse.redirect(new URL(status.terakhir ? "/?sheets=ok" : "/?sheets=gagal", request.url));
       sukses.cookies.set(STATE_COOKIE, "", hapusState);
       return sukses;
     }
@@ -229,6 +235,6 @@ export async function callback(request: NextRequest, provider: Provider) {
     success.cookies.set(STATE_COOKIE, "", hapusState);
     return success;
   } catch {
-    return gagal;
+    return sheetsIntent ? gagalSheets() : gagal;
   }
 }

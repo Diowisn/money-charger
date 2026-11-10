@@ -26,7 +26,7 @@ import { Transaksi } from "./view/tab-transaksi";
 import { Wawasan } from "./view/tab-wawasan";
 import type { HasilScan, Konfirmasi, Pesan, StatusLive, Tab, Tema } from "./view/tipe";
 
-export default function Dashboard({ awal }: { awal: DashboardData }) {
+export default function Dashboard({ awal, emailSetupSiap = false }: { awal: DashboardData; emailSetupSiap?: boolean }) {
   const [data, setData] = useState(awal);
   const [tab, setTab] = useState<Tab>("ringkasan");
   const [sibuk, setSibuk] = useState(false);
@@ -394,7 +394,7 @@ export default function Dashboard({ awal }: { awal: DashboardData }) {
           {tab === "keluarga" ? <Keluarga kirim={kirim} sibuk={sibuk} /> : null}
           {tab === "piutang" ? <Piutang data={data} kirim={kirim} sibuk={sibuk} mintaKonfirmasi={mintaKonfirmasi} /> : null}
           {tab === "target" ? <Target data={data} kirim={kirim} sibuk={sibuk} mintaKonfirmasi={mintaKonfirmasi} /> : null}
-          {tab === "otomatis" ? <Otomatis data={data} kirim={kirim} sibuk={sibuk} mintaKonfirmasi={mintaKonfirmasi} /> : null}
+          {tab === "otomatis" ? <Otomatis data={data} kirim={kirim} sibuk={sibuk} mintaKonfirmasi={mintaKonfirmasi} emailSetupSiap={emailSetupSiap} /> : null}
           {tab === "impor" ? <Impor kirim={kirim} sibuk={sibuk} /> : null}
           {tab === "asisten" ? <Asisten data={data} kirim={kirim} sibuk={sibuk} /> : null}
           {tab === "lainnya" ? <Lainnya navigasi={navigasiKe} /> : null}

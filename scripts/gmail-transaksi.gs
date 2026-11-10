@@ -1,9 +1,13 @@
 // Tempel file ini ke Google Apps Script (script.google.com) milik akun Gmail penerima.
 // Isi CONFIG, jalankan pasangTrigger sekali, lalu izinkan akses Gmail.
+// Multi-user: bagikan project ini, lalu tiap pengguna menjalankan pasangTrigger di Gmail masing-masing.
+// `akun` yang dikirim = email Gmail pengguna yang memasang trigger, dipakai server memisahkan data.
 
 const CONFIG = {
   WEBHOOK_URL: 'https://GANTI-DOMAIN-ANDA.vercel.app/api/email/inbound',
   SECRET: 'GANTI_DENGAN_EMAIL_INBOUND_SECRET',
+  // Opsional: samakan dengan token di URL web app agar orang lain tidak bisa memasang trigger.
+  SETUP_TOKEN: '',
   UMUR_EMAIL: '1d',
   MAKS_THREAD_PER_SUMBER: 15,
   BATAS_MENIT: 4,
@@ -149,4 +153,38 @@ function pasangTrigger() {
     .filter((t) => handler.indexOf(t.getHandlerFunction()) >= 0)
     .forEach((t) => ScriptApp.deleteTrigger(t));
   ScriptApp.newTrigger('prosesEmailTransaksi').timeBased().everyMinutes(5).create();
+}
+
+function halaman(pesan) {
+  const aman = String(pesan)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+  return HtmlService.createHtmlOutput(
+    '<!doctype html><html><head><meta name="viewport" content="width=device-width,initial-scale=1">' +
+      '<style>body{font-family:system-ui,sans-serif;max-width:32rem;margin:3rem auto;padding:0 1rem;line-height:1.5}</style>' +
+      '</head><body><h2>Money-Charger</h2><p>' + aman + '</p></body></html>'
+  ).setTitle('Money-Charger');
+}
+
+// Dipakai tombol dashboard lewat web app: ?aksi=pasang atau ?aksi=jalankan.
+// Deploy sebagai Web app, Execute as: User accessing the web app, Who has access: Anyone with Google account.
+function doGet(e) {
+  const parameter = (e && e.parameter) || {};
+  if (CONFIG.SETUP_TOKEN && parameter.token !== CONFIG.SETUP_TOKEN) {
+    return halaman('Token setup tidak cocok.');
+  }
+
+  try {
+    const akun = Session.getEffectiveUser().getEmail();
+    if (parameter.aksi === 'jalankan') {
+      prosesEmailTransaksi();
+      return halaman('Pemeriksaan email selesai untuk ' + akun + '.');
+    }
+    pasangTrigger();
+    return halaman('Email otomatis aktif untuk ' + akun + '. Trigger berjalan tiap 5 menit.');
+  } catch (error) {
+    return halaman('Gagal: ' + (error && error.message ? error.message : error));
+  }
 }

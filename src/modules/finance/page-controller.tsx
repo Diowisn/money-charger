@@ -7,7 +7,7 @@ export async function dashboardPage() {
   try {
     const userId = await userIdDariSesi();
     if (!userId) redirect("/login");
-    return <DashboardView awal={await muatDashboard(userId)} />;
+    return <DashboardView awal={await muatDashboard(userId)} emailSetupSiap={Boolean(process.env.GMAIL_SETUP_URL?.trim())} />;
   } catch (e) {
     console.error(e);
     return (

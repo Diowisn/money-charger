@@ -79,6 +79,11 @@ describe("PgRepo di Postgres sungguhan", () => {
     expect(hasil.rows[0].nama).toBe("workspace_members");
   });
 
+  it("skema google_sheets tersedia", async () => {
+    const hasil = await adapter.query("SELECT to_regclass('public.google_sheets') AS nama");
+    expect(hasil.rows[0].nama).toBe("google_sheets");
+  });
+
   it("memetakan nomor WhatsApp anggota aktif ke pemilik workspace", async () => {
     const member = await adapter.query("INSERT INTO auth_users (email) VALUES ('anggota@example.com') RETURNING id");
     await adapter.query(
@@ -106,6 +111,20 @@ describe("PgRepo di Postgres sungguhan", () => {
     expect(await repo.firstUserId()).toBe(ownerId);
     expect(await repo.userIdByEmail("TEST@EXAMPLE.COM")).toBe(ownerId);
     expect(await repo.userIdByEmail("lain@example.com")).toBeNull();
+    expect(await repo.userIdByEmailOrSoleUser("lain@example.com")).toBe(ownerId);
+    expect(await repo.userIdByEmailOrSoleUser(undefined)).toBe(ownerId);
+  });
+
+  it("multi-user tidak menjatuhkan email tak dikenal ke akun utama", async () => {
+    const member = await adapter.query("INSERT INTO auth_users (email) VALUES ('kedua@example.com') RETURNING id");
+    const repo = new PgRepo(adapter);
+    try {
+      expect(await repo.userIdByEmailOrSoleUser("kedua@example.com")).toBe(member.rows[0].id);
+      expect(await repo.userIdByEmailOrSoleUser("lain@example.com")).toBeNull();
+      expect(await repo.userIdByEmailOrSoleUser(undefined)).toBeNull();
+    } finally {
+      await adapter.query("DELETE FROM auth_users WHERE id = $1", [member.rows[0].id]);
+    }
   });
 
   it("tidak mengizinkan akun kedua mengambil data pribadi pemilik", async () => {

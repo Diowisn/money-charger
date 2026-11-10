@@ -80,7 +80,9 @@ export async function putusSheets(userId: string): Promise<StatusSheets> {
   } catch (error) {
     if ((error as { code?: string }).code !== "42P01") throw error;
   }
-  await new PgRepo(undefined, undefined, userId).setConfig("sheets_url", "");
+  const repo = new PgRepo(undefined, undefined, userId);
+  await repo.setConfig("sheets_url", "");
+  await repo.setConfig("sheets_terakhir", "");
   return statusSheets(userId);
 }
 
@@ -108,7 +110,9 @@ export async function simpanKoneksiSheets(
        diperbarui_pada = now()`,
     [userId, tokenEnc, sheet.id, sheet.url, input.email],
   );
-  await new PgRepo(undefined, undefined, userId).setConfig("sheets_url", "");
+  const repo = new PgRepo(undefined, undefined, userId);
+  await repo.setConfig("sheets_url", "");
+  await repo.setConfig("sheets_terakhir", "");
 
   try {
     await sinkronSheets(userId);

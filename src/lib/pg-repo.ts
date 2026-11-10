@@ -93,6 +93,17 @@ export class PgRepo implements Repo {
     return r.rows[0]?.id ?? null;
   }
 
+  /**
+   * Email kotak masuk → user. Akun pertama hanya dipakai bila sistem masih single-user;
+   * setelah ada beberapa user, email yang tidak cocok tidak boleh jatuh ke akun utama.
+   */
+  async userIdByEmailOrSoleUser(email: string | undefined): Promise<string | null> {
+    const cocok = await this.userIdByEmail(email);
+    if (cocok) return cocok;
+    const r = await this.db.query("SELECT id FROM auth_users ORDER BY created_at, id LIMIT 2");
+    return r.rows.length === 1 ? r.rows[0].id : null;
+  }
+
   async load(): Promise<State> {
     const userId = this.financeUser();
     const q = (t: string) => this.db.query(t, t.includes("$1") ? [userId] : undefined).then((r) => r.rows);

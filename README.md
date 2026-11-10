@@ -252,6 +252,24 @@ otomatis hanya bila hasilnya tunggal; jika ambigu, transaksi memakai dompet bawa
    Email yang sudah pernah dikirim dilewati oleh idempotensi server. Untuk diagnosa, jalankan
    `debugEmailTransaksi` (lihat query dan email yang cocok) atau `tesKoneksi` (HTTP 400 berarti secret benar).
    Alternatif: Resend Inbound, Cloudflare Email Workers, Mailgun Routes, atau Zapier/Make.
+   - **Multi-user tanpa tercampur:** satu project Apps Script boleh dipakai bersama. Bagikan project sebagai
+     Editor (atau minta tiap pengguna membuat salinan), lalu tiap pengguna login ke Gmail masing-masing,
+     membuka project itu, dan menjalankan `pasangTrigger` sekali. Trigger berjalan sebagai pengguna yang
+     memasangnya, hanya membaca inbox Gmail pengguna itu, dan mengirim `akun` = email Gmail tersebut. Satu
+     project bisa punya banyak trigger, satu per pengguna; server mencocokkan `akun` ke akun terdaftar.
+   - Email akun Money-Charger harus sama dengan email Gmail yang menjalankan trigger. Bila berbeda, ubah email
+     profil atau daftarkan akun dengan email Gmail itu. Satu Gmail berisi banyak bank/e-wallet tetap masuk ke
+     satu pengguna, bukan dipecah per bank.
+   - Satu Gmail yang menerima notifikasi banyak orang tidak dipisah otomatis; pakai Gmail terpisah per pengguna.
+     `SECRET` dipakai bersama di project, jadi jangan bagikan project ke luar pengguna yang dipercaya.
+   - Bila `akun` tidak cocok: pada sistem single-user transaksi tetap masuk ke satu-satunya akun; setelah ada
+     lebih dari satu pengguna, email dilewati agar tidak salah masuk ke akun utama.
+   - **Tombol setup di dashboard:** deploy project sebagai **Web app** dengan **Execute as: User accessing the
+     web app** dan **Who has access: Anyone with Google account**. Salin URL `/exec` ke `GMAIL_SETUP_URL`.
+     Tombol **Aktifkan email otomatis** muncul di tab Transaksi otomatis; tiap pengguna klik, pilih Gmail yang
+     sama dengan email akun, lalu izinkan akses. Trigger dipasang untuk pengguna itu, bukan untuk pemilik
+     project. Tombol **Periksa sekarang** menjalankan pemeriksaan sekali. Bila memakai `SETUP_TOKEN` di script,
+     sertakan `?token=...` pada `GMAIL_SETUP_URL`.
 3. Body JSON yang dikenali:
 
    ```json
@@ -286,15 +304,21 @@ otomatis hanya bila hasilnya tunggal; jika ambigu, transaksi memakai dompet bawa
 - **Kalender:** buka tab **Transaksi otomatis**, bagian **Aturan Saya**. Tombol **Unduh kalender (.ics)** berisi
   tagihan berulang, jatuh tempo utang/piutang, dan target tabungan 6 bulan ke depan. Tombol **Salin URL langganan**
   memberi feed bertoken agar Google/Apple Calendar memperbarui sendiri tanpa unduh ulang.
-- **Google Sheets otomatis:** buka tab Laporan > Google Sheets, klik **Hubungkan Google Sheets**, lalu pilih
-  akun Google dan setujui izin Drive. Server membuat spreadsheet privat **Money-Charger** dengan sheet
-  **Transaksi**, mengisi seluruh transaksi, dan menyinkronkan ulang otomatis sekali sehari saat cron.
+- **Google Sheets otomatis:** jalankan `npm run db:setup` sekali untuk skema v7, lalu buka tab Laporan >
+  Google Sheets, klik **Hubungkan Google Sheets**, pilih akun Google, dan setujui izin Drive. Server membuat
+  spreadsheet privat **Money-Charger** dengan sheet **Transaksi**, mengisi seluruh transaksi, dan
+  menyinkronkan ulang otomatis sekali sehari saat cron. Tidak perlu membuat spreadsheet atau menyalin URL.
+  - Setiap akun yang menghubungkan Google mendapat spreadsheet sendiri. Menghubungkan ulang dengan akun Google
+    yang sama memakai spreadsheet lama.
+  - Pembuatan otomatis butuh izin OAuth, jadi baru terjadi setelah pengguna menekan tombol hubungkan. Register
+    atau login dengan Google saja belum memberi izin Drive, sehingga spreadsheet tidak bisa dibuat saat register.
   - Aktifkan **Google Sheets API** di Google Cloud project, lalu tambahkan scope
     `https://www.googleapis.com/auth/drive.file` di OAuth consent screen. Redirect URI tetap
     `/api/auth/oauth/google/callback`.
   - Refresh token disimpan terenkripsi. Isi `GOOGLE_TOKEN_ENCRYPTION_KEY` dengan string acak panjang; bila kosong,
     server memakai `GOOGLE_CLIENT_SECRET` sebagai bahan kunci.
   - **Putuskan** menghapus koneksi dan token, tetapi tidak menghapus file spreadsheet dari Google Drive.
+    Untuk membuat spreadsheet baru, putuskan lalu hubungkan ulang.
 - **Cadangan Apps Script:** bila tidak ingin memberi akses Drive, buka bagian **Cadangan: web app Apps Script**
   di tab Laporan, lalu ikuti langkah di [`scripts/google-sheets.gs`](./scripts/google-sheets.gs).
   - Opsional: isi `SHEETS_WEBHOOK_SECRET` di server dan `SECRET` di script.

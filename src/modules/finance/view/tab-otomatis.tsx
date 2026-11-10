@@ -10,11 +10,13 @@ export function Otomatis({
   kirim,
   sibuk,
   mintaKonfirmasi,
+  emailSetupSiap = false,
 }: {
   data: DashboardData;
   kirim: Kirim;
   sibuk: boolean;
   mintaKonfirmasi: MintaKonfirmasi;
+  emailSetupSiap?: boolean;
 }) {
   const [nama, setNama] = useState("");
   const [nominal, setNominal] = useState("");
@@ -152,6 +154,29 @@ export function Otomatis({
           ))}
           {!data.otomatis.length ? <li className="kosong">Belum ada transaksi berulang.</li> : null}
         </ul>
+      </section>
+
+      <section className="kartu">
+        <div className="baris-antara">
+          <h2>Email Bank/E-Wallet</h2>
+          <span className={`badge ${emailSetupSiap ? "hijau" : ""}`}>{emailSetupSiap ? "Siap" : "Belum"}</span>
+        </div>
+        <p className="muted kecil">
+          Aktifkan sekali per akun Gmail yang menerima notifikasi transaksi. Pilih akun Google yang sama dengan email
+          akun Money-Charger. Setelah aktif, email diperiksa tiap 5 menit.
+        </p>
+        {emailSetupSiap ? (
+          <div className="baris-tombol">
+            <TautanTombol href="/api/email/setup?aksi=pasang" target="_blank" rel="noreferrer">
+              Aktifkan email otomatis
+            </TautanTombol>
+            <TautanTombol varian="sekunder" href="/api/email/setup?aksi=jalankan" target="_blank" rel="noreferrer">
+              Periksa sekarang
+            </TautanTombol>
+          </div>
+        ) : (
+          <p className="muted kecil">Server belum mengatur GMAIL_SETUP_URL.</p>
+        )}
       </section>
     </div>
   );

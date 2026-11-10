@@ -89,8 +89,15 @@ export async function prosesEmailMasuk(input: EmailMasuk): Promise<HasilEmail> {
   }
 
   const pemilik = new PgRepo();
-  const userId = (await pemilik.userIdByEmail(input.akun)) ?? (await pemilik.firstUserId());
-  if (!userId) throw new EmailAksiError("Belum ada akun; email tidak bisa dicatat.");
+  const userId = await pemilik.userIdByEmailOrSoleUser(input.akun);
+  if (!userId) {
+    return {
+      dicatat: false,
+      pesan: input.akun
+        ? `Email untuk "${input.akun}" tidak cocok dengan akun terdaftar; dilewati agar tidak masuk ke akun lain.`
+        : "Email tidak menyertakan alamat penerima; dilewati karena ada lebih dari satu akun.",
+    };
+  }
   const repo = new PgRepo(undefined, undefined, userId);
   const hariIni = wibDate(Date.now());
   const teksGabung = `${input.subjek ?? ""}\n${input.teks ?? ""}`;
