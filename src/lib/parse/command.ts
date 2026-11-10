@@ -26,6 +26,7 @@ export type Cmd =
   | { k: "goal_list" }
   | { k: "goal_save"; nama: string; nominal: number }
   | { k: "ai"; aksi: "status" | "on" | "off" | "konfirmasi_on" | "konfirmasi_off" }
+  | { k: "tanya"; teks: string }
   | { k: "error"; pesan: string }
   | { k: "bebas" };
 
@@ -48,7 +49,7 @@ const SATU_KATA: Record<string, Cmd> = {
 
 const AWAL_PERINTAH = new Set([
   "out", "in", "gaji", "bonus", "koreksi", "set", "geser", "pos", "tarik", "pindah", "sisa", "setup",
-  "piutang", "utang", "lunasi", "bayar", "target", "nabung", "ai",
+  "piutang", "utang", "lunasi", "bayar", "target", "nabung", "ai", "tanya",
 ]);
 
 const CONTOH: Record<string, string> = {
@@ -70,6 +71,7 @@ const CONTOH: Record<string, string> = {
   bayar: "bayar piutang Andi 50rb",
   target: "target 5 juta Laptop Baru",
   nabung: "nabung 100rb Laptop Baru",
+  tanya: "tanya berapa pengeluaran makan 3 bulan terakhir",
 };
 
 function isWadah(s: string): s is Wadah {
@@ -109,6 +111,9 @@ export function parseCommand(raw: string, today: string): Cmd {
   const sisaLow = sisa.toLowerCase();
 
   switch (kata) {
+    case "tanya":
+      return { k: "tanya", teks: sisa };
+
     case "ai": {
       if (sisaLow === "on") return { k: "ai", aksi: "on" };
       if (sisaLow === "off") return { k: "ai", aksi: "off" };

@@ -16,7 +16,7 @@ Acuan: [PRD Money-Charger SaaS](./prd-catatan-keuangan-whatsapp.md) dan [SRS](./
 | `src/lib/handler.ts` | Aturan domain pemrosesan pesan dan transaksi |
 | `src/lib/ai.ts` | Groq sebagai cadangan bahasa bebas, beserta validasi hasil AI |
 | `src/lib/ai-vision.ts` | Groq vision untuk membaca foto struk/transaksi, beserta validasi hasil |
-| `src/lib/insight.ts` | Konteks keuangan untuk asisten AI + klien Groq tanya jawab (tab Asisten) |
+| `src/lib/insight.ts` | Konteks keuangan untuk asisten AI + klien Groq tanya jawab (web dan WhatsApp) |
 | `src/lib/pg-repo.ts` | Akses Neon Postgres. `mem-repo.ts` adalah versi memori untuk tes |
 | `src/lib/inbound-queue.ts` | Antrean pesan masuk durable: idempoten, lease, retry, retensi |
 | `src/lib/outbox.ts` | Antrean balasan WhatsApp, retry backoff, dan pembersihan pesan lama |
@@ -78,7 +78,10 @@ Struktur ini **belum** menjadikan aplikasi multi-pelanggan: autentikasi, whiteli
    mengaktifkan lagi. Dengan `ai konfirmasi on` (bawaan), hasil AI ditampilkan sebagai pratinjau dan baru
    dicatat setelah balasan `ya`; `ai konfirmasi off` mengembalikan pencatatan langsung.
 7. Tab **Asisten** di dashboard memakai key yang sama untuk tanya jawab keuangan (`GROQ_INSIGHT_MODEL`,
-   default mengikuti `GROQ_MODEL`). AI hanya menerima ringkasan agregat dashboard, bukan nomor telepon atau data mentah.
+    default mengikuti `GROQ_MODEL`). AI hanya menerima ringkasan agregat dashboard, bukan nomor telepon atau data mentah.
+8. Di WhatsApp, aktifkan AI dengan `ai on`, lalu tanyakan `tanya berapa pengeluaran makan 3 bulan terakhir`.
+   Perintah memakai agregat dashboard + riwayat, tidak mengubah transaksi, dan dibatasi 20 pertanyaan/jam per nomor.
+   `ai off` mencabut izin AI untuk pertanyaan maupun kalimat bebas.
 
 ### 3. Meta WhatsApp Cloud API
 1. Buat aplikasi Meta dengan use case **Connect with customers through WhatsApp** dan buka **Langkah 1. Cobalah**.

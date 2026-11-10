@@ -3,12 +3,15 @@ import type { AiClient } from "@/lib/ai";
 import { buatCsv } from "@/lib/csv";
 import { hitungWadah } from "@/lib/engine";
 import { tanganiPesan, type Deps } from "@/lib/handler";
+import type { InsightClient } from "@/lib/insight";
 import { MemRepo } from "@/lib/mem-repo";
+import { resetBatasUntukUji } from "@/lib/rate-limit";
 
 const OWNER = "628111";
 let repo: MemRepo;
 let seq = 0;
 let ai: AiClient | null;
+let insight: InsightClient | null;
 
 /** Waktu pesan: tengah hari WIB pada tanggal tertentu. */
 const at = (iso: string, jam = 12) => {
@@ -17,7 +20,7 @@ const at = (iso: string, jam = 12) => {
 };
 
 async function kirim(teks: string, tgl: string, opsi: { id?: string; from?: string; type?: string; now?: number } = {}) {
-  const deps: Deps = { ai, baseUrl: "https://uji.example", now: () => opsi.now ?? at(tgl) };
+  const deps: Deps = { ai, insight, baseUrl: "https://uji.example", now: () => opsi.now ?? at(tgl) };
   const hasil = await tanganiPesan(repo, deps, {
     id: opsi.id ?? `wamid.${++seq}`,
     from: opsi.from ?? OWNER,
@@ -33,7 +36,9 @@ const wadah = async () => hitungWadah(await repo.load());
 beforeEach(() => {
   repo = new MemRepo([OWNER]);
   ai = null;
+  insight = null;
   seq = 0;
+  resetBatasUntukUji();
 });
 
 /** Setup standar: mulai 17/10 dengan Saldo 300rb, gaji pertama tgl 31/10 -> periode 1. */
@@ -556,6 +561,53 @@ describe("laporan, ekspor, bantuan (AC-23)", () => {
     expect(await kirim("bantuan", "2026-11-02")).toContain("out 25rb kopi");
     expect(await kirim("bantuan", "2026-11-02")).toContain("aman");
     expect(await kirim("halo apa kabar", "2026-11-02")).toContain("tidak dikenali");
+  });
+});
+
+describe("tanya (asisten riwayat via WhatsApp)", () => {
+  beforeEach(mulaiPeriode1);
+
+  it("tanpa GROQ_API_KEY memberi pesan jelas", async () => {
+    const r = await kirim("tanya kenapa boros", "2026-11-02");
+    expect(r).toContain("GROQ_API_KEY belum diatur");
+  });
+
+  it("AI nonaktif menolak tanpa mengirim ke provider", async () => {
+    insight = { tanya: async () => "tidak boleh terpanggil" };
+    await kirim("ai off", "2026-11-02");
+    const r = await kirim("tanya kenapa boros", "2026-11-02");
+    expect(r).toContain("AI sedang nonaktif");
+  });
+
+  it("menjawab memakai konteks agregat; pertanyaan diteruskan utuh", async () => {
+    let diterima: { pertanyaan: string; konteks: string } | null = null;
+    insight = {
+      tanya: async (pertanyaan, konteks) => {
+        diterima = { pertanyaan, konteks };
+        return "Pengeluaran terbesar bulan ini ada di pos Jajan.";
+      },
+    };
+    await kirim("out 25rb kopi", "2026-11-02");
+    const r = await kirim("tanya apa pos paling boros?", "2026-11-02");
+    expect(r).toContain("Pengeluaran terbesar bulan ini");
+    expect(diterima!.pertanyaan).toBe("apa pos paling boros?");
+    expect(diterima!.konteks).toContain("Hari ini: 2026-11-02");
+    expect(diterima!.konteks).not.toContain(OWNER);
+  });
+
+  it("pertanyaan terlalu pendek ditolak sebelum ke provider", async () => {
+    insight = { tanya: async () => "tidak boleh terpanggil" };
+    const r = await kirim("tanya ya", "2026-11-02");
+    expect(r).toContain("terlalu pendek");
+  });
+
+  it("membatasi nomor ke 20 pertanyaan per jam", async () => {
+    let panggilan = 0;
+    insight = { tanya: async () => { panggilan += 1; return "jawaban"; } };
+    let terakhir = "";
+    for (let i = 0; i < 21; i += 1) terakhir = (await kirim("tanya kenapa boros", "2026-11-02")) ?? "";
+    expect(panggilan).toBe(20);
+    expect(terakhir).toContain("Batas tanya-jawab tercapai");
   });
 });
 

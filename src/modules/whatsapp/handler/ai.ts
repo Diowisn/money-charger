@@ -1,6 +1,9 @@
 import { randomBytes } from "node:crypto";
 import { validasiAi } from "@/lib/ai";
+import { bangunDashboard } from "@/lib/dashboard";
 import { rp, tglPendek } from "@/lib/format";
+import { susunKonteksInsight, susunKonteksRiwayat, validasiPertanyaan } from "@/lib/insight";
+import { batasi } from "@/lib/rate-limit";
 import { daftarPilihan, norm } from "@/lib/parse/pos";
 import { EKSPOR_MS, KONFIRMASI_MS, TEKS_FALLBACK_KAKU, TEKS_TIDAK_DIKENAL } from "./konstanta";
 import { resolveSub } from "./rencana";
@@ -23,7 +26,7 @@ export async function aturAi(
   if (aksi === "status") {
     return [
       `AI: ${c.aiAktif ? "aktif" : "nonaktif"}. Pratinjau sebelum dicatat: ${c.aiKonfirmasi ? "aktif" : "nonaktif"}.`,
-      `Izin hanya berlaku untuk kalimat bebas dan foto; perintah kaku tetap diproses lokal.`,
+      `Izin berlaku untuk kalimat bebas, foto, dan pertanyaan "tanya"; perintah kaku tetap diproses lokal.`,
       `Ubah: "ai on", "ai off", "ai konfirmasi on", "ai konfirmasi off".`,
     ].join("\n");
   }
@@ -39,6 +42,21 @@ export async function aturAi(
   if (aksi === "off") return "AI dinonaktifkan. Tidak ada pesan yang dikirim ke provider AI; gunakan perintah kaku.";
   if (aksi === "konfirmasi_on") return 'Pratinjau AI diaktifkan. Transaksi hasil AI dicatat setelah kamu balas "ya".';
   return "Pratinjau AI dimatikan. Transaksi hasil AI langsung dicatat dan ditandai (dibaca AI).";
+}
+
+export async function tanya(s: SesiApi, teks: string): Promise<string> {
+  const v = validasiPertanyaan(teks);
+  if (!v.ok) return `${v.error} Contoh: tanya berapa pengeluaran makan 3 bulan terakhir`;
+  const batas = batasi(`wa-insight:${s.msg.from}`, 20, 60 * 60_000, s.nowMs);
+  if (!batas.boleh) return `Batas tanya-jawab tercapai. Coba lagi dalam ${batas.detikTunggu} detik.`;
+  if (!s.deps.insight) return "GROQ_API_KEY belum diatur, jadi asisten tanya-jawab belum bisa dipakai.";
+  if (!s.state.config.aiAktif) {
+    return 'AI sedang nonaktif, jadi pertanyaan tidak dikirim ke provider. Ketik "ai on" untuk mengaktifkan.';
+  }
+  const data = bangunDashboard(s.state, s.today);
+  const konteks = `${susunKonteksInsight(data)}\n\n${susunKonteksRiwayat(s.state, data)}`;
+  const jawaban = await s.deps.insight.tanya(v.teks, konteks);
+  return jawaban ?? "Asisten sedang tidak bisa menjawab. Coba lagi sebentar lagi.";
 }
 
 export async function bebas(s: SesiApi, teks: string): Promise<string> {

@@ -89,6 +89,14 @@ describe("perintah", () => {
     expect(parseCommand("bayar piutang Andi 40rb", t)).toMatchObject({ k: "debt_pay", jenis: "piutang", nama: "Andi", nominal: 40_000 });
   });
 
+  it("tanya (asisten riwayat)", () => {
+    expect(parseCommand("tanya berapa pengeluaran makan 3 bulan terakhir", t)).toMatchObject({
+      k: "tanya", teks: "berapa pengeluaran makan 3 bulan terakhir",
+    });
+    expect(parseCommand("TANYA kenapa boros bulan ini", t)).toMatchObject({ k: "tanya", teks: "kenapa boros bulan ini" });
+    expect(parseCommand("tanya", t).k).toBe("error");
+  });
+
   it("target dan nabung (goal tabungan)", () => {
     expect(parseCommand("target 5 juta Laptop Baru", t)).toMatchObject({
       k: "goal_add", nominal: 5_000_000, nama: "Laptop Baru", targetTanggal: null,

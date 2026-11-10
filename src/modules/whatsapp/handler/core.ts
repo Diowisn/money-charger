@@ -7,7 +7,7 @@ import { TEKS_BANTUAN, teksLaporan, teksLaporanPeriode, teksWadah } from "@/lib/
 import type { Repo } from "@/lib/repo";
 import type { State } from "@/lib/types";
 import { maskNomor } from "@/lib/whatsapp";
-import { aturAi, bebas, ekspor } from "./ai";
+import { aturAi, bebas, ekspor, tanya } from "./ai";
 import { debtBayar, debtDaftar, debtTambah } from "./debt";
 import { goalDaftar, goalNabung, goalTambah } from "./goal";
 import {
@@ -123,6 +123,7 @@ class Sesi implements SesiApi {
       case "evaluasi": return evaluasiManual(this);
       case "ekspor": return ekspor(this);
       case "ai": return aturAi(this, cmd.aksi);
+      case "tanya": return tanya(this, cmd.teks);
       case "bebas": return bebas(this, teks);
     }
   }

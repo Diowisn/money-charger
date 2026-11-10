@@ -5,6 +5,8 @@ export interface Deps {
   ai: import("@/lib/ai").AiClient | null;
   /** Pembaca foto struk/transaksi (Groq vision); null bila GROQ_API_KEY kosong. */
   vision?: import("@/lib/ai-vision").VisionClient | null;
+  /** Asisten tanya-jawab riwayat keuangan; null bila GROQ_API_KEY kosong. */
+  insight?: import("@/lib/insight").InsightClient | null;
   /** Mengunduh media WhatsApp (gambar) jadi base64 + mime type; null bila kredensial belum lengkap. */
   unduhMedia?: (mediaId: string) => Promise<{ base64: string; mimeType: string } | null>;
   /** jam sistem (epoch ms); dapat disuntik saat pengujian */

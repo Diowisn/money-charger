@@ -21,7 +21,7 @@ Sudah diimplementasikan:
 - Digest WhatsApp mingguan dan peringatan proaktif melalui cron/outbox.
 - Multi-dompet: tabel `accounts`, saldo per dompet, transfer, net worth.
 - Laporan lanjutan: periode kustom, cetak/simpan PDF, laporan terjadwal ke WhatsApp/email.
-- AI Pro: review bulanan otomatis, tanya jawab seluruh riwayat, deteksi anomali.
+- AI Pro: review bulanan otomatis, tanya jawab seluruh riwayat di web dan WhatsApp (`tanya <pertanyaan>`), deteksi anomali.
 - Kolaborasi keluarga: anggota, peran, persetujuan transaksi, nomor WhatsApp anggota.
 - Keamanan: 2FA TOTP, manajemen sesi, ekspor terenkripsi.
 - Integrasi email bank/e-wallet: deteksi penyedia, dompet sumber, dan pos otomatis.
@@ -116,6 +116,7 @@ Sudah diimplementasikan:
 
 - `src/lib/insight.ts`
   - `susunKonteksRiwayat(state, data)` merangkum seluruh bulan, kategori, dan anomali tanpa data mentah berlebihan.
+  - Perintah WhatsApp `tanya <pertanyaan>` memakai `InsightClient` yang sama, memvalidasi 3–400 karakter, menghormati `ai_aktif`, dan dibatasi 20 pertanyaan/jam per nomor.
   - `deteksiAnomali(state, hariIni)` mendeteksi lonjakan bulanan/kategori dan transaksi besar.
 - `src/modules/insight/model.ts`
   - `tanyaInsight` memakai konteks dashboard + seluruh riwayat.
@@ -217,6 +218,10 @@ Sudah diimplementasikan:
 - **FR-AI-03 MUST:** review bulanan opt-in dan maksimal sekali per bulan.
 - **FR-AI-04 MUST:** review bulanan dikirim melalui outbox, bukan langsung.
 - **FR-AI-05 MUST:** tanpa `GROQ_API_KEY`, fitur AI dilewati tanpa menggagalkan cron.
+- **FR-AI-06 MUST:** perintah WhatsApp `tanya <pertanyaan>` menjawab dari agregat dashboard dan konteks riwayat yang sama dengan web; tidak mengubah transaksi.
+- **FR-AI-07 MUST:** perintah `tanya` hanya mengirim data ke provider saat `ai_aktif`; saat nonaktif ditolak sebelum panggilan AI.
+- **FR-AI-08 MUST:** pertanyaan mengikuti validasi panjang 3–400 karakter dan dibatasi 20 panggilan per jam per nomor WhatsApp.
+- **FR-AI-09 MUST:** tanpa klien AI, bot memberi pesan konfigurasi yang jelas dan transaksi tetap dapat dicatat dengan perintah biasa.
 
 ### FR-WS — Wawasan dan peringatan
 
@@ -354,6 +359,10 @@ Sudah diimplementasikan:
 - **AC-AI-02:** lonjakan bulanan/kategori terdeteksi sebagai anomali.
 - **AC-AI-03:** dua cron pada bulan yang sama hanya membuat satu review.
 - **AC-AI-04:** review mati tidak membuat outbox.
+- **AC-AI-05:** `tanya ...` mengirim pertanyaan dan konteks agregat ke insight client lalu mengembalikan jawaban; tidak membuat transaksi.
+- **AC-AI-06:** `ai off` menolak `tanya` tanpa memanggil insight client.
+- **AC-AI-07:** tanpa insight client atau pertanyaan di luar 3–400 karakter, bot memberi pesan aman tanpa memanggil provider.
+- **AC-AI-08:** panggilan ke-21 dalam satu jam dari nomor yang sama ditolak; nomor lain punya batas terpisah.
 
 ### Wawasan
 

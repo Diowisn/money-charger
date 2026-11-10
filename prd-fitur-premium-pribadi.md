@@ -38,7 +38,7 @@ Membuat Money-Charger terasa seperti aplikasi keuangan kelas berbayar untuk pema
 - **Digest WhatsApp**: ringkasan mingguan, peringatan anggaran/tagihan, anti-duplikat harian/mingguan, dapat dimatikan.
 - **Multi-dompet dan net worth**: saldo per rekening/e-wallet, transfer antar dompet, kekayaan bersih.
 - **Laporan lanjutan**: periode kustom, cetak/simpan PDF, laporan terjadwal ke WhatsApp/email.
-- **AI Pro**: review bulanan otomatis, tanya jawab seluruh riwayat, deteksi anomali.
+- **AI Pro**: review bulanan otomatis, tanya jawab seluruh riwayat dari web dan WhatsApp (`tanya <pertanyaan>`), deteksi anomali.
 - **Kolaborasi keluarga**: anggota, peran, anggaran bersama, persetujuan transaksi, nomor WhatsApp anggota.
 - **Keamanan/kepercayaan**: 2FA, manajemen sesi, ekspor terenkripsi.
 - **Integrasi email bank/e-wallet**: deteksi penyedia, dompet sumber, dan pos otomatis dari notifikasi transaksi.
@@ -112,9 +112,9 @@ Membuat Money-Charger terasa seperti aplikasi keuangan kelas berbayar untuk pema
 ### F-PREM-07 AI Pro
 
 - Review bulanan otomatis.
-- Tanya jawab atas seluruh riwayat.
+- Tanya jawab atas seluruh riwayat dari web dan WhatsApp (`tanya <pertanyaan>`).
 - Deteksi anomali dan kebocoran pengeluaran.
-- Tetap opt-in dan dapat dicabut.
+- Tetap opt-in dan dapat dicabut melalui `ai off`; maksimal 20 pertanyaan WhatsApp per jam per nomor untuk menjaga biaya.
 
 ### F-PREM-08 Kolaborasi
 

@@ -1,5 +1,6 @@
 import { buatGroqClient } from "@/lib/ai";
 import { buatGroqVisionClient } from "@/lib/ai-vision";
+import { buatGroqInsightClient } from "@/lib/insight";
 import { antreInbound } from "@/lib/inbound-queue";
 import { ekstrakPesan, unduhMediaWhatsapp, verifySignature } from "@/lib/whatsapp";
 import type { Deps } from "./handler";
@@ -17,6 +18,7 @@ export function buatDeps(): Deps {
   return {
     ai: buatGroqClient(),
     vision: buatGroqVisionClient(),
+    insight: buatGroqInsightClient(),
     unduhMedia: (mediaId: string) => unduhMediaWhatsapp(mediaId),
     baseUrl: process.env.APP_BASE_URL,
     log: (s: string) => console.warn(s),
