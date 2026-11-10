@@ -1,6 +1,7 @@
 import { randomBytes } from "node:crypto";
 import { createSession, hashPassword, hashToken, verifyPassword } from "@/lib/auth";
 import { getPool, PgRepo } from "@/lib/pg-repo";
+import { verifikasiTotp } from "@/lib/totp";
 
 export async function jumlahPengguna(): Promise<number> {
   const r = await getPool().query("SELECT COUNT(*)::int AS n FROM auth_users");
@@ -41,14 +42,47 @@ export async function daftar(
   } catch (e) { await client.query("ROLLBACK"); throw e; } finally { client.release(); }
 }
 
-export async function masuk(email: string, password: string): Promise<string | null> {
-  const r = await getPool().query("SELECT id,password_hash FROM auth_users WHERE email=$1", [email]);
-  if (!r.rows[0]?.password_hash || !(await verifyPassword(password, r.rows[0].password_hash))) return null;
-  return createSession(r.rows[0].id);
+export type HasilMasuk =
+  | { status: "ok"; token: string }
+  | { status: "2fa" }
+  | { status: "gagal" };
+
+export async function masuk(email: string, password: string, kode2fa = ""): Promise<HasilMasuk> {
+  const r = await getPool().query<{ id: string; password_hash: string | null; totp_secret: string | null; totp_aktif: boolean }>(
+    "SELECT id, password_hash, totp_secret, totp_aktif FROM auth_users WHERE email=$1",
+    [email],
+  );
+  const akun = r.rows[0];
+  if (!akun?.password_hash || !(await verifyPassword(password, akun.password_hash))) return { status: "gagal" };
+  if (akun.totp_aktif) {
+    if (!akun.totp_secret) return { status: "gagal" };
+    if (!kode2fa) return { status: "2fa" };
+    if (!verifikasiTotp(akun.totp_secret, kode2fa)) return { status: "gagal" };
+  }
+  return { status: "ok", token: await createSession(akun.id) };
 }
 
 export async function cabutSemuaSesi(userId: string): Promise<void> {
   await getPool().query("DELETE FROM auth_sessions WHERE user_id = $1", [userId]);
+}
+
+export async function daftarSesi(userId: string, tokenSekarang: string) {
+  const hasil = await getPool().query<{ token_hash: string; created_at: string; expires_at: string }>(
+    "SELECT token_hash, created_at, expires_at FROM auth_sessions WHERE user_id = $1 AND expires_at > now() ORDER BY created_at DESC",
+    [userId],
+  );
+  return hasil.rows.map((row) => ({
+    id: row.token_hash === tokenSekarang ? null : row.token_hash,
+    dibuat: row.created_at,
+    kedaluwarsa: row.expires_at,
+    sekarang: row.token_hash === tokenSekarang,
+  }));
+}
+
+export async function cabutSesi(userId: string, tokenHash: string): Promise<boolean> {
+  if (!/^[0-9a-f]{64}$/.test(tokenHash)) return false;
+  const hasil = await getPool().query("DELETE FROM auth_sessions WHERE user_id = $1 AND token_hash = $2", [userId, tokenHash]);
+  return (hasil.rowCount ?? 0) > 0;
 }
 
 export async function buatTokenReset(email: string): Promise<{ token: string; telepon: string | null } | null> {

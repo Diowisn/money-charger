@@ -204,6 +204,7 @@ export interface ProfilAkun {
   tanggalLahir: string | null;
   avatar: string | null;
   punyaPassword: boolean;
+  duaFaktorAktif: boolean;
   providers: string[];
 }
 

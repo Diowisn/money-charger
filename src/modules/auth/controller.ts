@@ -1,9 +1,9 @@
 import { aktorWeb, catatAudit } from "@/lib/audit";
-import { normalisasiNomorWa, tolakJikaBelumLogin, userIdDariRequest } from "@/lib/auth";
+import { AUTH_COOKIE, hashToken, normalisasiNomorWa, tolakJikaBelumLogin, userIdDariRequest } from "@/lib/auth";
 import { kirimEmail } from "@/lib/email-out";
 import { batasi, ipDariRequest } from "@/lib/rate-limit";
 import { kirimBalasan } from "@/lib/whatsapp";
-import { buatTokenReset, cabutSemuaSesi, daftar, masuk, pakaiTokenReset } from "./model";
+import { buatTokenReset, cabutSesi, cabutSemuaSesi, daftar, daftarSesi, masuk, pakaiTokenReset } from "./model";
 import { loginBerhasil, loginGagal, logoutBerhasil } from "./view";
 
 export async function login(req: Request) {
@@ -15,24 +15,28 @@ export async function login(req: Request) {
     );
   }
 
-  let password = ""; let email = "";
+  let password = ""; let email = ""; let kode2fa = "";
   try {
-    const body = (await req.json()) as { password?: unknown; email?: unknown };
+    const body = (await req.json()) as { password?: unknown; email?: unknown; kode2fa?: unknown };
     password = typeof body?.password === "string" ? body.password : "";
     email = typeof body?.email === "string" ? body.email.trim().toLowerCase() : "";
+    kode2fa = typeof body?.kode2fa === "string" ? body.kode2fa.replace(/\D/g, "").slice(0, 6) : "";
   } catch {
     password = "";
   }
 
   const ip = ipDariRequest(req);
-  const token = await masuk(email, password);
-  if (!token) {
+  const hasil = await masuk(email, password, kode2fa);
+  if (hasil.status === "2fa") {
+    return Response.json({ ok: false, error: "Masukkan kode 2FA dari aplikasi authenticator.", perlu2fa: true }, { status: 401 });
+  }
+  if (hasil.status === "gagal") {
     await catatAudit(aktorWeb(ip), "login_gagal");
     await new Promise((resolve) => setTimeout(resolve, 350));
-    return loginGagal("Password salah atau database sesi tidak tersedia.", 401);
+    return loginGagal("Password atau kode 2FA salah.", 401);
   }
   await catatAudit(aktorWeb(ip), "login_berhasil");
-  return loginBerhasil(token);
+  return loginBerhasil(hasil.token);
 }
 
 export async function register(req: Request) {
@@ -77,6 +81,29 @@ export async function logoutSemua(req: import("next/server").NextRequest) {
     return logoutBerhasil();
   } catch {
     return loginGagal("Gagal mencabut sesi. Coba lagi.", 500);
+  }
+}
+
+export async function getSesi(req: import("next/server").NextRequest) {
+  const userId = await userIdDariRequest(req);
+  if (!userId) return loginGagal("Sesi habis. Silakan login ulang.", 401);
+  const token = req.cookies.get(AUTH_COOKIE)?.value;
+  return Response.json({ ok: true, data: await daftarSesi(userId, token ? hashToken(token) : "") });
+}
+
+export async function deleteSesi(req: import("next/server").NextRequest) {
+  const userId = await userIdDariRequest(req);
+  if (!userId) return loginGagal("Sesi habis. Silakan login ulang.", 401);
+  try {
+    const body = (await req.json()) as { tokenHash?: unknown };
+    const tokenHash = typeof body.tokenHash === "string" ? body.tokenHash : "";
+    if (!tokenHash || !(await cabutSesi(userId, tokenHash))) {
+      return loginGagal("Sesi tidak ditemukan.", 404);
+    }
+    await catatAudit(aktorWeb(ipDariRequest(req)), "sesi_dicabut");
+    return Response.json({ ok: true, pesan: "Sesi dicabut." });
+  } catch {
+    return loginGagal("Gagal mencabut sesi.", 500);
   }
 }
 

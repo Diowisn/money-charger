@@ -3,7 +3,7 @@ import { bacaBody, galat, ok } from "@/lib/api";
 import { userIdDariRequest } from "@/lib/auth";
 import { AksiError } from "@/lib/web-actions";
 import { logoutBerhasil } from "@/modules/auth/view";
-import { ambilProfil, gantiPassword, hapusAkun, ubahProfil } from "./model";
+import { aktifkan2fa, ambilProfil, gantiPassword, hapusAkun, matikan2fa, mulai2fa, ubahProfil } from "./model";
 
 async function userId(req: NextRequest): Promise<string | Response> {
   const id = await userIdDariRequest(req);
@@ -91,6 +91,44 @@ export async function patchProfil(req: NextRequest) {
       return ok({ profil: await ambilProfil(id), pesan: "Password diperbarui." });
     }
     throw new AksiError("Tidak ada perubahan.");
+  } catch (e) {
+    return galat(e);
+  }
+}
+
+export async function get2fa(req: NextRequest) {
+  const id = await userId(req);
+  if (id instanceof Response) return id;
+  try {
+    const profil = await ambilProfil(id);
+    if (!profil) return Response.json({ ok: false, error: "Akun tidak ditemukan." }, { status: 404 });
+    return ok({ aktif: profil.duaFaktorAktif });
+  } catch (e) {
+    return galat(e);
+  }
+}
+
+export async function post2fa(req: NextRequest) {
+  const id = await userId(req);
+  if (id instanceof Response) return id;
+  try {
+    const body = await bacaBody(req);
+    const aksi = String(body.aksi ?? "");
+    if (aksi === "mulai") {
+      const profil = await ambilProfil(id);
+      if (!profil) throw new AksiError("Akun tidak ditemukan.");
+      return ok(await mulai2fa(id, profil.email));
+    }
+    if (aksi === "aktifkan") {
+      const kode = String(body.kode ?? "").replace(/\D/g, "").slice(0, 6);
+      if (!(await aktifkan2fa(id, kode))) throw new AksiError("Kode 2FA tidak cocok.");
+      return ok({ pesan: "2FA aktif." });
+    }
+    if (aksi === "matikan") {
+      if (!(await matikan2fa(id, String(body.password ?? "")))) throw new AksiError("Password tidak cocok.");
+      return ok({ pesan: "2FA dimatikan." });
+    }
+    throw new AksiError("Aksi 2FA tidak dikenal.");
   } catch (e) {
     return galat(e);
   }

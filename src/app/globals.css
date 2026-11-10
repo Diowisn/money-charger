@@ -3593,6 +3593,17 @@ body {
   gap: 16px;
 }
 
+.kode-secret {
+  display: block;
+  padding: 0.75rem;
+  overflow-wrap: anywhere;
+  border: 1px solid var(--garis);
+  border-radius: 0.75rem;
+  font-size: 1.1rem;
+  letter-spacing: 0.08em;
+  text-align: center;
+}
+
 .laporan-kontrol {
   display: grid;
   gap: 14px;

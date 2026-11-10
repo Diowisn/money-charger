@@ -3,7 +3,7 @@
 | Atribut | Nilai |
 |---|---|
 | Status | Implementasi bertahap; pemakaian pribadi |
-| Versi | 1.1 |
+| Versi | 1.2 |
 | Tanggal | 10 November 2026 |
 | Terkait PRD | [PRD fitur premium pribadi](./prd-fitur-premium-pribadi.md) |
 | Terkait SRS utama | [SRS utama](./srs-catatan-keuangan-whatsapp.md) |
@@ -23,8 +23,9 @@ Sudah diimplementasikan:
 - Laporan lanjutan: periode kustom, cetak/simpan PDF, laporan terjadwal ke WhatsApp/email.
 - AI Pro: review bulanan otomatis, tanya jawab seluruh riwayat, deteksi anomali.
 - Kolaborasi keluarga: anggota, peran, persetujuan transaksi, nomor WhatsApp anggota.
+- Keamanan: 2FA TOTP, manajemen sesi, ekspor terenkripsi.
 - Peringatan dalam aplikasi.
-- Skema versi v3 (laporan tidak menambah tabel).
+- Skema versi v6 (`workspace_members`, nomor WhatsApp anggota, kolom 2FA).
 
 ## 2. Arsitektur tambahan
 
@@ -132,6 +133,16 @@ Sudah diimplementasikan:
 - Nomor WhatsApp anggota masuk `allowed_numbers`; worker memetakan nomor ke pemilik lewat `workspace_members`.
 - UI: `src/modules/finance/view/tab-keluarga.tsx`.
 
+### 2.9 Keamanan dan sesi
+
+- `src/lib/totp.ts`: base32, `kodeTotp`, `verifikasiTotp`, dan `otpauthUri`.
+- Kolom `auth_users.totp_secret` dan `auth_users.totp_aktif` (skema v6).
+- `src/modules/profile/model.ts`: `mulai2fa`, `aktifkan2fa`, `matikan2fa`; mematikan 2FA wajib password.
+- Login `masuk` mengembalikan status `2fa`; UI login menampilkan kolom kode 6 digit.
+- `/api/auth/sessions`: daftar sesi aktif milik sendiri (tanpa mengirim ID sesi saat ini ke client) dan cabut sesi lain.
+- `src/lib/export-enkripsi.ts`: AES-256-GCM + scrypt; `/api/export/encrypted` mengunduh CSV terenkripsi.
+- UI: bagian 2FA, perangkat/sesi, dan ekspor terenkripsi di tab Profil.
+
 ## 3. Persyaratan fungsional
 
 ### FR-REC â€” Transaksi berulang
@@ -201,6 +212,26 @@ Sudah diimplementasikan:
 - **FR-LAP-08 MUST:** laporan terjadwal opt-in dan hanya dikirim ke nomor pemilik serta email akun.
 - **FR-LAP-09 SHOULD:** rentang laporan dibatasi maksimal 3 tahun.
 
+### FR-KEL - Kolaborasi keluarga
+
+- **FR-KEL-01 MUST:** anggota diidentifikasi lewat email akun terdaftar; pemilik tidak bisa ditambahkan sebagai anggota.
+- **FR-KEL-02 MUST:** peran `admin`, `member`, dan `viewer`; hanya pemilik/admin yang boleh mengelola anggota dan pengaturan.
+- **FR-KEL-03 MUST:** `viewer` tidak boleh menulis; `member` mengajukan transaksi, bukan langsung mencatat.
+- **FR-KEL-04 MUST:** pengajuan disimpan di `pending_actions` jenis `persetujuan_transaksi` dan kedaluwarsa setelah 7 hari.
+- **FR-KEL-05 MUST:** persetujuan mencatat transaksi ke data pemilik dan tidak memproses pengajuan yang sama dua kali.
+- **FR-KEL-06 MUST:** anggota memakai data pemilik sehingga anggaran dan dompet otomatis bersama.
+- **FR-KEL-07 MUST:** nomor WhatsApp anggota opsional, unik, dan dipetakan ke pemilik workspace saat pesan masuk.
+- **FR-KEL-08 SHOULD:** menghapus anggota membatalkan pengajuan yang masih menunggu.
+
+### FR-SEC - Keamanan akun
+
+- **FR-SEC-01 MUST:** 2FA memakai TOTP dan hanya aktif setelah kode 6 digit dari secret baru diverifikasi.
+- **FR-SEC-02 MUST:** akun dengan 2FA aktif wajib mengirim kode yang valid saat login.
+- **FR-SEC-03 MUST:** mematikan 2FA wajib password; memulai 2FA baru saat masih aktif ditolak.
+- **FR-SEC-04 MUST:** daftar sesi hanya menampilkan sesi milik akun sendiri dan pencabutan dibatasi `user_id` tersebut.
+- **FR-SEC-05 MUST:** ekspor terenkripsi memakai AES-256-GCM dengan kunci turunan scrypt dan password minimal 8 karakter.
+- **FR-SEC-06 SHOULD:** pencabutan sesi dicatat di audit tanpa menyimpan token.
+
 ## 4. Keamanan dan integritas
 
 - Semua API recurring/import/accounts/laporan memakai `pemilikRequest`.
@@ -209,11 +240,19 @@ Sudah diimplementasikan:
 - Tidak ada token/password di log.
 - `recurring_runs` mencegah duplikasi; jika insert transaksi gagal, reservasi run dihapus.
 - Impor tidak menghapus atau menimpa transaksi lama.
+- Semua API keluarga memakai `pemilikRequest` dan `tolakPeran`; `actorId` diambil dari sesi, bukan body.
+- Persetujuan diklaim atomik (`status='diproses'`) agar klik ganda tidak membuat transaksi ganda.
+- Nomor WhatsApp anggota unik dan dipetakan ke pemilik workspace; nomor dicabut saat anggota dihapus.
+- Secret TOTP dan hash token sesi tidak pernah dikirim ke log; daftar sesi mengembalikan hash token hanya untuk sesi sendiri.
+- Ekspor terenkripsi memakai salt dan IV acak per berkas; password tidak disimpan.
 
 ## 5. Migrasi
 
 - Skema v2 menambahkan `recurring_rules` dan `recurring_runs`.
 - Skema v3 menambahkan `accounts` dan kolom dompet pada `transactions`.
+- Skema v4 menambahkan `workspace_members` untuk kolaborasi keluarga.
+- Skema v5 menambahkan `workspace_members.wa_number` dan indeks uniknya.
+- Skema v6 menambahkan `auth_users.totp_secret` dan `auth_users.totp_aktif`.
 - Jalankan `npm run db:setup` untuk menerapkan skema idempoten dan dompet utama.
 - Sebelum migrasi berisiko, buat snapshot Neon.
 - Marker versi dicatat di `schema_version`.
@@ -275,6 +314,24 @@ Sudah diimplementasikan:
 - **AC-LAP-05:** dua cron pada pekan/bulan yang sama hanya membuat satu laporan terjadwal.
 - **AC-LAP-06:** laporan terjadwal mati tidak membuat outbox/email.
 
+### Kolaborasi keluarga
+
+- **AC-KEL-01:** transaksi dari `member` masuk sebagai pengajuan; dashboard pemilik belum berubah sampai disetujui.
+- **AC-KEL-02:** dua permintaan setujui pada pengajuan yang sama hanya menghasilkan satu transaksi.
+- **AC-KEL-03:** `viewer` ditolak (403) saat mencoba menulis atau menghapus data.
+- **AC-KEL-04:** `member` melihat data pemilik setelah ditambahkan ke workspace.
+- **AC-KEL-05:** pesan WhatsApp dari nomor anggota diproses pada workspace pemilik.
+- **AC-KEL-06:** menghapus anggota mencabut nomornya dari `allowed_numbers` dan membatalkan pengajuan yang menunggu.
+
+### Keamanan akun
+
+- **AC-SEC-01:** setelah 2FA diaktifkan, login tanpa kode ditolak dan login dengan kode valid berhasil.
+- **AC-SEC-02:** kode 2FA salah ditolak.
+- **AC-SEC-03:** mematikan 2FA dengan password salah ditolak; dengan password benar berhasil.
+- **AC-SEC-04:** memulai 2FA saat 2FA masih aktif ditolak.
+- **AC-SEC-05:** sesi lain yang dicabut tidak bisa dipakai lagi.
+- **AC-SEC-06:** berkas ekspor terenkripsi hanya bisa didekripsi dengan password yang sama.
+
 ## 7. Rencana fitur berikutnya
 
 ### 7.1 Digest WhatsApp (sudah diimplementasikan)
@@ -305,11 +362,11 @@ Sudah diimplementasikan:
 - Tanya jawab seluruh riwayat dengan batas biaya.
 - Deteksi anomali sebagai insight, bukan mutasi.
 
-### 7.5 Kolaborasi dan keamanan
+### 7.5 Kolaborasi dan keamanan (sudah diimplementasikan)
 
 - Kolaborasi keluarga sudah diimplementasikan (bagian 2.8).
-- 2FA dan manajemen sesi untuk pemilik.
-- Ekspor terenkripsi.
+- 2FA TOTP, manajemen sesi, dan ekspor terenkripsi sudah diimplementasikan (bagian 2.9).
+- Paywall/billing tetap di luar lingkup selama aplikasi dipakai pribadi.
 
 ## 8. Traceability
 
@@ -323,4 +380,4 @@ Sudah diimplementasikan:
 | F-PREM-06 | FR-LAP | AC-LAP |
 | F-PREM-07 | FR-AI | AC-AI |
 | F-PREM-08 | FR-KEL | AC-KEL |
-| F-PREM-09 | Bagian 7.5 | Belum diimplementasikan |
+| F-PREM-09 | FR-SEC | AC-SEC |

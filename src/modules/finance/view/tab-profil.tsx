@@ -52,6 +52,11 @@ export function Profil({
   const [passwordLama, setPasswordLama] = useState("");
   const [passwordBaru, setPasswordBaru] = useState("");
   const [passwordUlang, setPasswordUlang] = useState("");
+  const [sesi, setSesi] = useState<{ id: string | null; dibuat: string; kedaluwarsa: string; sekarang: boolean }[]>([]);
+  const [secret2fa, setSecret2fa] = useState<{ secret: string; uri: string } | null>(null);
+  const [kode2fa, setKode2fa] = useState("");
+  const [sandi2fa, setSandi2fa] = useState("");
+  const [sandiEkspor, setSandiEkspor] = useState("");
   const [emailHapus, setEmailHapus] = useState("");
   const [passwordHapus, setPasswordHapus] = useState("");
   const fotoRef = useRef<HTMLInputElement>(null);
@@ -64,6 +69,10 @@ export function Profil({
     setAvatarTampil(profil?.avatar ?? null);
     setAvatarDraf(undefined);
   }, [profil?.nama, profil?.email, profil?.telepon, profil?.tanggalLahir, profil?.avatar, nama]);
+
+  useEffect(() => {
+    if (bagian === "ubah-profil") void muatSesi();
+  }, [bagian]);
 
   async function pilihFoto(file: File | undefined) {
     if (!file) return;
@@ -162,6 +171,86 @@ export function Profil({
       setGalatProfil("Tidak bisa menghubungi server.");
     } finally {
       setSibukProfil(false);
+    }
+  }
+
+  async function muatSesi() {
+    try {
+      const res = await fetch("/api/auth/sessions", { cache: "no-store", credentials: "same-origin" });
+      const j = (await res.json().catch(() => ({}))) as { ok?: boolean; data?: typeof sesi };
+      if (res.ok && j.ok && j.data) setSesi(j.data);
+    } catch {
+      // Daftar sesi bersifat informatif; abaikan bila gagal.
+    }
+  }
+
+  async function cabutSesi(id: string) {
+    try {
+      await fetch("/api/auth/sessions", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tokenHash: id }),
+      });
+      await muatSesi();
+    } catch {
+      setGalatProfil("Gagal mencabut sesi.");
+    }
+  }
+
+  async function mulai2fa() {
+    try {
+      const res = await fetch("/api/profile/2fa", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ aksi: "mulai" }),
+      });
+      const j = (await res.json().catch(() => ({}))) as { ok?: boolean; secret?: string; uri?: string; error?: string };
+      if (!res.ok || !j.ok || !j.secret || !j.uri) {
+        setGalatProfil(j.error ?? "Gagal memulai 2FA.");
+        return;
+      }
+      setSecret2fa({ secret: j.secret, uri: j.uri });
+      setGalatProfil(null);
+    } catch {
+      setGalatProfil("Tidak bisa menghubungi server.");
+    }
+  }
+
+  async function aktifkan2fa() {
+    const ok = await kirim("/api/profile/2fa", "POST", { aksi: "aktifkan", kode: kode2fa });
+    if (ok) {
+      setSecret2fa(null);
+      setKode2fa("");
+    }
+  }
+
+  async function matikan2fa() {
+    const ok = await kirim("/api/profile/2fa", "POST", { aksi: "matikan", password: sandi2fa });
+    if (ok) setSandi2fa("");
+  }
+
+  async function unduhEnkripsi() {
+    try {
+      const res = await fetch("/api/export/encrypted", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ password: sandiEkspor }),
+      });
+      if (!res.ok) {
+        const j = (await res.json().catch(() => ({}))) as { error?: string };
+        setGalatProfil(j.error ?? "Gagal membuat ekspor.");
+        return;
+      }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "money-charger-transaksi.enc";
+      a.click();
+      URL.revokeObjectURL(url);
+      setSandiEkspor("");
+    } catch {
+      setGalatProfil("Tidak bisa menghubungi server.");
     }
   }
 
@@ -295,13 +384,80 @@ export function Profil({
           </section>
 
           <section className="kartu profil-bagian">
+            <h2>Keamanan 2FA</h2>
+            <p className="muted kecil">
+              {profil?.duaFaktorAktif ? "2FA aktif. Login membutuhkan kode authenticator." : "2FA belum aktif."}
+            </p>
+            {!profil?.duaFaktorAktif && !secret2fa ? (
+              <Tombol varian="sekunder" lebar onClick={() => void mulai2fa()}>
+                Aktifkan 2FA
+              </Tombol>
+            ) : null}
+            {secret2fa ? (
+              <div className="form">
+                <p className="muted kecil">Tambahkan secret ini ke aplikasi authenticator:</p>
+                <code className="kode-secret">{secret2fa.secret}</code>
+                <a className="tautan" href={secret2fa.uri}>Buka tautan otpauth</a>
+                <label>
+                  Kode 6 digit
+                  <input inputMode="numeric" maxLength={6} value={kode2fa} onChange={(e) => setKode2fa(e.target.value.replace(/\D/g, "").slice(0, 6))} />
+                </label>
+                <Tombol lebar disabled={sibukProfil || kode2fa.length !== 6} onClick={() => void aktifkan2fa()}>
+                  Verifikasi dan aktifkan
+                </Tombol>
+              </div>
+            ) : null}
+            {profil?.duaFaktorAktif ? (
+              <div className="form">
+                <label>
+                  Password untuk mematikan 2FA
+                  <input type="password" autoComplete="current-password" value={sandi2fa} onChange={(e) => setSandi2fa(e.target.value)} />
+                </label>
+                <Tombol varian="bahaya" lebar disabled={sibukProfil || !sandi2fa} onClick={() => void matikan2fa()}>
+                  Matikan 2FA
+                </Tombol>
+              </div>
+            ) : null}
+          </section>
+
+          <section className="kartu profil-bagian">
             <h2>Perangkat &amp; sesi</h2>
             <p className="muted kecil">
               {profil?.providers.length ? `Terhubung: ${profil.providers.join(", ")}` : "Login email dan password"}
             </p>
+            <ul className="wawasan-daftar">
+              {sesi.map((item) => (
+                <li key={item.id} className="baris-antara">
+                  <span>
+                    <b>{item.sekarang ? "Perangkat ini" : "Sesi lain"}</b>
+                    <small className="muted"> · dibuat {item.dibuat.slice(0, 10)} · berlaku sampai {item.kedaluwarsa.slice(0, 10)}</small>
+                  </span>
+                  {item.sekarang || !item.id ? null : (
+                    <button type="button" className="tautan muted" onClick={() => void cabutSesi(item.id!)}>
+                      Cabut
+                    </button>
+                  )}
+                </li>
+              ))}
+              {!sesi.length ? <li className="muted kecil">Tidak ada sesi aktif.</li> : null}
+            </ul>
             <Tombol varian="bahaya" lebar onClick={() => void keluarSemua()}>
               Log out dari semua perangkat
             </Tombol>
+          </section>
+
+          <section className="kartu profil-bagian">
+            <h2>Ekspor terenkripsi</h2>
+            <p className="muted kecil">Cadangan CSV dienkripsi AES-256-GCM dengan password. Simpan password terpisah.</p>
+            <div className="form">
+              <label>
+                Password ekspor (min. 8 karakter)
+                <input type="password" autoComplete="new-password" value={sandiEkspor} onChange={(e) => setSandiEkspor(e.target.value)} />
+              </label>
+              <Tombol lebar disabled={sibukProfil || sandiEkspor.length < 8} onClick={() => void unduhEnkripsi()}>
+                Unduh cadangan terenkripsi
+              </Tombol>
+            </div>
           </section>
         </>
       ) : null}

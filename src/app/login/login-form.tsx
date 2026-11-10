@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, type FormEvent, type ReactNode } from "react";
 import { TautanTombol, Tombol } from "@/components/tombol";
@@ -60,6 +60,8 @@ export default function LoginForm({
   const [telepon, setTelepon] = useState("");
   const [tanggalLahir, setTanggalLahir] = useState("");
   const [password, setPassword] = useState("");
+  const [kode2fa, setKode2fa] = useState("");
+  const [perlu2fa, setPerlu2fa] = useState(false);
   const [lihatSandi, setLihatSandi] = useState(false);
   const [sibuk, setSibuk] = useState(false);
   const [info, setInfo] = useState<string | null>(null);
@@ -72,6 +74,8 @@ export default function LoginForm({
     setError(null);
     setInfo(null);
     setTautanReset(null);
+    setPerlu2fa(false);
+    setKode2fa("");
     setTampilan(ke);
   }
 
@@ -134,11 +138,12 @@ export default function LoginForm({
         body: JSON.stringify(
           daftar
             ? { nama: nama.trim(), email: emailBersih, telepon: telepon.trim(), tanggalLahir, password }
-            : { email: emailBersih, password },
+            : { email: emailBersih, password, kode2fa },
         ),
       });
-      const j = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string };
+      const j = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string; perlu2fa?: boolean };
       if (!res.ok || !j.ok) {
+        if (j.perlu2fa) setPerlu2fa(true);
         setError(j.error ?? (daftar ? "Gagal membuat akun." : "Gagal masuk."));
         return;
       }
@@ -365,6 +370,21 @@ export default function LoginForm({
                   />
                 </label>
                 {sandi}
+                {perlu2fa ? (
+                  <label>
+                    Kode 2FA
+                    <input
+                      inputMode="numeric"
+                      autoComplete="one-time-code"
+                      maxLength={6}
+                      value={kode2fa}
+                      onChange={(e) => {
+                        setKode2fa(e.target.value.replace(/\D/g, "").slice(0, 6));
+                        if (error) setError(null);
+                      }}
+                    />
+                  </label>
+                ) : null}
                 <p className="auth2-alt">
                   <button type="button" className="tautan" onClick={() => pindah("lupa")}>
                     Lupa password?

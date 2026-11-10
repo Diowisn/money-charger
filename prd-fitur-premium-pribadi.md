@@ -3,7 +3,7 @@
 | Atribut | Nilai |
 |---|---|
 | Status | Aktif; penggunaan pribadi, tanpa paywall |
-| Versi | 1.1 |
+| Versi | 1.2 |
 | Tanggal | 10 November 2026 |
 | Dokumen induk | [PRD utama](./prd-catatan-keuangan-whatsapp.md) |
 | Dokumen teknis | [SRS fitur premium pribadi](./srs-fitur-premium-pribadi.md) |
@@ -40,13 +40,13 @@ Membuat Money-Charger terasa seperti aplikasi keuangan kelas berbayar untuk pema
 - **Laporan lanjutan**: periode kustom, cetak/simpan PDF, laporan terjadwal ke WhatsApp/email.
 - **AI Pro**: review bulanan otomatis, tanya jawab seluruh riwayat, deteksi anomali.
 - **Kolaborasi keluarga**: anggota, peran, anggaran bersama, persetujuan transaksi, nomor WhatsApp anggota.
+- **Keamanan/kepercayaan**: 2FA, manajemen sesi, ekspor terenkripsi.
 - Backup/restore melalui Neon Console, audit log dasar, ekspor CSV.
 
 ### Berikutnya, berurutan
 
 1. **Integrasi**: impor email bank/e-wallet yang lebih kaya, Google Sheets, kalender.
-2. **Keamanan/kepercayaan**: 2FA, manajemen sesi, ekspor terenkripsi.
-3. **Mekanik paywall**: hanya jika akan dipublikasikan; tidak diperlukan untuk pemakaian pribadi.
+2. **Mekanik paywall**: hanya jika akan dipublikasikan; tidak diperlukan untuk pemakaian pribadi.
 
 ## 4. Kebutuhan per fitur
 
@@ -121,9 +121,9 @@ Membuat Money-Charger terasa seperti aplikasi keuangan kelas berbayar untuk pema
 - Persetujuan transaksi.
 - Beberapa nomor WhatsApp per workspace.
 
-### F-PREM-09 Keamanan dan paywall (masa depan)
+### F-PREM-09 Keamanan dan paywall
 
-- 2FA, manajemen sesi, ekspor terenkripsi.
+- 2FA TOTP, manajemen sesi, ekspor terenkripsi.
 - Billing, entitlement, trial, invoice, dunning hanya jika dipublikasikan.
 
 ## 5. Di luar lingkup saat ini
