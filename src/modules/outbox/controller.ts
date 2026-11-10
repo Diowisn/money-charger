@@ -1,5 +1,6 @@
 import type { NextRequest } from "next/server";
 import { prosesAntreanOutbox } from "@/lib/outbox";
+import { PgRepo } from "@/lib/pg-repo";
 import { rahasiaCocok } from "@/lib/secret";
 import { prosesDigest } from "@/modules/digest/model";
 import { prosesReviewBulanan } from "@/modules/insight/model";
@@ -48,6 +49,11 @@ export async function retryOutbox(req: NextRequest) {
       console.error(`Sinkron Sheets gagal: ${error instanceof Error ? error.message : "unknown"}`);
     }
     const outbox = await prosesAntreanOutbox();
+    try {
+      await new PgRepo().setConfig("cron_terakhir", new Date().toISOString());
+    } catch (error) {
+      console.error(`Catat cron_terakhir gagal: ${error instanceof Error ? error.message : "unknown"}`);
+    }
     return Response.json({ ok: true, inbound, outbox, otomatis, digest, laporan, review, sheets }, { headers: { "Cache-Control": "no-store" } });
   } catch (e) {
     console.error(`Outbox cron gagal: ${e instanceof Error ? e.message : "unknown error"}`);

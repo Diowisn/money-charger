@@ -54,6 +54,18 @@ function samarkanPesan(pesan: string): string {
   return pesan.replace(/postgres(ql)?:\/\/[^\s"']+/gi, "[redacted]").slice(0, 240);
 }
 
+const BATAS_CRON_JAM = 26;
+
+/** Pesan peringatan bila cron terakhir lebih dari 26 jam lalu (jadwal harian + toleransi), atau null bila sehat. */
+export function cronBasi(terakhir: string | null, sekarangMs: number): string | null {
+  if (!terakhir) return "Cron belum pernah tercatat berjalan; transaksi otomatis, digest, dan laporan terjadwal tidak akan jalan.";
+  const ms = Date.parse(terakhir);
+  if (!Number.isFinite(ms)) return "Nilai cron_terakhir tidak valid.";
+  const jam = (sekarangMs - ms) / 3_600_000;
+  if (jam > BATAS_CRON_JAM) return `Cron terakhir berjalan ${Math.floor(jam)} jam lalu (> ${BATAS_CRON_JAM} jam); periksa jadwal cron.`;
+  return null;
+}
+
 export async function periksaKesiapan() {
   const env = Object.fromEntries(SEMUA_VARS.map((k) => [k, Boolean(process.env[k]?.trim())]));
   const waSiap = WA_VARS.every((k) => env[k]);
@@ -77,6 +89,7 @@ export async function periksaKesiapan() {
     skemaSiap: false,
     tabelHilang: [...TABEL],
     jumlah: null,
+    cronTerakhir: null,
     error: null,
   };
 
@@ -94,6 +107,10 @@ export async function periksaKesiapan() {
       db.skemaSiap = hilang.length === 0;
 
       if (db.skemaSiap) {
+        const cron = await pool.query(
+          "SELECT nilai FROM config WHERE user_id IS NULL AND kunci = 'cron_terakhir'",
+        );
+        db.cronTerakhir = (cron.rows[0]?.nilai as string | undefined) ?? null;
         const hitung = await pool.query(
           `SELECT
              (SELECT COUNT(*) FROM allowed_numbers WHERE aktif)::int AS nomor_aktif,
@@ -123,6 +140,10 @@ export async function periksaKesiapan() {
   }
   if (jumlah?.inbound_gagal) peringatan.push(`${jumlah.inbound_gagal} pesan masuk gagal permanen; perlu diperiksa.`);
   if (jumlah?.outbox_gagal) peringatan.push(`${jumlah.outbox_gagal} balasan WhatsApp gagal permanen; perlu diperiksa.`);
+  if (db.skemaSiap) {
+    const basi = cronBasi(db.cronTerakhir as string | null, Date.now());
+    if (basi) peringatan.push(basi);
+  }
 
   return {
     ok: Boolean(env.DATABASE_URL && waSiap && db.tersambung && db.skemaSiap && (jumlah?.nomor_aktif ?? 0) > 0),

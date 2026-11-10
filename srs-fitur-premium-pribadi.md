@@ -164,6 +164,7 @@ Sudah diimplementasikan:
 - `src/lib/sheets.ts`: `bangunBarisSheets` (header + transaksi kronologis) dan `validasiUrlSheets` (hanya `https://script.google.com/macros/s/.../exec`).
 - `src/modules/sheets/`: `/api/sheets` menyimpan URL web app dan mengirim salinan penuh transaksi.
 - Sinkron otomatis: `prosesSinkronSheets(hariIni)` dipanggil cron `/api/cron/outbox` setelah review bulanan; `sudahSinkronHariIni(terakhir, hariIni)` membatasi maksimal sekali per hari WIB.
+- Pemantauan cron: cron sukses mencatat `config.cron_terakhir` (global, `user_id` NULL); `/api/health` menampilkan `database.cronTerakhir` dan menambah peringatan via `cronBasi` bila belum pernah jalan atau >26 jam.
 - `scripts/google-sheets.gs`: template web app Apps Script yang menulis ke sheet `Transaksi`; mendukung `SHEETS_WEBHOOK_SECRET` opsional.
 - Status disimpan di `config` (`sheets_url`, `sheets_terakhir`, `kalender_token`), tanpa tabel baru.
 - UI: tombol unduh `.ics` dan salin URL langganan di tab Transaksi otomatis; pengaturan dan sinkron Google Sheets di tab Laporan.
@@ -278,6 +279,7 @@ Sudah diimplementasikan:
 - **FR-INT-08 MUST:** URL langganan hanya dapat diminta pemilik yang login; token tidak pernah dicatat di log.
 - **FR-INT-09 MUST:** sinkron Google Sheets otomatis berjalan maksimal sekali per hari WIB per pengguna dan dilewati bila URL kosong.
 - **FR-INT-10 SHOULD:** kegagalan sinkron otomatis satu pengguna tidak menghentikan pengguna lain dan tidak menggagalkan cron.
+- **FR-INT-11 MUST:** cron sukses mencatat `cron_terakhir`; health memperingatkan bila cron belum pernah jalan atau terakhir >26 jam.
 
 ## 4. Keamanan dan integritas
 
@@ -405,6 +407,7 @@ Sudah diimplementasikan:
 - **AC-INT-08:** dua kali `POST /api/kalender` mengembalikan token yang sama.
 - **AC-INT-09:** dua cron pada hari WIB yang sama hanya menjalankan satu sinkron Sheets otomatis per pengguna.
 - **AC-INT-10:** pengguna tanpa `sheets_url` dilewati tanpa error.
+- **AC-INT-11:** `cron_terakhir` kosong atau >26 jam memunculkan peringatan di health; cron dalam 26 jam tidak.
 
 ## 7. Rencana fitur berikutnya
 

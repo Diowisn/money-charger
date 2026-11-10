@@ -155,7 +155,7 @@ Membuat Money-Charger terasa seperti aplikasi keuangan kelas berbayar untuk pema
 
 | Risiko | Mitigasi |
 |---|---|
-| Cron tidak berjalan | Status worker/health, retry, tanggal jatuh tempo idempoten |
+| Cron tidak berjalan | `/api/health` menampilkan `cronTerakhir` dan memperingatkan bila >26 jam; retry; tanggal jatuh tempo idempoten |
 | CSV kotor | Validasi per baris, laporan error, batas baris |
 | Deteksi langganan salah | Heuristik konservatif, hanya tampilan, bukan mutasi |
 | Saldo proyeksi menyesatkan | Label “proyeksi”, transparansi rumus |
