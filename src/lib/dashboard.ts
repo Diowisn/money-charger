@@ -46,6 +46,8 @@ export interface TxView {
   label: string | null;
   detail?: Record<string, string | number | null> | null;
   subPost: string | null;
+  subPostId: number | null;
+  accountId: number | null;
   wadahAsal: Wadah | null;
   wadahTujuan: Wadah | null;
   status: "berlaku" | "batal";
@@ -205,6 +207,8 @@ export function hitungPerubahanKategori(state: State, hariIni: string, batas = 5
 export interface DashboardData {
   hariIni: string;
   profil?: ProfilAkun;
+  ledger?: { ok: boolean; jumlah: number; akar: string | null; rusak: number | null };
+  email?: { email: string | null; terdaftar: boolean; terhubung: boolean; linkedAt: string | null; lastEmailAt: string | null };
   periode: {
     aktif: boolean;
     mulai: string | null;
@@ -338,6 +342,8 @@ function ringkasTx(state: State, t: Tx): TxView {
     label: t.label,
     detail: t.detail ?? null,
     subPost: namaSubPost(state, t.subPostId),
+    subPostId: t.subPostId,
+    accountId: t.accountId,
     wadahAsal: t.wadahAsal,
     wadahTujuan: t.wadahTujuan,
     status: t.status,

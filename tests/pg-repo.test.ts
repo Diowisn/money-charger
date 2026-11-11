@@ -84,16 +84,55 @@ describe("PgRepo di Postgres sungguhan", () => {
     expect(hasil.rows[0].nama).toBe("google_sheets");
   });
 
-  it("memetakan nomor WhatsApp anggota aktif ke pemilik workspace", async () => {
+  it("memetakan nomor WhatsApp ke akun pemilik nomor, bukan pemilik workspace", async () => {
     const member = await adapter.query("INSERT INTO auth_users (email) VALUES ('anggota@example.com') RETURNING id");
     await adapter.query(
       "INSERT INTO workspace_members (owner_id, member_id, role, wa_number) VALUES ($1, $2, 'member', '628222')",
       [ownerId, member.rows[0].id],
     );
-    expect(await new PgRepo(adapter).ownerForWa("628222")).toBe(ownerId);
+    expect(await new PgRepo(adapter).userIdForWa("628222")).toBe(member.rows[0].id);
     await adapter.query("UPDATE workspace_members SET status = 'nonaktif' WHERE wa_number = '628222'");
-    expect(await new PgRepo(adapter).ownerForWa("628222")).toBeNull();
+    expect(await new PgRepo(adapter).userIdForWa("628222")).toBeNull();
     await adapter.query("DELETE FROM auth_users WHERE id = $1", [member.rows[0].id]);
+  });
+
+  it("memetakan nomor dari profil akun sendiri dan mengizinkannya", async () => {
+    const akun = await adapter.query(
+      "INSERT INTO auth_users (email, telepon) VALUES ('ponsel@example.com', '0812-3456-7890') RETURNING id",
+    );
+    const userId = akun.rows[0].id as string;
+    try {
+      expect(await new PgRepo(adapter).userIdForWa("6281234567890")).toBe(userId);
+      expect(await new PgRepo(adapter).isAllowed("6281234567890")).toBe(true);
+    } finally {
+      await adapter.query("DELETE FROM auth_users WHERE id = $1", [userId]);
+    }
+  });
+
+  it("menjaga rantai hash transaksi dan mendeteksi perubahan langsung di database", async () => {
+    const user = await adapter.query("INSERT INTO auth_users (email) VALUES ('ledger@example.com') RETURNING id");
+    const userId = user.rows[0].id as string;
+    const r = new PgRepo(adapter, true, userId);
+    try {
+      await adapter.query(
+        "INSERT INTO transactions (user_id, tipe, nominal, tanggal) VALUES ($1, 'in', 5000, '2026-10-31')",
+        [userId],
+      );
+      expect((await r.verifyLedger()).ok).toBe(false);
+      await r.ensureLedger();
+      expect((await r.verifyLedger()).ok).toBe(true);
+      const pertama = await r.insertTx(buatTx({ tipe: "in", nominal: 100_000, tanggal: "2026-11-01" }));
+      const kedua = await r.insertTx(buatTx({ tipe: "out", nominal: 25_000, tanggal: "2026-11-02" }));
+      expect(await r.verifyLedger()).toMatchObject({ ok: true, jumlah: 3 });
+      await r.updateTx(pertama, { status: "batal" });
+      expect(await r.verifyLedger()).toMatchObject({ ok: true, jumlah: 3 });
+      await r.updateTx(kedua, { nominal: 30_000, tanggal: "2026-11-03", label: "diubah", accountId: null });
+      expect(await r.verifyLedger()).toMatchObject({ ok: true, jumlah: 3 });
+      await adapter.query("UPDATE transactions SET nominal = nominal + 1 WHERE id = $1", [kedua]);
+      expect(await r.verifyLedger()).toMatchObject({ ok: false, rusak: kedua });
+    } finally {
+      await adapter.query("DELETE FROM auth_users WHERE id = $1", [userId]);
+    }
   });
 
   it("menyimpan dompet dan menautkan transaksi ke dompet", async () => {
@@ -106,9 +145,9 @@ describe("PgRepo di Postgres sungguhan", () => {
     await adapter.query("DELETE FROM accounts WHERE id = $1", [id]);
   });
 
-  it("job tanpa sesi memakai email akun atau akun pertama sebagai pemilik", async () => {
+  it("job tanpa sesi memakai email akun atau satu-satunya akun sebagai pemilik", async () => {
     const repo = new PgRepo(adapter);
-    expect(await repo.firstUserId()).toBe(ownerId);
+    expect(await repo.soleUserId()).toBe(ownerId);
     expect(await repo.userIdByEmail("TEST@EXAMPLE.COM")).toBe(ownerId);
     expect(await repo.userIdByEmail("lain@example.com")).toBeNull();
     expect(await repo.userIdByEmailOrSoleUser("lain@example.com")).toBe(ownerId);
@@ -122,6 +161,7 @@ describe("PgRepo di Postgres sungguhan", () => {
       expect(await repo.userIdByEmailOrSoleUser("kedua@example.com")).toBe(member.rows[0].id);
       expect(await repo.userIdByEmailOrSoleUser("lain@example.com")).toBeNull();
       expect(await repo.userIdByEmailOrSoleUser(undefined)).toBeNull();
+      expect(await repo.soleUserId()).toBeNull();
     } finally {
       await adapter.query("DELETE FROM auth_users WHERE id = $1", [member.rows[0].id]);
     }

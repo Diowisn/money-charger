@@ -1,5 +1,5 @@
 import type { NextRequest } from "next/server";
-import { emailDikonfigurasi, prosesEmailMasuk, verifikasiRahasiaEmail, type EmailMasuk } from "./model";
+import { emailDikonfigurasi, prosesEmailMasuk, tautkanEmailAkun, verifikasiRahasiaEmail, type EmailMasuk } from "./model";
 import { emailGagal, emailOk } from "./view";
 
 export async function terimaEmail(req: NextRequest) {
@@ -38,5 +38,28 @@ export async function terimaEmail(req: NextRequest) {
   } catch (e) {
     console.error(e);
     return emailGagal(e instanceof Error ? e.message : "Gagal memproses email.", 400);
+  }
+}
+
+/** Dipanggil Apps Script setelah trigger Gmail milik pengguna terpasang. */
+export async function tautkanEmail(req: NextRequest) {
+  if (!emailDikonfigurasi()) {
+    return emailGagal("EMAIL_INBOUND_SECRET belum diatur di server.", 503);
+  }
+  if (!verifikasiRahasiaEmail(req.headers.get("x-email-secret"))) {
+    return emailGagal("Rahasia email tidak cocok.", 401);
+  }
+  let body: Record<string, unknown>;
+  try {
+    body = (await req.json()) as Record<string, unknown>;
+  } catch {
+    return emailGagal("Body harus JSON.", 400);
+  }
+  try {
+    const hasil = await tautkanEmailAkun(body.akun);
+    if (!hasil) return emailGagal("Email Gmail tidak cocok dengan akun Money-Charger mana pun.", 404);
+    return emailOk(`Gmail ${hasil.email} tertaut ke akun Money-Charger.`, true);
+  } catch (e) {
+    return emailGagal(e instanceof Error ? e.message : "Gagal menautkan email.", 400);
   }
 }

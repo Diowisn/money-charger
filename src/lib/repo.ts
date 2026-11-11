@@ -17,7 +17,18 @@ export interface Repo {
   addOutbox(waNumber: string, pesan: string): Promise<number>;
 
   insertTx(tx: NewTx): Promise<number>;
-  updateTx(id: number, patch: { status?: "berlaku" | "batal"; subPostId?: number | null }): Promise<void>;
+  updateTx(
+    id: number,
+    patch: {
+      status?: "berlaku" | "batal";
+      subPostId?: number | null;
+      nominal?: number;
+      biayaAdmin?: number;
+      tanggal?: string;
+      label?: string | null;
+      accountId?: number | null;
+    },
+  ): Promise<void>;
   setGajiPlan(txId: number, planVersionId: number): Promise<void>;
 
   addAccount(a: NewAkun): Promise<number>;

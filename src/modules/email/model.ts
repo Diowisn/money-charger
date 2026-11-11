@@ -12,7 +12,7 @@ import { rahasiaCocok as cocokRahasia } from "@/lib/secret";
 import { wibDate } from "@/lib/parse/date";
 import { cocokAkun } from "@/lib/parse/dompet";
 import { cariDalamTeks, cariPersis } from "@/lib/parse/pos";
-import { PgRepo } from "@/lib/pg-repo";
+import { getPool, PgRepo } from "@/lib/pg-repo";
 import type { State } from "@/lib/types";
 import { AksiError, tambahTransaksi } from "@/lib/web-actions";
 
@@ -49,6 +49,77 @@ function pilihPos(state: State, detail: DetailEmail, label: string | null): numb
 export interface HasilEmail {
   dicatat: boolean;
   pesan: string;
+}
+
+export interface StatusEmail {
+  email: string | null;
+  terdaftar: boolean;
+  terhubung: boolean;
+  linkedAt: string | null;
+  lastEmailAt: string | null;
+}
+
+function iso(nilai: unknown): string | null {
+  if (!nilai) return null;
+  const ms = nilai instanceof Date ? nilai.getTime() : Date.parse(String(nilai));
+  return Number.isFinite(ms) ? new Date(ms).toISOString() : null;
+}
+
+/** Status tautan Gmail/Apps Script untuk satu akun. */
+export async function statusEmail(userId: string): Promise<StatusEmail> {
+  try {
+    const hasil = await getPool().query<{ email: string; terdaftar: boolean; linked_at: unknown; last_email_at: unknown }>(
+      `SELECT u.email, (l.user_id IS NOT NULL) AS terdaftar, l.linked_at, l.last_email_at
+       FROM auth_users u LEFT JOIN email_links l ON l.user_id = u.id
+       WHERE u.id = $1`,
+      [userId],
+    );
+    const row = hasil.rows[0];
+    return {
+      email: row?.email ?? null,
+      terdaftar: Boolean(row?.terdaftar),
+      terhubung: Boolean(row?.linked_at || row?.last_email_at),
+      linkedAt: iso(row?.linked_at),
+      lastEmailAt: iso(row?.last_email_at),
+    };
+  } catch (error) {
+    if ((error as { code?: string }).code === "42P01") {
+      return { email: null, terdaftar: false, terhubung: false, linkedAt: null, lastEmailAt: null };
+    }
+    throw error;
+  }
+}
+
+/** Dipanggil Apps Script setelah trigger Gmail dipasang. Email harus cocok dengan akun terdaftar. */
+export async function tautkanEmailAkun(akun: unknown): Promise<{ email: string } | null> {
+  const alamat = typeof akun === "string" ? akun.trim().toLowerCase() : "";
+  if (!alamat) throw new EmailAksiError("Alamat Gmail wajib diisi.");
+  const hasil = await getPool().query<{ id: string; email: string }>(
+    "SELECT id, email FROM auth_users WHERE lower(email) = $1 LIMIT 1",
+    [alamat],
+  );
+  const user = hasil.rows[0];
+  if (!user) return null;
+  await getPool().query(
+    `INSERT INTO email_links (user_id, email, linked_at)
+     VALUES ($1, $2, now())
+     ON CONFLICT (user_id) DO UPDATE SET email = EXCLUDED.email, linked_at = now()`,
+    [user.id, user.email],
+  );
+  return { email: user.email };
+}
+
+async function catatEmailMasuk(userId: string, akun: string) {
+  try {
+    await getPool().query(
+      `INSERT INTO email_links (user_id, email, linked_at, last_email_at)
+       VALUES ($1, $2, now(), now())
+       ON CONFLICT (user_id) DO UPDATE SET email = EXCLUDED.email, last_email_at = now()`,
+      [userId, akun],
+    );
+  } catch (error) {
+    if ((error as { code?: string }).code !== "42P01") throw error;
+  }
 }
 
 function rahasiaCocok(nilai: string | null): boolean {
@@ -98,6 +169,7 @@ export async function prosesEmailMasuk(input: EmailMasuk): Promise<HasilEmail> {
         : "Email tidak menyertakan alamat penerima; dilewati karena ada lebih dari satu akun.",
     };
   }
+  if (input.akun) await catatEmailMasuk(userId, input.akun);
   const repo = new PgRepo(undefined, undefined, userId);
   const hariIni = wibDate(Date.now());
   const teksGabung = `${input.subjek ?? ""}\n${input.teks ?? ""}`;

@@ -303,6 +303,56 @@ export async function tambahTransaksi(
   });
 }
 
+export interface InputUbahTransaksi {
+  id: number;
+  tanggal: string;
+  nominal: number;
+  label?: string | null;
+  subPostId?: number | null;
+  accountId?: number | string | null;
+  biayaAdmin?: number;
+}
+
+/** Ubah transaksi pemasukan/pengeluaran yang masih berlaku; tipe tidak bisa diubah. */
+export async function ubahTransaksi(
+  r: Repo,
+  hariIni: string,
+  input: InputUbahTransaksi,
+): Promise<{ id: number }> {
+  const id = Number(input.id);
+  if (!Number.isInteger(id) || id <= 0) throw new AksiError("Transaksi tidak valid.");
+  const nominal = bulat(input.nominal, false);
+  const tanggal = tanggalSah(input.tanggal, hariIni);
+  const label = typeof input.label === "string" ? input.label.trim().slice(0, 120) || null : null;
+
+  return r.transaction(async (tx) => {
+    const state = await tx.load();
+    const t = state.txs.find((x) => x.id === id);
+    if (!t) throw new AksiError("Transaksi tidak ditemukan.");
+    if (t.status !== "berlaku") throw new AksiError("Transaksi yang sudah dibatalkan tidak bisa diubah.");
+    if (t.tipe !== "out" && t.tipe !== "in") {
+      throw new AksiError("Hanya pemasukan atau pengeluaran yang bisa diubah.");
+    }
+
+    if (t.tipe === "out") {
+      let subPostId: number | null = null;
+      if (input.subPostId !== undefined && input.subPostId !== null) {
+        const sub = state.subPosts.find((s) => s.id === Number(input.subPostId) && s.aktif);
+        if (!sub) throw new AksiError("Pos tidak ditemukan atau sudah nonaktif.");
+        subPostId = sub.id;
+      }
+      const accountId = akunSah(state, input.accountId);
+      const biayaAdmin = bulat(input.biayaAdmin ?? 0, true);
+      await tx.updateTx(t.id, { nominal, biayaAdmin, tanggal, label, subPostId, accountId });
+      return { id: t.id };
+    }
+
+    const accountId = akunSah(state, input.accountId);
+    await tx.updateTx(t.id, { nominal, biayaAdmin: 0, tanggal, label, subPostId: null, accountId });
+    return { id: t.id };
+  });
+}
+
 const NAMA_TIPE: Record<string, string> = {
   out: "pengeluaran",
   in: "pemasukan",

@@ -10,13 +10,13 @@ export async function prosesAntreanInbound(
   batas = 10,
 ): Promise<{ diproses: number; selesai: number; gagal: number }> {
   const jobs = await klaimInbound(batas);
-  const userId = await new PgRepo().firstUserId();
   let selesai = 0;
   let gagal = 0;
 
   for (const job of jobs) {
     try {
-      const pemilik = (await new PgRepo().ownerForWa(job.payload.from)) ?? userId;
+      const pemilik = await new PgRepo().userIdForWa(job.payload.from);
+      if (!pemilik) throw new Error("Nomor WhatsApp belum dipetakan ke akun.");
       const hasil = await tanganiPesan(new PgRepo(undefined, undefined, pemilik), buatDeps(), job.payload);
       if (hasil) {
         await catatAudit(`wa:${maskNomor(job.payload.from)}`, "pesan_diproses", {

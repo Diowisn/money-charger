@@ -5,6 +5,8 @@
 
 const CONFIG = {
   WEBHOOK_URL: 'https://GANTI-DOMAIN-ANDA.vercel.app/api/email/inbound',
+  // Opsional. Kosong = diturunkan dari WEBHOOK_URL dengan mengganti /inbound menjadi /link.
+  LINK_URL: '',
   SECRET: 'GANTI_DENGAN_EMAIL_INBOUND_SECRET',
   // Opsional: samakan dengan token di URL web app agar orang lain tidak bisa memasang trigger.
   SETUP_TOKEN: '',
@@ -56,6 +58,26 @@ function querySumber(sumber) {
     .map((k) => 'subject:' + (k.indexOf(' ') >= 0 ? '"' + k + '"' : k))
     .join(' OR ');
   return 'newer_than:' + CONFIG.UMUR_EMAIL + ' in:anywhere (' + dari + ')' + (subjek ? ' (' + subjek + ')' : '');
+}
+
+// Memberi tahu server bahwa Gmail ini sudah dipasangi trigger dan tertaut ke akun Money-Charger.
+function tautkanAkun(akun) {
+  const url = CONFIG.LINK_URL || CONFIG.WEBHOOK_URL.replace(/\/inbound\/?$/, '/link');
+  try {
+    const res = UrlFetchApp.fetch(url, {
+      method: 'post',
+      contentType: 'application/json',
+      headers: { 'X-Email-Secret': CONFIG.SECRET },
+      payload: JSON.stringify({ akun }),
+      muteHttpExceptions: true,
+    });
+    const code = res.getResponseCode();
+    Logger.log('Taut akun HTTP ' + code + ': ' + res.getContentText());
+    return code >= 200 && code < 300;
+  } catch (e) {
+    Logger.log('Gagal menautkan akun: ' + e);
+    return false;
+  }
 }
 
 function kirimKeWebhook(msg, akun, penyedia) {
@@ -178,12 +200,21 @@ function doGet(e) {
 
   try {
     const akun = Session.getEffectiveUser().getEmail();
+    const diminta = String(parameter.akun || '').trim().toLowerCase();
+    if (diminta && diminta !== akun.toLowerCase()) {
+      return halaman('Akun Gmail tidak cocok. Buka tautan ini memakai Gmail ' + parameter.akun + '.');
+    }
     if (parameter.aksi === 'jalankan') {
       prosesEmailTransaksi();
-      return halaman('Pemeriksaan email selesai untuk ' + akun + '.');
+      const tertaut = tautkanAkun(akun);
+      return halaman('Pemeriksaan email selesai untuk ' + akun + '.' + (tertaut ? ' Akun tertaut.' : ' Tautan akun gagal dicatat.'));
     }
     pasangTrigger();
-    return halaman('Email otomatis aktif untuk ' + akun + '. Trigger berjalan tiap 5 menit.');
+    const tertaut = tautkanAkun(akun);
+    return halaman(
+      'Email otomatis aktif untuk ' + akun + '. Trigger berjalan tiap 5 menit.' +
+        (tertaut ? ' Akun tertaut.' : ' Tautan akun gagal dicatat; periksa EMAIL_INBOUND_SECRET.')
+    );
   } catch (error) {
     return halaman('Gagal: ' + (error && error.message ? error.message : error));
   }

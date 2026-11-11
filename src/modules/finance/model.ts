@@ -5,6 +5,7 @@ import { PgRepo } from "@/lib/pg-repo";
 import type { JadwalLaporan } from "@/lib/types";
 import { daftarAturan } from "@/modules/recurring/model";
 import { ambilProfil } from "@/modules/profile/model";
+import { statusEmail } from "@/modules/email/model";
 import { pastikanAkunDefault } from "@/modules/accounts/model";
 import {
   batalkanDebt,
@@ -22,9 +23,11 @@ import {
   tambahGoal,
   tambahPos,
   tambahTransaksi,
+  ubahTransaksi,
   type InputDebt,
   type InputGoal,
   type InputTransaksi,
+  type InputUbahTransaksi,
   type ItemRencana,
 } from "@/lib/web-actions";
 import { AksiError } from "@/lib/web-actions";
@@ -32,12 +35,16 @@ import { AksiError } from "@/lib/web-actions";
 export async function muatDashboard(userId: string) {
   const hariIni = wibDate(Date.now());
   await pastikanAkunDefault(userId);
-  const [state, profil, otomatis] = await Promise.all([
-    new PgRepo(undefined, undefined, userId).load(),
+  const repo = new PgRepo(undefined, undefined, userId);
+  await repo.ensureLedger();
+  const [state, ledger, profil, otomatis, email] = await Promise.all([
+    repo.load(),
+    repo.verifyLedger(),
     ambilProfil(userId),
     daftarAturan(userId, hariIni),
+    statusEmail(userId),
   ]);
-  return { ...bangunDashboard(state, hariIni), profil: profil ?? undefined, otomatis };
+  return { ...bangunDashboard(state, hariIni), ledger, email, profil: profil ?? undefined, otomatis };
 }
 
 export async function simpanRencanaFinance(items: ItemRencana[], sekarang: boolean, userId: string) {
@@ -49,6 +56,16 @@ export async function simpanRencanaFinance(items: ItemRencana[], sekarang: boole
 export async function tambahTransaksiFinance(input: InputTransaksi, userId: string) {
   const hasil = await tambahTransaksi(new PgRepo(undefined, undefined, userId), wibDate(Date.now()), input);
   await catatAudit("web", "transaksi_ditambah", { tipe: input.tipe, id: hasil.id });
+  return hasil;
+}
+
+export async function ubahTransaksiFinance(input: InputUbahTransaksi, userId: string) {
+  const hasil = await ubahTransaksi(new PgRepo(undefined, undefined, userId), wibDate(Date.now()), input);
+  await catatAudit("web", "transaksi_diubah", {
+    id: hasil.id,
+    nominal: input.nominal,
+    tanggal: input.tanggal,
+  });
   return hasil;
 }
 

@@ -136,7 +136,7 @@ export async function prosesTransaksiBerulang(hariIni = wibDate(Date.now())): Pr
       continue;
     }
     try {
-      const userId = rule.user_id ?? await new PgRepo().firstUserId();
+      const userId = rule.user_id ?? await new PgRepo().soleUserId();
       if (!userId) throw new Error("Pemilik aturan tidak ditemukan.");
       const hasil = await tambahTransaksi(new PgRepo(undefined, undefined, userId), due, {
         tipe: "out",

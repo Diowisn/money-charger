@@ -4,9 +4,9 @@ import type { TxView } from "@/lib/dashboard";
 import { buatXlsx } from "@/lib/xlsx";
 
 const txs: TxView[] = [
-  { id: 1, tipe: "out", nominal: 25000, biayaAdmin: 2500, tanggal: "2025-11-02", label: "makan", subPost: "Makan", wadahAsal: null, wadahTujuan: null, status: "berlaku", bisaDihapus: true },
-  { id: 2, tipe: "in", nominal: 100000, biayaAdmin: 0, tanggal: "2025-11-03", label: "bonus", subPost: null, wadahAsal: null, wadahTujuan: "saldo", status: "berlaku", bisaDihapus: true },
-  { id: 3, tipe: "out", nominal: 5000, biayaAdmin: 0, tanggal: "2025-10-30", label: "batal", subPost: "Lain", wadahAsal: null, wadahTujuan: null, status: "batal", bisaDihapus: false },
+  { id: 1, tipe: "out", nominal: 25000, biayaAdmin: 2500, tanggal: "2025-11-02", label: "makan", subPost: "Makan", subPostId: 1, accountId: null, wadahAsal: null, wadahTujuan: null, status: "berlaku", bisaDihapus: true },
+  { id: 2, tipe: "in", nominal: 100000, biayaAdmin: 0, tanggal: "2025-11-03", label: "bonus", subPost: null, subPostId: null, accountId: null, wadahAsal: null, wadahTujuan: "saldo", status: "berlaku", bisaDihapus: true },
+  { id: 3, tipe: "out", nominal: 5000, biayaAdmin: 0, tanggal: "2025-10-30", label: "batal", subPost: "Lain", subPostId: 3, accountId: null, wadahAsal: null, wadahTujuan: null, status: "batal", bisaDihapus: false },
 ];
 
 describe("ekspor xlsx", () => {

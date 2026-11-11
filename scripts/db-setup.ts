@@ -44,7 +44,25 @@ async function main() {
     "INSERT INTO schema_version (version, description) VALUES ($1, $2) ON CONFLICT (version) DO NOTHING",
     [7, "Koneksi Google Sheets langsung (refresh token terenkripsi)."],
   );
-  console.log("Skema siap. Baseline skema v1, v2, v3, v4, v5, v6, dan v7 tercatat.");
+  await getPool().query(
+    "INSERT INTO schema_version (version, description) VALUES ($1, $2) ON CONFLICT (version) DO NOTHING",
+    [8, "Isolasi transaksi per akun dan rantai hash transaksi."],
+  );
+  await getPool().query(
+    "INSERT INTO schema_version (version, description) VALUES ($1, $2) ON CONFLICT (version) DO NOTHING",
+    [9, "Tautan email per akun untuk Apps Script Gmail."],
+  );
+  const users = await getPool().query<{ id: string }>("SELECT id FROM auth_users");
+  for (const user of users.rows) {
+    await new PgRepo(undefined, undefined, user.id).backfillLedger();
+  }
+  const email = await getPool().query(
+    `INSERT INTO email_links (user_id, email)
+     SELECT id, email FROM auth_users
+     ON CONFLICT (user_id) DO NOTHING`,
+  );
+  console.log("Skema siap. Baseline skema v1-v9 tercatat; rantai hash transaksi diisi.");
+  console.log(`Email terdaftar: ${email.rowCount ?? 0} akun baru.`);
 
   const seeded = await new PgRepo().seed(nomor);
   console.log(seeded ? "Draft 1 dan alias bawaan terisi." : "Data bawaan sudah ada, dilewati.");

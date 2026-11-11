@@ -242,4 +242,4 @@ Rilis R0 ditahan bila akun kedua dapat dibuat, sesi yang dicabut tetap berlaku, 
 
 Spesifikasi implementasi fitur kelas berbayar untuk pemakaian pribadi ada di [SRS fitur premium pribadi](./srs-fitur-premium-pribadi.md), dengan ringkasan produk di [PRD fitur premium pribadi](./prd-fitur-premium-pribadi.md). Tidak ada billing/tenant pada tahap ini.
 
-Status ringkas: skema v2 (`recurring_rules`, `recurring_runs`), worker transaksi berulang, API `/api/recurring`, impor CSV `/api/import`, dan data Wawasan sudah diimplementasikan.
+Status ringkas per 11 November 2026: skema v7 (`recurring_rules`, `recurring_runs`, `accounts`, `workspace_members`, kolom 2FA, `google_sheets`), worker transaksi berulang, impor CSV, digest, laporan lanjutan, AI Pro, keamanan akun, email inbound, kalender, Sheets, meter pemakaian, ubah transaksi, dan filter pos/dompet sudah diimplementasikan. Kolaborasi keluarga ditangguhkan: API `/api/keluarga` mengembalikan 410 dan `pemilikRequest` tidak memetakan anggota ke pemilik. Rincian kontrak, threat model, kegagalan, dan roadmap ada di SRS premium bagian 2.12, 4.1, dan 7.

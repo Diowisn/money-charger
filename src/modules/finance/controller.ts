@@ -1,7 +1,6 @@
 import type { NextRequest } from "next/server";
 import { pemilikRequest, tolakPeran } from "@/lib/auth";
 import { AksiError } from "@/lib/web-actions";
-import { ajukanTransaksi } from "@/modules/keluarga/model";
 import {
   batalkanDebtFinance,
   batalkanGoalFinance,
@@ -19,6 +18,7 @@ import {
   tambahDebtFinance,
   tambahGoalFinance,
   tambahTransaksiFinance,
+  ubahTransaksiFinance,
 } from "./model";
 import { bacaBody, dashboard, galat, ok } from "./view";
 
@@ -58,10 +58,22 @@ export async function postTransaction(req: NextRequest) {
   const userId = auth.userId;
   try {
     const body = await bacaBody(req);
-    if (auth.role === "member") {
-      return ok(await ajukanTransaksi(userId, auth.actorId, body));
-    }
     return ok(await tambahTransaksiFinance(body as unknown as Parameters<typeof tambahTransaksiFinance>[0], userId));
+  } catch (e) {
+    return galat(e);
+  }
+}
+
+export async function patchTransaction(req: NextRequest) {
+  const auth = await pemilikRequest(req);
+  if ("tolak" in auth) return auth.tolak;
+  const tolak = tolakPeran(auth, "tulis");
+  if (tolak) return tolak;
+  const userId = auth.userId;
+  try {
+    const body = await bacaBody(req);
+    const data = await ubahTransaksiFinance(body as unknown as Parameters<typeof ubahTransaksiFinance>[0], userId);
+    return ok({ data, pesan: "Transaksi diperbarui." });
   } catch (e) {
     return galat(e);
   }

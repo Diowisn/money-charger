@@ -57,21 +57,14 @@ export async function tolakJikaBelumLogin(req: NextRequest): Promise<Response | 
 
 export type PeranWorkspace = "owner" | "admin" | "member" | "viewer";
 
-/** Validasi sesi sekali saja; hasilnya dipakai ulang oleh handler (hemat satu query per request). */
+/**
+ * Validasi sesi sekali saja. Setiap akun selalu memakai datanya sendiri;
+ * keanggotaan workspace tidak memberi akses ke transaksi akun lain.
+ */
 export async function pemilikRequest(req: NextRequest): Promise<{ userId: string; actorId: string; role: PeranWorkspace } | { tolak: Response }> {
   const actorId = await userIdDariRequest(req);
   if (!actorId) {
     return { tolak: Response.json({ ok: false, error: "Sesi habis. Silakan login ulang." }, { status: 401 }) };
-  }
-  try {
-    const anggota = await getPool().query<{ owner_id: string; role: PeranWorkspace }>(
-      "SELECT owner_id, role FROM workspace_members WHERE member_id = $1 AND status = 'aktif' ORDER BY id LIMIT 1",
-      [actorId],
-    );
-    const row = anggota.rows[0];
-    if (row) return { userId: row.owner_id, actorId, role: row.role };
-  } catch (error) {
-    if ((error as { code?: string }).code !== "42P01") throw error;
   }
   return { userId: actorId, actorId, role: "owner" };
 }

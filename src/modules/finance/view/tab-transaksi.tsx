@@ -38,6 +38,8 @@ export function Transaksi({
   const [wadahTujuan, setWadahTujuan] = useState("saldo");
   const [paksa, setPaksa] = useState(false);
   const [bulanFilter, setBulanFilter] = useState("semua");
+  const [posFilter, setPosFilter] = useState("semua");
+  const [dompetFilter, setDompetFilter] = useState("semua");
   const [cari, setCari] = useState("");
   const [halaman, setHalaman] = useState(1);
 
@@ -58,11 +60,16 @@ export function Transaksi({
     const q = cari.trim().toLowerCase();
     return data.transaksi.filter((t) => {
       if (bulanFilter !== "semua" && !t.tanggal.startsWith(bulanFilter)) return false;
+      if (posFilter === "tanpa" && t.subPostId !== null) return false;
+      if (posFilter !== "semua" && posFilter !== "tanpa" && t.subPostId !== Number(posFilter)) return false;
+      if (dompetFilter === "utama" && t.accountId !== null) return false;
+      if (dompetFilter !== "semua" && dompetFilter !== "utama" && t.accountId !== Number(dompetFilter)) return false;
       if (!q) return true;
-      const isi = `${t.subPost ?? ""} ${t.label ?? ""} ${t.tanggal} ${t.wadahTujuan ?? ""} ${t.wadahAsal ?? ""}`;
+      const dompet = data.dompet.daftar.find((a) => a.id === t.accountId)?.nama ?? "";
+      const isi = `${t.subPost ?? ""} ${t.label ?? ""} ${t.tanggal} ${dompet} ${t.wadahTujuan ?? ""} ${t.wadahAsal ?? ""}`;
       return isi.toLowerCase().includes(q);
     });
-  }, [data.transaksi, bulanFilter, cari]);
+  }, [data.transaksi, data.dompet.daftar, bulanFilter, posFilter, dompetFilter, cari]);
 
   const totalHalaman = Math.max(1, Math.ceil(tersaring.length / PER_HALAMAN));
   const halamanAman = Math.min(halaman, totalHalaman);
@@ -267,7 +274,12 @@ export function Transaksi({
             <p className="eyebrow">TRANSAKSI</p>
             <h2>Semua transaksi</h2>
           </div>
-          <span className="badge">{tersaring.length} catatan</span>
+          <span className="baris-antara">
+            <span className={`badge ${data.ledger?.ok ? "hijau" : "tipe-out"}`}>
+              {data.ledger?.ok ? "Hash transaksi utuh" : data.ledger ? "Hash transaksi rusak" : "Hash belum tersedia"}
+            </span>
+            <span className="badge">{tersaring.length} catatan</span>
+          </span>
         </div>
 
         <div className="filter-riwayat">
@@ -290,6 +302,42 @@ export function Transaksi({
               {daftarBulan.map((b) => (
                 <option key={b} value={b}>
                   {labelBulan(b)}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="filter-jenis">
+            Pos
+            <select
+              value={posFilter}
+              onChange={(e) => {
+                setPosFilter(e.target.value);
+                setHalaman(1);
+              }}
+            >
+              <option value="semua">Semua pos</option>
+              <option value="tanpa">Tanpa pos</option>
+              {data.posSemua.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.grup} — {p.nama}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="filter-jenis">
+            Dompet
+            <select
+              value={dompetFilter}
+              onChange={(e) => {
+                setDompetFilter(e.target.value);
+                setHalaman(1);
+              }}
+            >
+              <option value="semua">Semua dompet</option>
+              <option value="utama">Dompet utama</option>
+              {data.dompet.daftar.map((a) => (
+                <option key={a.id} value={a.id}>
+                  {a.nama}
                 </option>
               ))}
             </select>

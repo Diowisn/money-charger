@@ -241,8 +241,8 @@ BTN, GoPay, OVO, DANA, ShopeePay, LinkAja, Jenius, Jago, SeaBank, Blu, Neo). Dom
 otomatis hanya bila hasilnya tunggal; jika ambigu, transaksi memakai dompet bawaan dan tanpa pos.
 
 1. Isi `EMAIL_INBOUND_SECRET` dengan string acak panjang di `.env.local` dan di Vercel, lalu redeploy.
-   Opsional: batasi pengirim lewat `EMAIL_ALLOWED_SENDERS`, satu atau beberapa domain dipisah koma, mis.
-   `EMAIL_ALLOWED_SENDERS=bankbsi.co.id,bca.co.id,mandiri.co.id,dana.id,gopay.co.id`. Kosong = semua pengirim.
+   Opsional: batasi pengirim lewat `EMAIL_ALLOWED_SENDERS`, satu atau beberapa domain dipisah koma. Daftar bank/e-wallet yang didukung (tanpa Neo dan Blu):
+   `bankbsi.co.id,bca.co.id,bankmandiri.co.id,mandiri.co.id,bri.co.id,bni.co.id,cimbniaga.co.id,permatabank.co.id,btn.co.id,jenius.com,jago.com,seabank.co.id,gopay.co.id,gojek.com,ovo.id,dana.id,shopeepay.co.id,shopee.co.id,linkaja.id`. Kosong = semua pengirim.
 2. Jembatan termudah untuk Gmail: buka `script.google.com`, buat project baru, tempel isi
    [`scripts/gmail-transaksi.gs`](./scripts/gmail-transaksi.gs), ganti `WEBHOOK_URL` dan `SECRET`, lalu jalankan
    `pasangTrigger` sekali dan izinkan akses Gmail. Script memeriksa email 24 jam terakhir tiap 5 menit untuk BSI,
@@ -266,10 +266,12 @@ otomatis hanya bila hasilnya tunggal; jika ambigu, transaksi memakai dompet bawa
      lebih dari satu pengguna, email dilewati agar tidak salah masuk ke akun utama.
    - **Tombol setup di dashboard:** deploy project sebagai **Web app** dengan **Execute as: User accessing the
      web app** dan **Who has access: Anyone with Google account**. Salin URL `/exec` ke `GMAIL_SETUP_URL`.
-     Tombol **Aktifkan email otomatis** muncul di tab Transaksi otomatis; tiap pengguna klik, pilih Gmail yang
-     sama dengan email akun, lalu izinkan akses. Trigger dipasang untuk pengguna itu, bukan untuk pemilik
-     project. Tombol **Periksa sekarang** menjalankan pemeriksaan sekali. Bila memakai `SETUP_TOKEN` di script,
-     sertakan `?token=...` pada `GMAIL_SETUP_URL`.
+     Tombol **Aktifkan email otomatis** muncul di tab Transaksi otomatis; tautan membawa email akun yang sedang
+     login, dan Apps Script menolak bila Gmail yang dipilih berbeda. Setelah trigger dipasang, Apps Script
+     memanggil `/api/email/link` sehingga status **Tertaut** muncul di akun itu. Tombol **Periksa sekarang**
+     menjalankan pemeriksaan sekali. Bila memakai `SETUP_TOKEN` di script, sertakan `?token=...` pada
+     `GMAIL_SETUP_URL`. Google tetap mewajibkan tiap pengguna memberi izin Gmail sekali; server tidak bisa
+     memasang trigger ke mailbox orang lain tanpa persetujuan pemiliknya.
 3. Body JSON yang dikenali:
 
    ```json
@@ -338,9 +340,9 @@ Isi dashboard:
 - **Transaksi otomatis**: aturan tagihan/langganan bulanan (nama, nominal, tanggal, pos). Cron yang sama dengan antrean WhatsApp mencatat transaksi pada tanggal jatuh tempo dan tidak menggandakan bulan yang sama.
 - **Impor mutasi CSV**: unggah/tempel CSV dengan kolom `tanggal,tipe,nominal` (opsional `label,pos,biaya_admin,wadah`), lengkap dengan deteksi duplikat.
 - **Laporan**: pilih periode preset atau rentang tanggal kustom, lihat ringkasan pemasukan/pengeluaran per pos dan dompet, lalu cetak atau simpan PDF. Laporan mingguan/bulanan dapat dikirim otomatis ke WhatsApp dan email akun.
-- **Keluarga & akses**: tambah anggota lewat email akun, atur peran admin/anggota/lihat saja, dan setujui atau tolak transaksi yang diajukan anggota. Anggota memakai data, anggaran, dan dompet yang sama; nomor WhatsApp anggota opsional dan otomatis dipetakan ke workspace.
+- **Privasi per akun**: setiap akun hanya bisa membaca dan mengubah transaksi, dompet, pos, serta anggarannya sendiri. Berbagi data lintas akun sudah dinonaktifkan; nomor WhatsApp dipetakan ke akun pemilik nomor. Setiap transaksi diberi rantai hash (HMAC bila `LEDGER_SECRET` diisi) dan status keutuhannya tampil di tab Transaksi.
 - **Rencana**: slider jatah per pos, Dana Darurat, Tabungan, dan Investasi. Simpan membuat versi rencana baru (versi lama diarsipkan). Opsi "berlaku juga di periode berjalan" menyesuaikan gaji periode aktif dan mencatat selisih ke Saldo.
-- **Transaksi**: catat pengeluaran, pemasukan, gaji, bonus, tarik, dan pindah; hapus transaksi (pembatalan, bukan hapus permanen). Menghapus gaji juga membatalkan alokasi dan selisihnya.
+- **Transaksi**: catat pengeluaran, pemasukan, gaji, bonus, tarik, dan pindah; ubah pemasukan/pengeluaran yang masih berlaku; hapus transaksi (pembatalan, bukan hapus permanen). Riwayat bisa difilter per bulan, pos, dompet, dan kata kunci. Menghapus gaji juga membatalkan alokasi dan selisihnya.
 - **Pos**: tambah pos (langsung masuk rencana aktif), ganti nama, tambah alias, nonaktifkan, dan setup awal sebelum gaji pertama.
 - **Piutang**: catat piutang (orang berutang ke kita) dan utang (kita berutang), bayar sebagian/lunas, atau batalkan.
 - **Target**: buat target tabungan (nama, nominal, target tanggal opsional), lihat saran sisihan per bulan/minggu, tambah tabungan sebagian demi sebagian, otomatis "Tercapai" saat terkumpul mencapai target.

@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { Tombol } from "@/components/tombol";
 import type { DashboardData, TxView } from "@/lib/dashboard";
 import { BarisInfo } from "./komponen";
@@ -139,8 +140,117 @@ export function KonfirmasiDialog({
   );
 }
 
-export function DetailDialog({ detailTx, tutup }: { detailTx: TxView; tutup: () => void }) {
+export function DetailDialog({
+  detailTx,
+  tutup,
+  data,
+  simpanUbah,
+  sibuk,
+}: {
+  detailTx: TxView;
+  tutup: () => void;
+  data?: DashboardData;
+  simpanUbah?: (body: Record<string, unknown>) => Promise<boolean>;
+  sibuk?: boolean;
+}) {
+  const [mengubah, setMengubah] = useState(false);
+  const [tanggal, setTanggal] = useState(detailTx.tanggal);
+  const [nominal, setNominal] = useState(String(detailTx.nominal));
+  const [label, setLabel] = useState(detailTx.label ?? "");
+  const posAwal = data?.posSemua.find((p) => p.id === detailTx.subPostId && p.aktif)?.id ?? null;
+  const [subPostId, setSubPostId] = useState(posAwal === null ? "" : String(posAwal));
+  const [accountId, setAccountId] = useState(detailTx.accountId === null ? "" : String(detailTx.accountId));
+  const [biayaAdmin, setBiayaAdmin] = useState(String(detailTx.biayaAdmin ?? 0));
   const detailEntries = Object.entries(detailTx.detail ?? {}).filter(([, nilai]) => nilai !== null && nilai !== "");
+  const bisaUbah = Boolean(
+    simpanUbah && data && detailTx.bisaDihapus && (detailTx.tipe === "out" || detailTx.tipe === "in"),
+  );
+  const namaDompet = data?.dompet.daftar.find((a) => a.id === detailTx.accountId)?.nama ?? null;
+
+  async function simpan() {
+    if (!simpanUbah) return;
+    const ok = await simpanUbah({
+      id: detailTx.id,
+      tanggal,
+      nominal: Number(nominal),
+      label: label.trim() || null,
+      subPostId: detailTx.tipe === "out" && subPostId ? Number(subPostId) : null,
+      accountId: accountId ? Number(accountId) : null,
+      biayaAdmin: detailTx.tipe === "out" ? Number(biayaAdmin || 0) : 0,
+    });
+    if (ok) tutup();
+  }
+
+  if (mengubah && data) {
+    return (
+      <div
+        className="dialog-overlay"
+        onMouseDown={(event) => {
+          if (event.target === event.currentTarget) setMengubah(false);
+        }}
+      >
+        <section className="dialog-kartu detail-kartu" role="dialog" aria-modal="true" aria-labelledby="ubah-judul">
+          <div className="detail-kepala">
+            <h2 id="ubah-judul">Ubah transaksi</h2>
+            <span className="badge">{NAMA_TIPE[detailTx.tipe] ?? detailTx.tipe}</span>
+          </div>
+          <div className="form">
+            <label>
+              Nominal (Rp)
+              <InputRupiah value={nominal} onChange={setNominal} placeholder="contoh 50.000" />
+            </label>
+            <label>
+              Tanggal
+              <input type="date" max={data.hariIni} value={tanggal} onChange={(e) => setTanggal(e.target.value)} />
+            </label>
+            <label>
+              Catatan (opsional)
+              <input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="contoh makan siang" />
+            </label>
+            <label>
+              Dompet
+              <select value={accountId} onChange={(e) => setAccountId(e.target.value)}>
+                <option value="">Dompet utama</option>
+                {data.dompet.daftar.map((akun) => (
+                  <option key={akun.id} value={akun.id}>
+                    {akun.nama}
+                  </option>
+                ))}
+              </select>
+            </label>
+            {detailTx.tipe === "out" ? (
+              <>
+                <label>
+                  Pos (opsional)
+                  <select value={subPostId} onChange={(e) => setSubPostId(e.target.value)}>
+                    <option value="">Belum dipetakan</option>
+                    {data.posSemua.filter((p) => p.aktif).map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.grup} — {p.nama}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  Biaya admin (Rp)
+                  <InputRupiah value={biayaAdmin} onChange={setBiayaAdmin} placeholder="0" />
+                </label>
+              </>
+            ) : null}
+          </div>
+          <div className="dialog-aksi">
+            <Tombol varian="sekunder" onClick={() => setMengubah(false)} disabled={sibuk}>
+              Batal
+            </Tombol>
+            <Tombol onClick={() => void simpan()} disabled={sibuk || !nominal || Number(nominal) < 1}>
+              {sibuk ? "Menyimpan..." : "Simpan perubahan"}
+            </Tombol>
+          </div>
+        </section>
+      </div>
+    );
+  }
+
   return (
     <div
       className="dialog-overlay"
@@ -162,6 +272,7 @@ export function DetailDialog({ detailTx, tutup }: { detailTx: TxView; tutup: () 
             nilai={<b>{rp(detailTx.tipe === "out" ? detailTx.nominal + detailTx.biayaAdmin : detailTx.nominal)}</b>}
           />
           <BarisInfo label="Pos" nilai={detailTx.subPost} />
+          {namaDompet ? <BarisInfo label="Dompet" nilai={namaDompet} /> : null}
           <BarisInfo label="Catatan" nilai={detailTx.label} />
           {detailTx.wadahAsal ? <BarisInfo label="Wadah asal" nilai={detailTx.wadahAsal} /> : null}
           {detailTx.wadahTujuan ? <BarisInfo label="Wadah tujuan" nilai={detailTx.wadahTujuan} /> : null}
@@ -182,6 +293,11 @@ export function DetailDialog({ detailTx, tutup }: { detailTx: TxView; tutup: () 
           </>
         ) : null}
         <div className="dialog-aksi">
+          {bisaUbah ? (
+            <Tombol varian="sekunder" onClick={() => setMengubah(true)} disabled={sibuk}>
+              Ubah
+            </Tombol>
+          ) : null}
           <Tombol varian="sekunder" onClick={tutup}>Tutup</Tombol>
         </div>
       </section>

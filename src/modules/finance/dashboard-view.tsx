@@ -11,7 +11,6 @@ import { JUDUL_TAB, MENU_IDENTITAS, MENU_SAMPING, TAB_UTAMA, indukTab } from "./
 import { Asisten } from "./view/tab-asisten";
 import { Dompet } from "./view/tab-dompet";
 import { Impor } from "./view/tab-impor";
-import { Keluarga } from "./view/tab-keluarga";
 import { Lainnya } from "./view/tab-lainnya";
 import { Piutang } from "./view/tab-piutang";
 import { Otomatis } from "./view/tab-otomatis";
@@ -352,7 +351,16 @@ export default function Dashboard({ awal, emailSetupSiap = false }: { awal: Dash
         ) : null}
         {scanSibuk ? <div className="toast" role="status">Membaca struk…</div> : null}
         {konfirmasi ? <KonfirmasiDialog konfirmasi={konfirmasi} setKonfirmasi={setKonfirmasi} /> : null}
-        {detailTx ? <DetailDialog detailTx={detailTx} tutup={() => setDetailTx(null)} /> : null}
+        {detailTx ? (
+          <DetailDialog
+            key={detailTx.id}
+            detailTx={detailTx}
+            data={data}
+            sibuk={sibuk}
+            simpanUbah={(body) => kirim("/api/transactions", "PATCH", body)}
+            tutup={() => setDetailTx(null)}
+          />
+        ) : null}
 
         <main className="konten">
           {tab === "ringkasan" ? (
@@ -391,8 +399,7 @@ export default function Dashboard({ awal, emailSetupSiap = false }: { awal: Dash
           ) : null}
           {tab === "pos" ? <Pos data={data} kirim={kirim} sibuk={sibuk} mintaKonfirmasi={mintaKonfirmasi} /> : null}
           {tab === "dompet" ? <Dompet data={data} kirim={kirim} sibuk={sibuk} /> : null}
-          {tab === "keluarga" ? <Keluarga kirim={kirim} sibuk={sibuk} /> : null}
-          {tab === "piutang" ? <Piutang data={data} kirim={kirim} sibuk={sibuk} mintaKonfirmasi={mintaKonfirmasi} /> : null}
+                    {tab === "piutang" ? <Piutang data={data} kirim={kirim} sibuk={sibuk} mintaKonfirmasi={mintaKonfirmasi} /> : null}
           {tab === "target" ? <Target data={data} kirim={kirim} sibuk={sibuk} mintaKonfirmasi={mintaKonfirmasi} /> : null}
           {tab === "otomatis" ? <Otomatis data={data} kirim={kirim} sibuk={sibuk} mintaKonfirmasi={mintaKonfirmasi} emailSetupSiap={emailSetupSiap} /> : null}
           {tab === "impor" ? <Impor kirim={kirim} sibuk={sibuk} /> : null}

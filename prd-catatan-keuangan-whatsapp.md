@@ -256,4 +256,4 @@ Keputusan berikut harus ditutup sebelum rilis yang menyentuh area terkait:
 
 Fitur kelas berbayar untuk pemakaian pribadi—tanpa billing/paywall—dicatat terpisah agar mudah dilanjutkan di sesi berikutnya: [PRD fitur premium pribadi](./prd-fitur-premium-pribadi.md). Dokumen teknisnya: [SRS fitur premium pribadi](./srs-fitur-premium-pribadi.md).
 
-Status ringkas: Wawasan, transaksi berulang, impor CSV, dan peringatan dalam aplikasi sudah ada. Berikutnya digest WhatsApp, multi-dompet, laporan lanjutan, AI Pro, kolaborasi, dan keamanan.
+Status ringkas per 11 November 2026: Wawasan, transaksi berulang, impor CSV, digest WhatsApp, multi-dompet, laporan lanjutan, AI Pro, keamanan akun, integrasi email, kalender `.ics`, Google Sheets, meter pemakaian, ubah transaksi, dan filter pos/dompet sudah ada. Kolaborasi keluarga ditangguhkan (API `/api/keluarga` mengembalikan 410). Berikutnya: tag/template/lampiran, recovery 2FA, audit lengkap, backup/restore, laporan formal, API, dan paywall jika dipublikasikan. Matriks status lengkap ada di PRD premium bagian 8.

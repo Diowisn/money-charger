@@ -5,7 +5,18 @@ export function aktorWeb(ip: string): string {
   return `web:${createHash("sha256").update(ip).digest("hex").slice(0, 16)}`;
 }
 
-const KUNCI_DETAIL_AMAN = new Set(["jenis", "pesanId", "provider", "status", "jumlah", "sumber"]);
+const KUNCI_DETAIL_AMAN = new Set([
+  "jenis",
+  "pesanId",
+  "provider",
+  "status",
+  "jumlah",
+  "sumber",
+  "id",
+  "tipe",
+  "nominal",
+  "tanggal",
+]);
 
 export function sanitasiDetailAudit(detail: Record<string, unknown>): Record<string, string | number | boolean> {
   return Object.fromEntries(

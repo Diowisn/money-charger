@@ -124,11 +124,24 @@ export class MemRepo implements Repo {
     this.d.txs.push({ ...tx, id, status: tx.status ?? "berlaku" });
     return id;
   }
-  async updateTx(id: number, patch: { status?: "berlaku" | "batal"; subPostId?: number | null }) {
+  async updateTx(id: number, patch: {
+    status?: "berlaku" | "batal";
+    subPostId?: number | null;
+    nominal?: number;
+    biayaAdmin?: number;
+    tanggal?: string;
+    label?: string | null;
+    accountId?: number | null;
+  }) {
     const t = this.d.txs.find((x) => x.id === id);
     if (!t) return;
     if (patch.status) t.status = patch.status;
     if (patch.subPostId !== undefined) t.subPostId = patch.subPostId;
+    if (patch.nominal !== undefined) t.nominal = patch.nominal;
+    if (patch.biayaAdmin !== undefined) t.biayaAdmin = patch.biayaAdmin;
+    if (patch.tanggal !== undefined) t.tanggal = patch.tanggal;
+    if (patch.label !== undefined) t.label = patch.label;
+    if (patch.accountId !== undefined) t.accountId = patch.accountId;
   }
   async setGajiPlan(txId: number, planVersionId: number) {
     const t = this.d.txs.find((x) => x.id === txId);

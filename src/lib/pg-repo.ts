@@ -1,6 +1,7 @@
 import { Pool, types, type PoolClient } from "pg";
 import type { Repo } from "./repo";
 import { parseConfig } from "./engine";
+import { hashBaris, type HasilLedger } from "./ledger";
 import {
   SEED_CONFIG_DEFAULT,
   SEED_DD,
@@ -65,24 +66,31 @@ export class PgRepo implements Repo {
     return this.requireUserId();
   }
 
-  /** Akun pertama pemilik data lama. Dipakai job tanpa sesi (email/WhatsApp) agar transaksi tidak tersimpan tanpa user_id. */
-  async firstUserId(): Promise<string | null> {
-    const r = await this.db.query("SELECT id FROM auth_users ORDER BY created_at, id LIMIT 1");
-    return r.rows[0]?.id ?? null;
+  /** Hanya dipakai job tanpa sesi saat sistem benar-benar single-user; multi-user wajib punya pemetaan eksplisit. */
+  async soleUserId(): Promise<string | null> {
+    const r = await this.db.query("SELECT id FROM auth_users ORDER BY created_at, id LIMIT 2");
+    return r.rows.length === 1 ? r.rows[0].id : null;
   }
 
-  /** Pemilik workspace untuk nomor WhatsApp anggota, bila terdaftar. */
-  async ownerForWa(wa: string): Promise<string | null> {
+  /** Akun pemilik nomor WhatsApp. Data tidak pernah dibagi ke akun lain. */
+  async userIdForWa(wa: string): Promise<string | null> {
     try {
       const r = await this.db.query(
-        "SELECT owner_id FROM workspace_members WHERE wa_number = $1 AND status = 'aktif' LIMIT 1",
+        "SELECT member_id FROM workspace_members WHERE wa_number = $1 AND status = 'aktif' LIMIT 1",
         [wa],
       );
-      return r.rows[0]?.owner_id ?? null;
+      if (r.rows[0]?.member_id) return r.rows[0].member_id;
     } catch (error) {
-      if ((error as { code?: string }).code === "42P01") return null;
-      throw error;
+      if ((error as { code?: string }).code !== "42P01") throw error;
     }
+    const akun = await this.db.query(
+      `SELECT id FROM auth_users
+       WHERE regexp_replace(COALESCE(telepon, ''), '\\D', '', 'g') IN ($1, '0' || substr($1, 3), substr($1, 3))
+       LIMIT 1`,
+      [wa],
+    );
+    if (akun.rows[0]?.id) return akun.rows[0].id;
+    return this.soleUserId();
   }
 
   /** Mencocokkan email kotak masuk dengan akun terdaftar (tidak peka huruf besar/kecil). */
@@ -200,7 +208,14 @@ export class PgRepo implements Repo {
   }
 
   async isAllowed(wa: string) {
-    const r = await this.db.query("SELECT 1 FROM allowed_numbers WHERE wa_number = $1 AND aktif", [wa]);
+    const r = await this.db.query(
+      `SELECT 1 FROM allowed_numbers WHERE wa_number = $1 AND aktif
+       UNION ALL
+       SELECT 1 FROM auth_users
+       WHERE regexp_replace(COALESCE(telepon, ''), '\\D', '', 'g') IN ($1, '0' || substr($1, 3), substr($1, 3))
+       LIMIT 1`,
+      [wa],
+    );
     return (r.rowCount ?? 0) > 0;
   }
 
@@ -251,12 +266,114 @@ export class PgRepo implements Repo {
         t.status ?? "berlaku", t.penggantiDari, t.indukId, t.planVersionId, t.waMessageId,
       ],
     );
-    return r.rows[0].id as number;
+    const id = r.rows[0].id as number;
+    await this.rechainFrom(id);
+    return id;
   }
-  async updateTx(id: number, patch: { status?: "berlaku" | "batal"; subPostId?: number | null }) {
-    if (patch.status) await this.db.query("UPDATE transactions SET status = $2 WHERE id = $1 AND user_id IS NOT DISTINCT FROM $3", [id, patch.status, this.financeUser()]);
-    if (patch.subPostId !== undefined)
-      await this.db.query("UPDATE transactions SET sub_post_id = $2 WHERE id = $1 AND user_id IS NOT DISTINCT FROM $3", [id, patch.subPostId, this.financeUser()]);
+
+  /** Hitung ulang hash baris mulai id ini sampai terakhir (update status ikut mengubah rantai). */
+  private async rechainFrom(id: number) {
+    const userId = this.financeUser();
+    const before = await this.db.query(
+      "SELECT hash FROM transactions WHERE user_id IS NOT DISTINCT FROM $1 AND id < $2 ORDER BY id DESC LIMIT 1",
+      [userId, id],
+    );
+    let prev = (before.rows[0]?.hash as string | null) ?? "";
+    const rows = await this.db.query(
+      "SELECT * FROM transactions WHERE user_id IS NOT DISTINCT FROM $1 AND id >= $2 ORDER BY id",
+      [userId, id],
+    );
+    for (const row of rows.rows) {
+      const hash = hashBaris(row, prev || null);
+      await this.db.query("UPDATE transactions SET hash_prev = $2, hash = $3 WHERE id = $1", [row.id, prev || null, hash]);
+      prev = hash;
+    }
+    const kepala = await this.db.query(
+      "SELECT id, hash FROM transactions WHERE user_id IS NOT DISTINCT FROM $1 ORDER BY id DESC LIMIT 1",
+      [userId],
+    );
+    const jumlah = await this.db.query(
+      "SELECT COUNT(*)::bigint AS n FROM transactions WHERE user_id IS NOT DISTINCT FROM $1",
+      [userId],
+    );
+    await this.db.query(
+      `INSERT INTO ledger_anchors (user_id, tx_id, tx_count, root, diperbarui_pada)
+       VALUES ($1,$2,$3,$4,now())
+       ON CONFLICT (user_id) DO UPDATE
+       SET tx_id = EXCLUDED.tx_id, tx_count = EXCLUDED.tx_count, root = EXCLUDED.root, diperbarui_pada = now()`,
+      [userId, kepala.rows[0]?.id ?? null, jumlah.rows[0]?.n ?? 0, kepala.rows[0]?.hash ?? null],
+    );
+  }
+
+  /** Mengisi hash untuk transaksi lama setelah migrasi/skema baru. */
+  async backfillLedger() {
+    await this.rechainFrom(0);
+  }
+
+  /** Backfill sekali jalan bila masih ada transaksi lama tanpa hash. */
+  async ensureLedger() {
+    if (!(await this.cek()).rows.length) return;
+    await this.transaction(async (r) => {
+      const db = r as PgRepo;
+      if ((await db.cek()).rows.length) await db.backfillLedger();
+    });
+  }
+
+  private cek() {
+    return this.db.query(
+      "SELECT 1 FROM transactions WHERE user_id IS NOT DISTINCT FROM $1 AND hash IS NULL LIMIT 1",
+      [this.financeUser()],
+    );
+  }
+
+  /** Periksa utuh/tidaknya rantai hash milik user ini. */
+  async verifyLedger(): Promise<HasilLedger> {
+    const userId = this.financeUser();
+    const rows = await this.db.query(
+      "SELECT * FROM transactions WHERE user_id IS NOT DISTINCT FROM $1 ORDER BY id",
+      [userId],
+    );
+    let prev = "";
+    for (const row of rows.rows) {
+      const hash = hashBaris(row, prev || null);
+      if ((row.hash_prev ?? "") !== prev || row.hash !== hash) {
+        return { ok: false, jumlah: rows.rows.length, akar: prev || null, rusak: Number(row.id) };
+      }
+      prev = hash;
+    }
+    return { ok: true, jumlah: rows.rows.length, akar: prev || null, rusak: null };
+  }
+
+  async updateTx(id: number, patch: {
+    status?: "berlaku" | "batal";
+    subPostId?: number | null;
+    nominal?: number;
+    biayaAdmin?: number;
+    tanggal?: string;
+    label?: string | null;
+    accountId?: number | null;
+  }) {
+    const sets: string[] = [];
+    const nilai: unknown[] = [];
+    const tambah = (kolom: string, v: unknown) => {
+      nilai.push(v);
+      sets.push(`${kolom} = $${nilai.length}`);
+    };
+    if (patch.status !== undefined) tambah("status", patch.status);
+    if (patch.subPostId !== undefined) tambah("sub_post_id", patch.subPostId);
+    if (patch.nominal !== undefined) tambah("nominal", patch.nominal);
+    if (patch.biayaAdmin !== undefined) tambah("biaya_admin", patch.biayaAdmin);
+    if (patch.tanggal !== undefined) tambah("tanggal", patch.tanggal);
+    if (patch.label !== undefined) tambah("label", patch.label);
+    if (patch.accountId !== undefined) tambah("account_id", patch.accountId);
+    if (!sets.length) return;
+    const idParam = nilai.length + 1;
+    const userParam = nilai.length + 2;
+    await this.db.query(
+      `UPDATE transactions SET ${sets.join(", ")} WHERE id = $${idParam} AND user_id IS NOT DISTINCT FROM $${userParam}`,
+      [...nilai, id, this.financeUser()],
+    );
+    await this.rechainFrom(id);
   }
   async setGajiPlan(txId: number, planVersionId: number) {
     await this.db.query(
@@ -265,6 +382,7 @@ export class PgRepo implements Repo {
          AND EXISTS (SELECT 1 FROM plan_versions WHERE id = $2 AND user_id IS NOT DISTINCT FROM $3)`,
       [txId, planVersionId, this.financeUser()],
     );
+    await this.rechainFrom(txId);
   }
 
   async setConfig(k: string, v: string) {

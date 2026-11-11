@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { NextRequest } from "next/server";
 import { sanitasiDetailAudit } from "@/lib/audit";
 import { retryOutbox } from "@/modules/outbox/controller";
-import { terimaEmail } from "@/modules/email/controller";
+import { tautkanEmail, terimaEmail } from "@/modules/email/controller";
 import { health } from "@/modules/health/controller";
 import { terimaWebhook } from "@/modules/whatsapp/controller";
 
@@ -24,6 +24,24 @@ describe("proteksi endpoint operasional", () => {
   it("menghapus isi dan field sensitif dari detail audit", () => {
     expect(sanitasiDetailAudit({ jenis: "text", pesanId: "wamid.123", nomor: "628123456789", pesan: "out 20rb kopi", token: "secret" })).toEqual({ jenis: "text", pesanId: "wamid.123" });
     expect(sanitasiDetailAudit({ jenis: "x".repeat(200) })).toEqual({ jenis: "x".repeat(120) });
+  });
+
+  it("menolak tautan Gmail tanpa secret yang benar", async () => {
+    delete process.env.EMAIL_INBOUND_SECRET;
+    const tanpaSecret = new NextRequest("https://app.example/api/email/link", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ akun: "a@example.com" }),
+    });
+    expect((await tautkanEmail(tanpaSecret)).status).toBe(503);
+
+    process.env.EMAIL_INBOUND_SECRET = "secret-uji";
+    const salah = new NextRequest("https://app.example/api/email/link", {
+      method: "POST",
+      headers: { "content-type": "application/json", "x-email-secret": "salah" },
+      body: JSON.stringify({ akun: "a@example.com" }),
+    });
+    expect((await tautkanEmail(salah)).status).toBe(401);
   });
 
   it("menolak secret email di query string", async () => {

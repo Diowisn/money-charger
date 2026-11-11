@@ -159,11 +159,16 @@ export function Otomatis({
       <section className="kartu">
         <div className="baris-antara">
           <h2>Email Bank/E-Wallet</h2>
-          <span className={`badge ${emailSetupSiap ? "hijau" : ""}`}>{emailSetupSiap ? "Siap" : "Belum"}</span>
+          <span className={`badge ${data.email?.terhubung ? "hijau" : ""}`}>
+            {data.email?.terhubung ? "Tertaut" : data.email?.terdaftar ? "Terdaftar" : emailSetupSiap ? "Siap dipasang" : "Belum"}
+          </span>
         </div>
         <p className="muted kecil">
-          Aktifkan sekali per akun Gmail yang menerima notifikasi transaksi. Pilih akun Google yang sama dengan email
-          akun Money-Charger. Setelah aktif, email diperiksa tiap 5 menit.
+          {data.email?.terhubung
+            ? `Gmail ${data.email.email ?? ""} sudah tertaut. Email bank/e-wallet diperiksa tiap 5 menit dan masuk ke akun ini saja.`
+            : data.email?.terdaftar
+              ? `Email ${data.email.email ?? ""} sudah terdaftar di server. Klik "Aktifkan email otomatis" sekali agar Gmail ini mengirim transaksi.`
+              : "Aktifkan sekali per akun Gmail yang menerima notifikasi transaksi. Pilih akun Google yang sama dengan email akun Money-Charger. Setelah aktif, email diperiksa tiap 5 menit."}
         </p>
         {emailSetupSiap ? (
           <div className="baris-tombol">

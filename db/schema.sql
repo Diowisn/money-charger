@@ -114,6 +114,8 @@ CREATE TABLE IF NOT EXISTS transactions (
   wa_message_id       TEXT,
   account_id          BIGINT REFERENCES accounts(id) ON DELETE SET NULL,
   account_id_tujuan   BIGINT REFERENCES accounts(id) ON DELETE SET NULL,
+  hash_prev           TEXT,                                 -- hash transaksi sebelumnya milik user ini
+  hash                TEXT,                                 -- SHA-256/HMAC dari isi transaksi + hash_prev
   dibuat_pada         TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS idx_tx_tanggal ON transactions (tanggal);
@@ -124,6 +126,17 @@ ALTER TABLE transactions ADD COLUMN IF NOT EXISTS detail JSONB NOT NULL DEFAULT 
 ALTER TABLE transactions ADD COLUMN IF NOT EXISTS account_id BIGINT REFERENCES accounts(id) ON DELETE SET NULL;
 ALTER TABLE transactions ADD COLUMN IF NOT EXISTS account_id_tujuan BIGINT REFERENCES accounts(id) ON DELETE SET NULL;
 CREATE INDEX IF NOT EXISTS idx_tx_account ON transactions (account_id, tanggal);
+ALTER TABLE transactions ADD COLUMN IF NOT EXISTS hash_prev TEXT;
+ALTER TABLE transactions ADD COLUMN IF NOT EXISTS hash TEXT;
+
+-- Kepala rantai hash per user. Dipakai untuk membandingkan akar rantai saat ini.
+CREATE TABLE IF NOT EXISTS ledger_anchors (
+  user_id         UUID PRIMARY KEY REFERENCES auth_users(id) ON DELETE CASCADE,
+  tx_id           BIGINT,
+  tx_count        BIGINT NOT NULL DEFAULT 0,
+  root            TEXT,
+  diperbarui_pada TIMESTAMPTZ NOT NULL DEFAULT now()
+);
 
 CREATE TABLE IF NOT EXISTS debts (
   id            BIGSERIAL PRIMARY KEY,
@@ -187,6 +200,27 @@ CREATE TABLE IF NOT EXISTS pending_actions (
   status            TEXT NOT NULL DEFAULT 'menunggu',
   dibuat_pada       TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+CREATE TABLE IF NOT EXISTS email_links (
+  user_id       UUID PRIMARY KEY REFERENCES auth_users(id) ON DELETE CASCADE,
+  email         TEXT NOT NULL,
+  linked_at     TIMESTAMPTZ,                                -- diisi setelah Apps Script/email pertama terverifikasi
+  last_email_at TIMESTAMPTZ
+);
+ALTER TABLE email_links ALTER COLUMN linked_at DROP NOT NULL;
+ALTER TABLE email_links ALTER COLUMN linked_at DROP DEFAULT;
+CREATE UNIQUE INDEX IF NOT EXISTS idx_email_links_email ON email_links (lower(email));
+
+-- Akun baru/berubah email langsung terdaftar untuk pencocokan email masuk.
+CREATE OR REPLACE FUNCTION daftarkan_email_akun() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN
+  INSERT INTO email_links (user_id, email) VALUES (NEW.id, NEW.email)
+  ON CONFLICT (user_id) DO UPDATE SET email = EXCLUDED.email;
+  RETURN NEW;
+END $$;
+DROP TRIGGER IF EXISTS trg_email_links ON auth_users;
+CREATE TRIGGER trg_email_links AFTER INSERT OR UPDATE OF email ON auth_users
+FOR EACH ROW EXECUTE FUNCTION daftarkan_email_akun();
 
 CREATE TABLE IF NOT EXISTS inbound_messages (
   wa_message_id  TEXT PRIMARY KEY,

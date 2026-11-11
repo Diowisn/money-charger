@@ -18,6 +18,7 @@ const SEMUA_VARS = [
   "HEALTH_TOKEN",
   "EMAIL_INBOUND_SECRET",
   "CRON_SECRET",
+  "LEDGER_SECRET",
 ] as const;
 
 const TABEL = [
@@ -33,6 +34,8 @@ const TABEL = [
   "plan_versions",
   "plan_items",
   "transactions",
+  "ledger_anchors",
+  "email_links",
   "pending_actions",
   "inbound_messages",
   "config",
@@ -86,6 +89,7 @@ export async function periksaKesiapan() {
   if (!env.HEALTH_TOKEN) peringatan.push("HEALTH_TOKEN kosong; endpoint /api/health hanya menampilkan status ringkas.");
   if (!env.EMAIL_INBOUND_SECRET) peringatan.push("EMAIL_INBOUND_SECRET kosong; webhook email menolak semua permintaan.");
   if (!env.CRON_SECRET) peringatan.push("CRON_SECRET kosong; retry terjadwal outbox belum aktif.");
+  if (!env.LEDGER_SECRET) peringatan.push("LEDGER_SECRET kosong; hash transaksi memakai SHA-256 tanpa kunci rahasia.");
 
   const db: Record<string, unknown> = {
     tersambung: false,
