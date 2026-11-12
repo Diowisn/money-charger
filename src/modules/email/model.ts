@@ -255,3 +255,57 @@ export async function prosesEmailMasuk(input: EmailMasuk): Promise<HasilEmail> {
   await catatAudit("email", "email_diproses", { dicatat: hasil.dicatat });
   return hasil;
 }
+
+/** Pratinjau parsing email tanpa menulis transaksi, inbound, atau status tautan. */
+export async function pratinjauEmail(input: EmailMasuk) {
+  const repo = new PgRepo();
+  const userId = await repo.userIdByEmailOrSoleUser(input.akun);
+  if (!userId) {
+    return {
+      ok: false,
+      cocok: false,
+      akun: input.akun ?? null,
+      pesan: input.akun
+        ? `Email untuk "${input.akun}" tidak cocok dengan akun terdaftar.`
+        : "Email tidak menyertakan alamat penerima dan sistem punya lebih dari satu akun.",
+    };
+  }
+
+  const state = await new PgRepo(undefined, undefined, userId).load();
+  const hariIni = wibDate(Date.now());
+  const teksGabung = `${input.subjek ?? ""}\n${input.teks ?? ""}`;
+  const arah = arahEmail(input.subjek ?? "", input.teks ?? "");
+  const tanggal = tanggalIsoSah(input.tanggal, hariIni) ?? ekstrakTanggalEmail(teksGabung, hariIni) ?? hariIni;
+  const detail = ekstrakDetailEmail(teksGabung);
+  const penyedia = input.penyedia ?? deteksiPenyediaEmail(input.dari, input.subjek, input.teks);
+  const nominal =
+    detail.total ??
+    (input.nominal && input.nominal > 0 ? Math.round(input.nominal) : ekstrakNominalEmail(teksGabung));
+  const label = detail.merchant ?? labelEmail(input.subjek ?? "", input.teks ?? "", arah ?? "keluar") ?? (input.subjek ?? "Email masuk").slice(0, 120);
+  const dompet = input.dompet ?? detail.dompet ?? penyedia;
+  const accountId = cocokAkun(state.accounts, [dompet, penyedia, detail.dompet]) ?? null;
+  const subPostId = arah === "keluar" ? pilihPos(state, detail, label) : null;
+  const account = state.accounts.find((a) => a.id === accountId);
+  const subPost = state.subPosts.find((s) => s.id === subPostId);
+
+  return {
+    ok: true,
+    cocok: true,
+    akun: input.akun ?? null,
+    arah,
+    nominal: nominal ?? null,
+    tanggal,
+    label,
+    dompet,
+    penyedia,
+    dompetCocok: account ? { id: account.id, nama: account.nama } : null,
+    posCocok: subPost ? { id: subPost.id, nama: subPost.nama } : null,
+    detail,
+    dicatat: false,
+    pesan: !arah
+      ? "Arah transaksi tidak dikenali; email tidak akan dicatat."
+      : !nominal
+        ? "Nominal tidak ditemukan; email tidak akan dicatat."
+        : "Pratinjau saja; tidak ada transaksi yang disimpan.",
+  };
+}

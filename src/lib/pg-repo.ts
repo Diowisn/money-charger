@@ -170,6 +170,7 @@ export class PgRepo implements Repo {
           accountIdTujuan: t.account_id_tujuan ?? null,
           tanggal: t.tanggal,
           label: t.label,
+          tags: Array.isArray(t.tags) ? t.tags : [],
           detail: t.detail && typeof t.detail === "object" && !Array.isArray(t.detail) ? t.detail : null,
           sumber: t.sumber,
           status: t.status,
@@ -258,11 +259,11 @@ export class PgRepo implements Repo {
     const r = await this.db.query(
       `INSERT INTO transactions
         (user_id, tipe, nominal, biaya_admin, sub_post_id, sub_post_id_tujuan, wadah_asal, wadah_tujuan, account_id, account_id_tujuan,
-         tanggal, label, detail, sumber, status, pengganti_dari, induk_id, plan_version_id, wa_message_id)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19) RETURNING id`,
+         tanggal, label, tags, detail, sumber, status, pengganti_dari, induk_id, plan_version_id, wa_message_id)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20) RETURNING id`,
       [
         this.financeUser(), t.tipe, t.nominal, t.biayaAdmin ?? 0, t.subPostId, t.subPostIdTujuan, t.wadahAsal, t.wadahTujuan,
-        t.accountId, t.accountIdTujuan, t.tanggal, t.label, t.detail ? JSON.stringify(t.detail) : "{}", t.sumber,
+        t.accountId, t.accountIdTujuan, t.tanggal, t.label, t.tags ?? [], t.detail ? JSON.stringify(t.detail) : "{}", t.sumber,
         t.status ?? "berlaku", t.penggantiDari, t.indukId, t.planVersionId, t.waMessageId,
       ],
     );
@@ -351,6 +352,7 @@ export class PgRepo implements Repo {
     biayaAdmin?: number;
     tanggal?: string;
     label?: string | null;
+    tags?: string[];
     accountId?: number | null;
   }) {
     const sets: string[] = [];
@@ -365,6 +367,7 @@ export class PgRepo implements Repo {
     if (patch.biayaAdmin !== undefined) tambah("biaya_admin", patch.biayaAdmin);
     if (patch.tanggal !== undefined) tambah("tanggal", patch.tanggal);
     if (patch.label !== undefined) tambah("label", patch.label);
+    if (patch.tags !== undefined) tambah("tags", patch.tags);
     if (patch.accountId !== undefined) tambah("account_id", patch.accountId);
     if (!sets.length) return;
     const idParam = nilai.length + 1;

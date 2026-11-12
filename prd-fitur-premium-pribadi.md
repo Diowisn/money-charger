@@ -3,7 +3,7 @@
 | Atribut | Nilai |
 |---|---|
 | Status | Aktif; penggunaan pribadi, tanpa paywall |
-| Versi | 1.5 |
+| Versi | 1.6 |
 | Tanggal | 11 November 2026 |
 | Pemilik dokumen | Pemilik produk |
 | Dokumen induk | [PRD utama](./prd-catatan-keuangan-whatsapp.md) |
@@ -21,6 +21,7 @@
 | 1.3 | 10 Nov 2026 | Email, kalender, Google Sheets, meter pemakaian. |
 | 1.4 | 11 Nov 2026 | Lengkapi alur, prioritas, NFR, privasi, operasi, roadmap, matriks fitur, paywall, dan traceability. |
 | 1.5 | 11 Nov 2026 | Implementasi ubah transaksi dan filter pos/dompet. |
+| 1.6 | 11 Nov 2026 | Implementasi tag transaksi dan rekap 24 bulan. |
 
 **Konvensi status**
 
@@ -54,7 +55,7 @@ Membuat Money-Charger terasa seperti aplikasi keuangan kelas berbayar untuk pema
 - **Fondasi inti sudah ada:** autentikasi per akun, transaksi, pos/kategori, dompet, ringkasan, pencarian, ekspor, piutang/utang, target tabungan, dan asisten AI.
 - **Lapisan premium pribadi sudah ada:** wawasan, transaksi otomatis, impor CSV, digest WhatsApp, multi-dompet, laporan lanjutan, AI Pro, keamanan akun, email transaksi, kalender `.ics`, Google Sheets, dan meter pemakaian.
 - **Kolaborasi keluarga ditangguhkan:** model, tabel, dan pengujian peran masih ada, tetapi API `/api/keluarga` sengaja mengembalikan `410` karena berbagi data lintas akun belum diizinkan. Dokumen ini tidak boleh lagi menyebut fitur tersebut “selesai” sampai keputusan dan threat model workspace disetujui.
-- **Yang belum ada dan menjadi kandidat berikutnya:** tag, template input, lampiran struk tersimpan, multi-mata uang, audit log lengkap dengan UI, recovery 2FA, backup/restore satu klik, API/webhook publik, laporan laba rugi/arus kas formal, simulasi skenario, otomatisasi aturan, Telegram, dan white-label PDF.
+- **Yang belum ada dan menjadi kandidat berikutnya:** template input, lampiran struk tersimpan, multi-mata uang, audit log lengkap dengan UI, recovery 2FA, backup/restore satu klik, API/webhook publik, laporan laba rugi/arus kas formal, simulasi skenario, otomatisasi aturan, Telegram, dan white-label PDF.
 - **Paywall/billing tetap di luar lingkup** selama aplikasi dipakai pribadi.
 
 Matriks status per fitur ada di bagian 8. Detail teknis ada di [SRS](./srs-fitur-premium-pribadi.md).
@@ -241,7 +242,7 @@ Matriks status per fitur ada di bagian 8. Detail teknis ada di [SRS](./srs-fitur
 |---|---|---|
 | Transfer antar dompet | Selesai | Tidak dihitung sebagai pemasukan/pengeluaran |
 | Lampiran bukti/struk | Sebagian | Foto struk diproses OCR via WhatsApp; file tidak disimpan sebagai lampiran transaksi |
-| Tag transaksi | Belum | Belum ada skema/UI tag |
+| Tag transaksi | Selesai | Tag bebas, filter, tampil di detail, ikut CSV |
 | Template input cepat | Belum | Perintah WhatsApp cepat, tetapi template yang bisa disimpan belum ada |
 | Input via WhatsApp | Selesai | Perintah teks, foto struk, tanya jawab |
 | Input via Telegram | Belum | Belum ada adapter Telegram |
@@ -270,7 +271,7 @@ Matriks status per fitur ada di bagian 8. Detail teknis ada di [SRS](./srs-fitur
 | Transaksi berulang/pengingat tanpa batas | Selesai | Tidak ada batas jumlah aturan |
 | Laporan laba rugi dan arus kas | Sebagian | Ringkasan pemasukan/pengeluaran/arus bersih; format laporan formal belum |
 | Laporan kustom periode/kategori/dompet | Sebagian | Periode kustom ada; filter kategori/dompet belum |
-| Perbandingan multi-tahun dan tren panjang | Belum | Grafik saat ini 6 bulan |
+| Perbandingan multi-tahun dan tren panjang | Selesai | Grafik rekap 6/12/24 bulan |
 | Skor kesehatan, rasio tabungan, rasio utang | Sebagian | Skor dan rasio tabungan ada; rasio utang eksplisit belum |
 | Insight otomatis | Selesai | Anomali, langganan, perubahan kategori |
 | Prediksi saldo dan simulasi skenario | Sebagian | Prediksi ada; simulasi “hemat 10%” belum |
@@ -298,10 +299,10 @@ Matriks status per fitur ada di bagian 8. Detail teknis ada di [SRS](./srs-fitur
 | Prioritas | Item | Alasan | Kriteria selesai |
 |---|---|---|---|
 | P2 | Ubah transaksi + filter pos/dompet **(selesai)** | Koreksi data tanpa hapus; pencarian lebih cepat | Edit tercatat audit; filter bekerja di riwayat |
-| P2 | Tag + template + lampiran struk | Input lebih cepat dan bukti tersimpan | Tag CRUD; template CRUD; lampiran terhubung transaksi |
+| P2 | Template + lampiran struk | Input lebih cepat dan bukti tersimpan | Template CRUD; lampiran terhubung transaksi |
 | P2 | Recovery 2FA + audit UI + ekspor penuh | Keamanan dan kepercayaan | Recovery code sekali pakai; audit bisa dicari; ekspor semua entitas |
 | P2 | Re-enable kolaborasi/approval | Nilai keluarga | Isolasi workspace, audit akses, dan AC-KEL lulus |
-| P2 | Laporan laba rugi/arus kas + multi-tahun + simulasi | Analisis lebih dalam | Laporan formal, tren >1 tahun, simulasi tanpa mutasi |
+| P2 | Laporan laba rugi/arus kas + simulasi | Analisis lebih dalam | Laporan formal dan simulasi tanpa mutasi; rekap 24 bulan sudah ada |
 | P2 | API/webhook publik + ekspor akuntansi | Integrasi | API key, scope, rate limit, dokumentasi, audit |
 | P3 | Paywall/entitlement + kuota | Hanya jika dipublikasikan | Matriks paket, billing webhook idempoten, uji refund/dunning |
 | P3 | PIN/biometrik, white-label PDF, akuntan eksternal | Kebutuhan SaaS | Threat model dan uji akses |
@@ -534,7 +535,7 @@ Jadwalkan berkala; `/api/health` memperingatkan bila cron belum pernah jalan ata
 
 ### 14.2 P2 — penguatan
 
-- Ubah transaksi, filter pos/dompet, tag, template, dan lampiran lulus uji.
+- Ubah transaksi, filter pos/dompet, dan tag lulus uji; template/lampiran masih P2.
 - Recovery 2FA tersedia dan diuji; audit UI dapat mencari aksi sensitif.
 - Ekspor seluruh entitas (bukan hanya transaksi) tersedia.
 - Laporan laba rugi/arus kas, multi-tahun, dan simulasi tidak mengubah data.

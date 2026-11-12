@@ -131,6 +131,7 @@ export class MemRepo implements Repo {
     biayaAdmin?: number;
     tanggal?: string;
     label?: string | null;
+    tags?: string[];
     accountId?: number | null;
   }) {
     const t = this.d.txs.find((x) => x.id === id);
@@ -141,6 +142,7 @@ export class MemRepo implements Repo {
     if (patch.biayaAdmin !== undefined) t.biayaAdmin = patch.biayaAdmin;
     if (patch.tanggal !== undefined) t.tanggal = patch.tanggal;
     if (patch.label !== undefined) t.label = patch.label;
+    if (patch.tags !== undefined) t.tags = patch.tags;
     if (patch.accountId !== undefined) t.accountId = patch.accountId;
   }
   async setGajiPlan(txId: number, planVersionId: number) {

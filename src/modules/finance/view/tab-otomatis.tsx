@@ -25,6 +25,11 @@ export function Otomatis({
   const [mulai, setMulai] = useState(data.hariIni);
   const [pesanKalender, setPesanKalender] = useState<string | null>(null);
   const pos = data.posSemua.filter((p) => p.aktif);
+  const emailTerakhir = data.email?.lastEmailAt ?? data.email?.linkedAt ?? null;
+  const emailBasi = Boolean(
+    data.email?.terhubung &&
+      (!emailTerakhir || Date.now() - Date.parse(emailTerakhir) > 86_400_000),
+  );
 
   async function salinLangganan() {
     setPesanKalender(null);
@@ -159,16 +164,18 @@ export function Otomatis({
       <section className="kartu">
         <div className="baris-antara">
           <h2>Email Bank/E-Wallet</h2>
-          <span className={`badge ${data.email?.terhubung ? "hijau" : ""}`}>
-            {data.email?.terhubung ? "Tertaut" : data.email?.terdaftar ? "Terdaftar" : emailSetupSiap ? "Siap dipasang" : "Belum"}
+          <span className={`badge ${emailBasi ? "tipe-out" : data.email?.terhubung ? "hijau" : ""}`}>
+            {emailBasi ? "Perlu dicek" : data.email?.terhubung ? "Tertaut" : data.email?.terdaftar ? "Terdaftar" : emailSetupSiap ? "Siap dipasang" : "Belum"}
           </span>
         </div>
         <p className="muted kecil">
-          {data.email?.terhubung
-            ? `Gmail ${data.email.email ?? ""} sudah tertaut. Email bank/e-wallet diperiksa tiap 5 menit dan masuk ke akun ini saja.`
-            : data.email?.terdaftar
-              ? `Email ${data.email.email ?? ""} sudah terdaftar di server. Klik "Aktifkan email otomatis" sekali agar Gmail ini mengirim transaksi.`
-              : "Aktifkan sekali per akun Gmail yang menerima notifikasi transaksi. Pilih akun Google yang sama dengan email akun Money-Charger. Setelah aktif, email diperiksa tiap 5 menit."}
+          {emailBasi
+            ? "Sudah tertaut, tetapi belum ada email transaksi dalam 24 jam. Periksa trigger Gmail/Apps Script atau SECRET."
+            : data.email?.terhubung
+              ? `Gmail ${data.email.email ?? ""} sudah tertaut. Email bank/e-wallet diperiksa tiap 5 menit dan masuk ke akun ini saja.`
+              : data.email?.terdaftar
+                ? `Email ${data.email.email ?? ""} sudah terdaftar di server. Klik "Aktifkan email otomatis" sekali agar Gmail ini mengirim transaksi.`
+                : "Aktifkan sekali per akun Gmail yang menerima notifikasi transaksi. Pilih akun Google yang sama dengan email akun Money-Charger. Setelah aktif, email diperiksa tiap 5 menit."}
         </p>
         {emailSetupSiap ? (
           <div className="baris-tombol">

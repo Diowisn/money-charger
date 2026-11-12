@@ -1,4 +1,4 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Tombol } from "@/components/tombol";
 import type { DashboardData } from "@/lib/dashboard";
 import { BULAN_PENDEK, labelBulan, mundurBulan, rp } from "./format";
@@ -8,10 +8,11 @@ import type { Tab } from "./tipe";
 export function Rekap({ data, navigasi }: { data: DashboardData; navigasi: (tab: Tab) => void }) {
   const r = data.ringkasan;
   const bulanIni = data.hariIni.slice(0, 7);
+  const [rentang, setRentang] = useState(6);
   const daftarBulan = useMemo(() => {
     const [tahun, bulan] = data.hariIni.split("-").map(Number);
-    return Array.from({ length: 6 }, (_, i) => mundurBulan(tahun, bulan, 5 - i));
-  }, [data.hariIni]);
+    return Array.from({ length: rentang }, (_, i) => mundurBulan(tahun, bulan, rentang - 1 - i));
+  }, [data.hariIni, rentang]);
 
   const agregat = useMemo(
     () =>
@@ -59,10 +60,18 @@ export function Rekap({ data, navigasi }: { data: DashboardData; navigasi: (tab:
 
       <section className="kartu rekap-grafik">
         <div className="baris-antara">
-          <h2>Rekap 6 Bulan</h2>
-          <span className="badge">Bulanan</span>
+          <h2>Rekap {rentang} Bulan</h2>
+          <select
+            aria-label="Rentang rekap"
+            value={rentang}
+            onChange={(event) => setRentang(Number(event.target.value))}
+          >
+            <option value={6}>6 bulan</option>
+            <option value={12}>12 bulan</option>
+            <option value={24}>24 bulan</option>
+          </select>
         </div>
-        <div className="grafik-batang" role="img" aria-label="Grafik pemasukan dan pengeluaran 6 bulan">
+        <div className="grafik-batang" role="img" aria-label={`Grafik pemasukan dan pengeluaran ${rentang} bulan`}>
           {agregat.map((a) => (
             <div className="batang-kolom" key={a.kunci}>
               <div className="batang-pasangan">
@@ -77,7 +86,7 @@ export function Rekap({ data, navigasi }: { data: DashboardData; navigasi: (tab:
                   title={`Pengeluaran ${labelBulan(a.kunci)}: ${rp(a.keluar)}`}
                 />
               </div>
-              <span className="batang-label">{BULAN_PENDEK[Number(a.kunci.slice(5)) - 1]}</span>
+              <span className="batang-label">{BULAN_PENDEK[Number(a.kunci.slice(5)) - 1]}{rentang > 12 ? ` ${a.kunci.slice(2, 4)}` : ""}</span>
             </div>
           ))}
         </div>

@@ -31,6 +31,7 @@ export function Transaksi({
   const [biayaAdmin, setBiayaAdmin] = useState("");
   const [tanggal, setTanggal] = useState(data.hariIni);
   const [label, setLabel] = useState("");
+  const [tags, setTags] = useState("");
   const [accountId, setAccountId] = useState("");
   const [subPostId, setSubPostId] = useState("");
   const [wadah, setWadah] = useState("saldo");
@@ -40,6 +41,7 @@ export function Transaksi({
   const [bulanFilter, setBulanFilter] = useState("semua");
   const [posFilter, setPosFilter] = useState("semua");
   const [dompetFilter, setDompetFilter] = useState("semua");
+  const [tagFilter, setTagFilter] = useState("semua");
   const [cari, setCari] = useState("");
   const [halaman, setHalaman] = useState(1);
 
@@ -56,6 +58,11 @@ export function Transaksi({
     [data.transaksi],
   );
 
+  const daftarTag = useMemo(
+    () => [...new Set(data.transaksi.flatMap((t) => t.tags))].sort((a, b) => a.localeCompare(b)),
+    [data.transaksi],
+  );
+
   const tersaring = useMemo(() => {
     const q = cari.trim().toLowerCase();
     return data.transaksi.filter((t) => {
@@ -64,19 +71,20 @@ export function Transaksi({
       if (posFilter !== "semua" && posFilter !== "tanpa" && t.subPostId !== Number(posFilter)) return false;
       if (dompetFilter === "utama" && t.accountId !== null) return false;
       if (dompetFilter !== "semua" && dompetFilter !== "utama" && t.accountId !== Number(dompetFilter)) return false;
+      if (tagFilter !== "semua" && !t.tags.includes(tagFilter)) return false;
       if (!q) return true;
       const dompet = data.dompet.daftar.find((a) => a.id === t.accountId)?.nama ?? "";
-      const isi = `${t.subPost ?? ""} ${t.label ?? ""} ${t.tanggal} ${dompet} ${t.wadahTujuan ?? ""} ${t.wadahAsal ?? ""}`;
+      const isi = `${t.subPost ?? ""} ${t.label ?? ""} ${t.tags.join(" ")} ${t.tanggal} ${dompet} ${t.wadahTujuan ?? ""} ${t.wadahAsal ?? ""}`;
       return isi.toLowerCase().includes(q);
     });
-  }, [data.transaksi, data.dompet.daftar, bulanFilter, posFilter, dompetFilter, cari]);
+  }, [data.transaksi, data.dompet.daftar, bulanFilter, posFilter, dompetFilter, tagFilter, cari]);
 
   const totalHalaman = Math.max(1, Math.ceil(tersaring.length / PER_HALAMAN));
   const halamanAman = Math.min(halaman, totalHalaman);
   const tampil = tersaring.slice((halamanAman - 1) * PER_HALAMAN, halamanAman * PER_HALAMAN);
 
   async function simpan() {
-    const body: Record<string, unknown> = { tipe, nominal: Number(nominal), tanggal, label: label || null };
+    const body: Record<string, unknown> = { tipe, nominal: Number(nominal), tanggal, label: label || null, tags };
     if (tipe === "out") {
       body.subPostId = subPostId ? Number(subPostId) : null;
       body.biayaAdmin = biayaAdminAktif ? Number(biayaAdmin || 0) : 0;
@@ -102,6 +110,7 @@ export function Transaksi({
     if (ok) {
       setNominal("");
       setLabel("");
+      setTags("");
       setBiayaAdmin("");
       setBiayaAdminAktif(false);
     }
@@ -159,6 +168,11 @@ export function Transaksi({
           <label>
             Catatan (opsional)
             <input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="contoh makan siang" />
+          </label>
+
+          <label>
+            Tag (opsional, pisahkan koma)
+            <input value={tags} onChange={(e) => setTags(e.target.value)} placeholder="contoh keluarga, kerja" />
           </label>
 
           {tipe === "out" || tipe === "in" || tipe === "gaji" || tipe === "bonus" ? (
@@ -338,6 +352,23 @@ export function Transaksi({
               {data.dompet.daftar.map((a) => (
                 <option key={a.id} value={a.id}>
                   {a.nama}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="filter-jenis">
+            Tag
+            <select
+              value={tagFilter}
+              onChange={(e) => {
+                setTagFilter(e.target.value);
+                setHalaman(1);
+              }}
+            >
+              <option value="semua">Semua tag</option>
+              {daftarTag.map((tag) => (
+                <option key={tag} value={tag}>
+                  #{tag}
                 </option>
               ))}
             </select>

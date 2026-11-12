@@ -139,8 +139,10 @@ describe("PgRepo di Postgres sungguhan", () => {
     const r = new PgRepo(adapter, true, ownerId);
     const id = await r.addAccount({ nama: "BCA", tipe: "bank", saldoAwal: 50_000 });
     expect((await r.load()).accounts.find((a) => a.id === id)).toMatchObject({ nama: "BCA", saldoAwal: 50_000 });
-    await r.insertTx(buatTx({ tipe: "out", nominal: 10_000, tanggal: "2026-11-01", accountId: id }));
+    const txId = await r.insertTx(buatTx({ tipe: "out", nominal: 10_000, tanggal: "2026-11-01", accountId: id, tags: ["kerja"] }));
     expect((await r.load()).txs.find((t) => t.accountId === id)?.nominal).toBe(10_000);
+    await r.updateTx(txId, { tags: ["baru"] });
+    expect((await r.load()).txs.find((t) => t.id === txId)?.tags).toEqual(["baru"]);
     await adapter.query("DELETE FROM transactions WHERE account_id = $1", [id]);
     await adapter.query("DELETE FROM accounts WHERE id = $1", [id]);
   });

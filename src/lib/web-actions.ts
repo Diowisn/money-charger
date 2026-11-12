@@ -80,6 +80,20 @@ function akunSah(state: State, v: unknown): number | null {
   return akun.id;
 }
 
+const TAG_MAKS = 8;
+const TAG_PANJANG = 24;
+
+function tagsSah(v: unknown): string[] {
+  const mentah = Array.isArray(v) ? v : typeof v === "string" ? v.split(",") : [];
+  const hasil: string[] = [];
+  for (const item of mentah) {
+    const tag = String(item ?? "").trim().toLowerCase().replace(/^#+/, "").slice(0, TAG_PANJANG);
+    if (tag && !hasil.includes(tag)) hasil.push(tag);
+    if (hasil.length >= TAG_MAKS) break;
+  }
+  return hasil;
+}
+
 function tarifJatah(plan: { items: PlanItem[] }): number {
   return plan.items.filter((i) => i.tipe === "sub_pos" || i.tipe === "dd").reduce((s, i) => s + i.nominal, 0);
 }
@@ -166,6 +180,7 @@ export interface InputTransaksi {
   biayaAdmin?: number;
   tanggal: string;
   label?: string | null;
+  tags?: unknown;
   subPostId?: number | null;
   wadah?: Wadah | string | null;
   wadahAsal?: Wadah | string | null;
@@ -186,6 +201,7 @@ export async function tambahTransaksi(
   if (biayaAdmin > 0 && input.tipe !== "out") throw new AksiError("Biaya admin hanya untuk pengeluaran.");
   const tanggal = tanggalSah(input.tanggal, hariIni);
   const label = typeof input.label === "string" ? input.label.trim().slice(0, 120) || null : null;
+  const tags = tagsSah(input.tags);
 
   return r.transaction(async (tx) => {
     const state = await tx.load();
@@ -199,7 +215,7 @@ export async function tambahTransaksi(
       }
       const accountId = akunSah(state, input.accountId);
       const id = await tx.insertTx(
-        buatTx({ tipe: "out", nominal, biayaAdmin, subPostId, accountId, tanggal, label, detail: input.detail ?? null, sumber: "kaku" }),
+        buatTx({ tipe: "out", nominal, biayaAdmin, subPostId, accountId, tanggal, label, tags, detail: input.detail ?? null, sumber: "kaku" }),
       );
       return { id };
     }
@@ -208,7 +224,7 @@ export async function tambahTransaksi(
       const tujuan = wadahSah(input.wadah, "saldo");
       const accountId = akunSah(state, input.accountId);
       const id = await tx.insertTx(
-        buatTx({ tipe: "in", nominal, wadahTujuan: tujuan, accountId, tanggal, label, detail: input.detail ?? null, sumber: "kaku" }),
+        buatTx({ tipe: "in", nominal, wadahTujuan: tujuan, accountId, tanggal, label, tags, detail: input.detail ?? null, sumber: "kaku" }),
       );
       return { id };
     }
@@ -223,7 +239,7 @@ export async function tambahTransaksi(
       }
       const accountId = akunSah(state, input.accountId);
       const id = await tx.insertTx(
-        buatTx({ tipe: input.tipe, nominal, wadahAsal: dari, wadahTujuan: ke, accountId, tanggal, label, detail: input.detail ?? null }),
+        buatTx({ tipe: input.tipe, nominal, wadahAsal: dari, wadahTujuan: ke, accountId, tanggal, label, tags, detail: input.detail ?? null }),
       );
       return { id };
     }
@@ -250,7 +266,7 @@ export async function tambahTransaksi(
       const inv = nominalItem(plan, "investasi");
       const accountId = akunSah(state, input.accountId);
       const gid = await tx.insertTx(
-        buatTx({ tipe: "gaji", nominal, accountId, tanggal, planVersionId: plan.id, label, detail: input.detail ?? null }),
+        buatTx({ tipe: "gaji", nominal, accountId, tanggal, planVersionId: plan.id, label, tags, detail: input.detail ?? null }),
       );
       if (tab > 0) {
         await tx.insertTx(buatTx({ tipe: "alokasi_gaji", nominal: tab, wadahTujuan: "tabungan", tanggal, indukId: gid }));
@@ -280,7 +296,7 @@ export async function tambahTransaksi(
     if (input.wadah || !berjalan) {
       const tujuan = wadahSah(input.wadah, "saldo");
       const id = await tx.insertTx(
-        buatTx({ tipe: "bonus", nominal, wadahTujuan: tujuan, accountId, tanggal, label }),
+        buatTx({ tipe: "bonus", nominal, wadahTujuan: tujuan, accountId, tanggal, label, tags }),
       );
       return { id };
     }
@@ -288,7 +304,7 @@ export async function tambahTransaksi(
     const { jajan, saldo } = bagiBonus(nominal, state.config.persenJajan);
     const subId = state.config.bonusSubPostId;
     const sub = state.subPosts.find((s) => s.id === subId && s.aktif);
-    const gid = await tx.insertTx(buatTx({ tipe: "bonus", nominal, accountId, tanggal, label }));
+    const gid = await tx.insertTx(buatTx({ tipe: "bonus", nominal, accountId, tanggal, label, tags }));
     if (!sub) {
       await tx.insertTx(buatTx({ tipe: "bonus", nominal, wadahTujuan: "saldo", tanggal, indukId: gid }));
       return { id: gid };
@@ -308,6 +324,7 @@ export interface InputUbahTransaksi {
   tanggal: string;
   nominal: number;
   label?: string | null;
+  tags?: unknown;
   subPostId?: number | null;
   accountId?: number | string | null;
   biayaAdmin?: number;
@@ -324,6 +341,7 @@ export async function ubahTransaksi(
   const nominal = bulat(input.nominal, false);
   const tanggal = tanggalSah(input.tanggal, hariIni);
   const label = typeof input.label === "string" ? input.label.trim().slice(0, 120) || null : null;
+  const tags = tagsSah(input.tags);
 
   return r.transaction(async (tx) => {
     const state = await tx.load();
@@ -343,12 +361,12 @@ export async function ubahTransaksi(
       }
       const accountId = akunSah(state, input.accountId);
       const biayaAdmin = bulat(input.biayaAdmin ?? 0, true);
-      await tx.updateTx(t.id, { nominal, biayaAdmin, tanggal, label, subPostId, accountId });
+      await tx.updateTx(t.id, { nominal, biayaAdmin, tanggal, label, tags, subPostId, accountId });
       return { id: t.id };
     }
 
     const accountId = akunSah(state, input.accountId);
-    await tx.updateTx(t.id, { nominal, biayaAdmin: 0, tanggal, label, subPostId: null, accountId });
+    await tx.updateTx(t.id, { nominal, biayaAdmin: 0, tanggal, label, tags, subPostId: null, accountId });
     return { id: t.id };
   });
 }
@@ -516,6 +534,7 @@ export async function pindahAkun(r: Repo, hariIni: string, input: InputPindahAku
   const nominal = bulat(input.nominal, false);
   const tanggal = tanggalSah(input.tanggal, hariIni);
   const label = typeof input.label === "string" ? input.label.trim().slice(0, 120) || null : null;
+
   return r.transaction(async (tx) => {
     const state = await tx.load();
     const dari = state.accounts.find((a) => a.id === Number(input.dariId) && a.aktif);

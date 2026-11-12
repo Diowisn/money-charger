@@ -137,6 +137,11 @@ export async function periksaKesiapan() {
              (SELECT COUNT(*) FROM inbound_jobs WHERE status = 'gagal')::int AS inbound_gagal,
              (SELECT COUNT(*) FROM outbox WHERE status = 'menunggu')::int AS outbox_menunggu,
              (SELECT COUNT(*) FROM outbox WHERE status = 'gagal')::int AS outbox_gagal,
+             (SELECT COUNT(*) FROM email_links)::int AS email_terdaftar,
+             (SELECT COUNT(*) FROM email_links WHERE linked_at IS NOT NULL OR last_email_at IS NOT NULL)::int AS email_terhubung,
+             (SELECT COUNT(*) FROM email_links
+               WHERE COALESCE(last_email_at, linked_at) IS NOT NULL
+                 AND COALESCE(last_email_at, linked_at) < now() - interval '24 hours')::int AS email_basi,
              (SELECT COUNT(*) FROM audit_events)::int AS audit_events,
              (SELECT COUNT(*) FROM integrations)::int AS integrations`,
         );
@@ -147,12 +152,22 @@ export async function periksaKesiapan() {
     }
   }
 
-  const jumlah = db.jumlah as { nomor_aktif?: number; outbox_gagal?: number; inbound_gagal?: number } | null;
+  const jumlah = db.jumlah as {
+    nomor_aktif?: number;
+    outbox_gagal?: number;
+    inbound_gagal?: number;
+    email_terdaftar?: number;
+    email_terhubung?: number;
+    email_basi?: number;
+  } | null;
   if (db.tersambung && db.skemaSiap && (!jumlah || jumlah.nomor_aktif === 0)) {
     peringatan.push("Tabel allowed_numbers kosong; jalankan `npm run db:setup` agar nomor Anda diterima.");
   }
   if (jumlah?.inbound_gagal) peringatan.push(`${jumlah.inbound_gagal} pesan masuk gagal permanen; perlu diperiksa.`);
   if (jumlah?.outbox_gagal) peringatan.push(`${jumlah.outbox_gagal} balasan WhatsApp gagal permanen; perlu diperiksa.`);
+  if (jumlah?.email_basi) {
+    peringatan.push(`${jumlah.email_basi} akun tertaut email tidak mengirim transaksi >24 jam; periksa trigger Gmail/Apps Script.`);
+  }
   if (db.skemaSiap) {
     const basi = cronBasi(db.cronTerakhir as string | null, Date.now());
     if (basi) peringatan.push(basi);

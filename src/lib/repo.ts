@@ -26,6 +26,7 @@ export interface Repo {
       biayaAdmin?: number;
       tanggal?: string;
       label?: string | null;
+      tags?: string[];
       accountId?: number | null;
     },
   ): Promise<void>;

@@ -50,6 +50,7 @@ export interface Tx {
   accountIdTujuan: number | null;
   tanggal: string; // YYYY-MM-DD (WIB)
   label: string | null;
+  tags: string[];
   /** Detail tambahan dari sumber (mis. merchant, lokasi, RRN, biaya admin dari email BSI). */
   detail: Record<string, string | number | null> | null;
   sumber: "kaku" | "ai";
@@ -74,6 +75,7 @@ export function buatTx(
     accountId: null,
     accountIdTujuan: null,
     label: null,
+    tags: [],
     detail: null,
     sumber: "kaku",
     penggantiDari: null,

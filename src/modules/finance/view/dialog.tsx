@@ -157,6 +157,7 @@ export function DetailDialog({
   const [tanggal, setTanggal] = useState(detailTx.tanggal);
   const [nominal, setNominal] = useState(String(detailTx.nominal));
   const [label, setLabel] = useState(detailTx.label ?? "");
+  const [tags, setTags] = useState(detailTx.tags.join(", "));
   const posAwal = data?.posSemua.find((p) => p.id === detailTx.subPostId && p.aktif)?.id ?? null;
   const [subPostId, setSubPostId] = useState(posAwal === null ? "" : String(posAwal));
   const [accountId, setAccountId] = useState(detailTx.accountId === null ? "" : String(detailTx.accountId));
@@ -174,6 +175,7 @@ export function DetailDialog({
       tanggal,
       nominal: Number(nominal),
       label: label.trim() || null,
+      tags,
       subPostId: detailTx.tipe === "out" && subPostId ? Number(subPostId) : null,
       accountId: accountId ? Number(accountId) : null,
       biayaAdmin: detailTx.tipe === "out" ? Number(biayaAdmin || 0) : 0,
@@ -206,6 +208,10 @@ export function DetailDialog({
             <label>
               Catatan (opsional)
               <input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="contoh makan siang" />
+            </label>
+            <label>
+              Tag (opsional, pisahkan koma)
+              <input value={tags} onChange={(e) => setTags(e.target.value)} placeholder="contoh keluarga, kerja" />
             </label>
             <label>
               Dompet
@@ -274,6 +280,10 @@ export function DetailDialog({
           <BarisInfo label="Pos" nilai={detailTx.subPost} />
           {namaDompet ? <BarisInfo label="Dompet" nilai={namaDompet} /> : null}
           <BarisInfo label="Catatan" nilai={detailTx.label} />
+          <BarisInfo
+            label="Tag"
+            nilai={detailTx.tags.length ? detailTx.tags.map((tag) => `#${tag}`).join(", ") : null}
+          />
           {detailTx.wadahAsal ? <BarisInfo label="Wadah asal" nilai={detailTx.wadahAsal} /> : null}
           {detailTx.wadahTujuan ? <BarisInfo label="Wadah tujuan" nilai={detailTx.wadahTujuan} /> : null}
           <BarisInfo label="Status" nilai={detailTx.status === "batal" ? "Dibatalkan" : "Berlaku"} />

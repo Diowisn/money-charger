@@ -44,6 +44,7 @@ export interface TxView {
   biayaAdmin: number;
   tanggal: string;
   label: string | null;
+  tags: string[];
   detail?: Record<string, string | number | null> | null;
   subPost: string | null;
   subPostId: number | null;
@@ -340,6 +341,7 @@ function ringkasTx(state: State, t: Tx): TxView {
     biayaAdmin: t.biayaAdmin ?? 0,
     tanggal: t.tanggal,
     label: t.label,
+    tags: t.tags ?? [],
     detail: t.detail ?? null,
     subPost: namaSubPost(state, t.subPostId),
     subPostId: t.subPostId,

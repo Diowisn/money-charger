@@ -290,7 +290,8 @@ otomatis hanya bila hasilnya tunggal; jika ambigu, transaksi memakai dompet bawa
 
    - `id` wajib dan harus unik per email (dipakai untuk mencegah pencatatan ganda bila penyedia mengirim ulang).
    - `akun` opsional: email kotak masuk penerima. Bila cocok dengan email akun yang terdaftar/login, transaksi masuk ke akun itu.
-     Script Gmail mengisinya otomatis. Bila tidak cocok, transaksi memakai akun pertama.
+     Script Gmail mengisinya otomatis. Bila tidak cocok, email dilewati saat ada lebih dari satu akun; hanya sistem
+     single-user yang memakai satu-satunya akun.
    - `nominal` opsional. Bila kosong, server membaca label `Nominal`/`Nominal Transaksi`/`Total`, lalu angka `Rp`,
      lalu angka bergrup; mendukung `Rp 25.925,00` maupun `1,800,000.00`.
    - `tanggal` opsional (`YYYY-MM-DD`). Bila kosong, server mencoba membaca tanggal dari isi email
@@ -300,6 +301,9 @@ otomatis hanya bila hasilnya tunggal; jika ambigu, transaksi memakai dompet bawa
 
 4. Uji dengan `curl`/Postman sebelum menyambungkan penyedia sungguhan. Email yang sama boleh dikirim ulang:
    `id` yang sama tidak dicatat dua kali.
+   Tambahkan `?dryRun=1` (atau header `X-Email-Dry-Run: 1`) untuk melihat hasil parsing tanpa menulis
+   transaksi, inbound, atau status tautan. `/api/health` memberi peringatan bila akun yang sudah tertaut
+   tidak mengirim email transaksi lebih dari 24 jam.
 
 ### 8. Kalender dan Google Sheets (opsional)
 
@@ -335,14 +339,14 @@ Isi dashboard:
 
 - **Ringkasan**: sisa uang, rasio terpakai, pendapatan/pengeluaran bulan ini, alokasi per grup, dan detail pos yang bisa dilipat.
 - **Sisa aman**: batas belanja harian dari sisa jatah periode, rata-rata belanja 14 hari, dan perkiraan berapa hari saldo masih cukup.
-- **Perubahan kategori**: kategori yang naik/turun paling besar dibanding bulan lalu di tab Rekap.
+- **Perubahan kategori**: kategori yang naik/turun paling besar dibanding bulan lalu di tab Rekap. Rekap bisa menampilkan 6, 12, atau 24 bulan.
 - **Wawasan**: skor kesehatan finansial, proyeksi pengeluaran/saldo akhir bulan, rasio tabungan, deteksi langganan bulanan, peringatan otomatis, dan daftar hal yang perlu diperhatikan.
 - **Transaksi otomatis**: aturan tagihan/langganan bulanan (nama, nominal, tanggal, pos). Cron yang sama dengan antrean WhatsApp mencatat transaksi pada tanggal jatuh tempo dan tidak menggandakan bulan yang sama.
 - **Impor mutasi CSV**: unggah/tempel CSV dengan kolom `tanggal,tipe,nominal` (opsional `label,pos,biaya_admin,wadah`), lengkap dengan deteksi duplikat.
 - **Laporan**: pilih periode preset atau rentang tanggal kustom, lihat ringkasan pemasukan/pengeluaran per pos dan dompet, lalu cetak atau simpan PDF. Laporan mingguan/bulanan dapat dikirim otomatis ke WhatsApp dan email akun.
 - **Privasi per akun**: setiap akun hanya bisa membaca dan mengubah transaksi, dompet, pos, serta anggarannya sendiri. Berbagi data lintas akun sudah dinonaktifkan; nomor WhatsApp dipetakan ke akun pemilik nomor. Setiap transaksi diberi rantai hash (HMAC bila `LEDGER_SECRET` diisi) dan status keutuhannya tampil di tab Transaksi.
 - **Rencana**: slider jatah per pos, Dana Darurat, Tabungan, dan Investasi. Simpan membuat versi rencana baru (versi lama diarsipkan). Opsi "berlaku juga di periode berjalan" menyesuaikan gaji periode aktif dan mencatat selisih ke Saldo.
-- **Transaksi**: catat pengeluaran, pemasukan, gaji, bonus, tarik, dan pindah; ubah pemasukan/pengeluaran yang masih berlaku; hapus transaksi (pembatalan, bukan hapus permanen). Riwayat bisa difilter per bulan, pos, dompet, dan kata kunci. Menghapus gaji juga membatalkan alokasi dan selisihnya.
+- **Transaksi**: catat pengeluaran, pemasukan, gaji, bonus, tarik, dan pindah; ubah pemasukan/pengeluaran yang masih berlaku; hapus transaksi (pembatalan, bukan hapus permanen). Transaksi bisa diberi tag bebas; riwayat bisa difilter per bulan, pos, dompet, tag, dan kata kunci. Menghapus gaji juga membatalkan alokasi dan selisihnya.
 - **Pos**: tambah pos (langsung masuk rencana aktif), ganti nama, tambah alias, nonaktifkan, dan setup awal sebelum gaji pertama.
 - **Piutang**: catat piutang (orang berutang ke kita) dan utang (kita berutang), bayar sebagian/lunas, atau batalkan.
 - **Target**: buat target tabungan (nama, nominal, target tanggal opsional), lihat saran sisihan per bulan/minggu, tambah tabungan sebagian demi sebagian, otomatis "Tercapai" saat terkumpul mencapai target.

@@ -2809,10 +2809,11 @@ body {
   margin-top: 18px;
   padding-top: 8px;
   border-bottom: 1px solid var(--garis);
+  overflow-x: auto;
 }
 
 .batang-kolom {
-  flex: 1;
+  flex: 1 0 22px;
   height: 100%;
   display: flex;
   flex-direction: column;

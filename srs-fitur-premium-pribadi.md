@@ -3,7 +3,7 @@
 | Atribut | Nilai |
 |---|---|
 | Status | Implementasi bertahap; pemakaian pribadi |
-| Versi | 1.5 |
+| Versi | 1.6 |
 | Tanggal | 11 November 2026 |
 | Pemilik dokumen | Pemilik produk |
 | Terkait PRD | [PRD fitur premium pribadi](./prd-fitur-premium-pribadi.md) |
@@ -21,6 +21,7 @@
 | 1.3 | 10 Nov 2026 | Email, kalender, Sheets, meter. |
 | 1.4 | 11 Nov 2026 | Perbaiki heading, status keluarga, tambah arsitektur, aktor, kontrak API, data, flow, NFR, threat model, failure mode, verifikasi, traceability per FR, keputusan terbuka, glosarium. |
 | 1.5 | 11 Nov 2026 | Implementasi `PATCH /api/transactions`, filter pos/dompet, audit perubahan, dan test ledger. |
+| 1.6 | 11 Nov 2026 | Implementasi tag transaksi (schema v10) dan rekap 24 bulan. |
 
 **Konvensi status**
 
@@ -46,11 +47,11 @@ Sudah diimplementasikan:
 - Integrasi email bank/e-wallet: deteksi penyedia, dompet sumber, dan pos otomatis.
 - Integrasi kalender `.ics` dan sinkron Google Sheets via OAuth langsung.
 - Peringatan dalam aplikasi.
-- Skema versi v7 (`workspace_members`, nomor WhatsApp anggota, kolom 2FA, `google_sheets`).
+- Skema versi v10 (`workspace_members`, nomor WhatsApp anggota, kolom 2FA, `google_sheets`, `email_links`, `transactions.tags`).
 
 **Ditangguhkan:** kolaborasi keluarga. Tabel `workspace_members`, model peran, dan `tolakPeran` masih ada, tetapi `GET/POST /api/keluarga` mengembalikan `410` dan `pemilikRequest` selalu memakai `userId = actorId`. Jangan menganggap fitur ini aktif sampai isolasi workspace disetujui.
 
-**Belum ada:** tag, template, lampiran struk tersimpan, multi-mata uang, audit UI, recovery 2FA, backup/restore satu klik, API/webhook publik, laporan laba rugi formal, multi-tahun, simulasi skenario, aturan auto-kategorisasi buatan pengguna, Telegram, white-label PDF, PIN/biometrik.
+**Belum ada:** template, lampiran struk tersimpan, multi-mata uang, audit UI, recovery 2FA, backup/restore satu klik, API/webhook publik, laporan laba rugi formal, simulasi skenario, aturan auto-kategorisasi buatan pengguna, Telegram, white-label PDF, PIN/biometrik.
 
 ### 1.1 Aktor dan matriks akses
 
@@ -241,8 +242,8 @@ Semua endpoint kecuali yang ditandai publik memakai cookie sesi `mc_auth`. Envel
 | Endpoint | Metode | Auth | Input | Output/efek | Error |
 |---|---|---|---|---|---|
 | `/api/dashboard` | GET | Sesi | — | State dashboard | 401, 500 |
-| `/api/transactions` | POST | Sesi + tulis | `tipe,nominal,tanggal,label,accountId,subPostId,wadah,...` | Transaksi baru | 400, 401, 403 |
-| `/api/transactions` | PATCH | Sesi + tulis | `{id,tanggal,nominal,label,accountId,subPostId,biayaAdmin}` | Ubah pemasukan/pengeluaran; rechaining ledger | 400, 401, 403, 404 |
+| `/api/transactions` | POST | Sesi + tulis | `tipe,nominal,tanggal,label,tags,accountId,subPostId,wadah,...` | Transaksi baru | 400, 401, 403 |
+| `/api/transactions` | PATCH | Sesi + tulis | `{id,tanggal,nominal,label,tags,accountId,subPostId,biayaAdmin}` | Ubah pemasukan/pengeluaran; rechaining ledger | 400, 401, 403, 404 |
 | `/api/transactions` | DELETE | Sesi + kelola | `{id}` | Pembatalan transaksi | 400, 401, 403, 404 |
 | `/api/accounts` | POST | Sesi + kelola | `aksi:tambah|pindah` | Dompet/transfer | 400, 401, 403 |
 | `/api/recurring` | POST | Sesi + kelola | `aksi:tambah|status|hapus` | Aturan berubah | 400, 401, 403 |
@@ -269,7 +270,7 @@ Semua endpoint kecuali yang ditandai publik memakai cookie sesi `mc_auth`. Envel
 
 | Tabel/objek | Kolom kunci | Constraint/index | Retensi |
 |---|---|---|---|
-| `transactions` | `id,user_id,tipe,nominal,tanggal,sub_post_id,account_id,detail,status` | FK user/pos/dompet; status `berlaku|batal`; hash ledger | Selama akun aktif |
+| `transactions` | `id,user_id,tipe,nominal,tanggal,sub_post_id,account_id,tags,detail,status` | FK user/pos/dompet; status `berlaku|batal`; GIN tags; hash ledger | Selama akun aktif |
 | `accounts` | `id,user_id,nama,tipe,saldo_awal,urutan` | Unik `(user_id,lower(nama))`; index user | Selama akun aktif |
 | `recurring_rules` | `id,user_id,nama,nominal,hari,mulai,aktif` | FK user/pos; hari 1–31 | Selama aturan ada |
 | `recurring_runs` | `rule_id,periode,transaction_id` | PK `(rule_id,periode)` | Selama aturan ada |
@@ -452,7 +453,7 @@ Semua endpoint kecuali yang ditandai publik memakai cookie sesi `mc_auth`. Envel
 
 - **FR-ANL-01 SHOULD:** laporan laba rugi dan arus kas memisahkan pemasukan, pengeluaran, biaya admin, arus bersih, dan saldo awal/akhir.
 - **FR-ANL-02 SHOULD:** laporan kustom dapat memfilter periode, pos, dan dompet.
-- **FR-ANL-03 SHOULD:** tren multi-tahun memakai agregat bulanan tanpa memuat seluruh transaksi mentah.
+- **FR-ANL-03 SHOULD (selesai):** tren multi-tahun memakai agregat bulanan; UI rekap 6/12/24 bulan tanpa memuat transaksi mentah.
 - **FR-ANL-04 SHOULD:** rasio utang dihitung dari utang aktif dibagi pemasukan periode, dengan label dan rumus transparan.
 - **FR-ANL-05 SHOULD:** simulasi skenario hanya mengubah tampilan; tidak membuat mutasi.
 - **FR-ANL-06 MUST:** semua angka analisis dapat ditelusuri ke transaksi/sumber.
@@ -502,7 +503,7 @@ Semua endpoint kecuali yang ditandai publik memakai cookie sesi `mc_auth`. Envel
 
 ### FR-TAG — Fitur berikutnya (P2)
 
-- **FR-TAG-01 SHOULD:** tag transaksi mendukung CRUD dan filter.
+- **FR-TAG-01 SHOULD (selesai):** tag transaksi bebas, dinormalisasi, disimpan di `transactions.tags`, difilter, dan diekspor CSV.
 - **FR-TAG-02 SHOULD:** template menyimpan field transaksi yang sering dipakai tanpa menyimpan nominal terakhir diam-diam.
 - **FR-TAG-03 SHOULD:** lampiran struk divalidasi ukuran/tipe dan dihapus bersama transaksi.
 - **FR-TAG-04 SHOULD:** multi-mata uang menyimpan mata uang asal, kurs, nilai dasar IDR, dan aturan pembulatan.
@@ -582,6 +583,9 @@ Semua endpoint kecuali yang ditandai publik memakai cookie sesi `mc_auth`. Envel
 - Skema v5 menambahkan `workspace_members.wa_number` dan indeks uniknya.
 - Skema v6 menambahkan `auth_users.totp_secret` dan `auth_users.totp_aktif`.
 - Skema v7 menambahkan `google_sheets` (refresh token Google terenkripsi, spreadsheet, email).
+- Skema v8 menambahkan isolasi transaksi per akun dan rantai hash.
+- Skema v9 menambahkan `email_links` untuk Apps Script Gmail.
+- Skema v10 menambahkan `transactions.tags` dan index GIN.
 - Jalankan `npm run db:setup` untuk menerapkan skema idempoten dan dompet utama.
 - Sebelum migrasi berisiko, buat snapshot Neon.
 - Marker versi dicatat di `schema_version`.
@@ -602,6 +606,9 @@ Semua endpoint kecuali yang ditandai publik memakai cookie sesi `mc_auth`. Envel
 | v5 | `workspace_members.wa_number` + unique index | Aditif; fitur ditangguhkan |
 | v6 | `auth_users.totp_secret`, `totp_aktif` | Aditif |
 | v7 | `google_sheets` | Aditif |
+| v8 | Isolasi per akun + hash ledger | Aditif/backfill |
+| v9 | `email_links` | Aditif |
+| v10 | `transactions.tags` + GIN | Aditif |
 
 ### 5.2 Aturan migrasi dan rollback
 
@@ -733,7 +740,8 @@ Semua endpoint kecuali yang ditandai publik memakai cookie sesi `mc_auth`. Envel
 - **AC-SEC2-02:** ekspor penuh memuat transaksi, pos, dompet, anggaran, target, utang, dan pengaturan aman.
 - **AC-UX-01 (selesai):** ubah transaksi memperbarui data dan audit tanpa membuat transaksi baru.
 - **AC-UX-02 (selesai):** filter pos/dompet/rentang tanggal mengembalikan hasil yang tepat.
-- **AC-UX-03 (belum):** tag/template/lampiran divalidasi ukuran/tipe dan dihapus bersama transaksi.
+- **AC-TAG-01 (selesai):** tag dinormalisasi, maksimal 8, unik, tersimpan, tampil di detail, dan bisa difilter.
+- **AC-UX-03 (belum):** template/lampiran divalidasi ukuran/tipe dan dihapus bersama transaksi.
 - **AC-UX-04 (belum):** transaksi multi-mata uang menyimpan kurs dan nilai IDR secara eksplisit.
 
 ## 7. Rencana teknis berikutnya
@@ -744,7 +752,7 @@ Semua endpoint kecuali yang ditandai publik memakai cookie sesi `mc_auth`. Envel
 |---|---|---|---|
 | Ubah transaksi **(selesai)** | Endpoint `PATCH /api/transactions`; audit; rechain hash ledger | Rantai hash dan transaksi turunan | 1 |
 | Filter pos/dompet **(selesai)** | Filter UI riwayat; tanpa perubahan data | Query lambat | 2 |
-| Tag + template | Tabel tag/template; relasi transaksi; validasi | Skema baru | 3 |
+| Tag **(selesai)** + template | `transactions.tags`; tabel template; validasi | Skema baru | 3 |
 | Lampiran struk | Storage terbatas/enkripsi; hapus cascade; batas ukuran/tipe | PII dan biaya | 4 |
 | Recovery 2FA | Tabel recovery code hash sekali pakai; alur unduh | Kehilangan akun | 5 |
 | Audit UI | Halaman audit, filter aksi/tanggal; perluas `catatAudit` | PII di detail | 6 |
@@ -792,7 +800,7 @@ Semua endpoint kecuali yang ditandai publik memakai cookie sesi `mc_auth`. Envel
 | Roadmap 8.7 | FR-COL | AC-COL | Ditangguhkan |
 | Roadmap 8.7 | FR-INT2 | AC-INT2 | Belum |
 | Roadmap 8.7 | FR-UX | AC-UX | Selesai (edit + filter); tag/template/lampiran belum |
-| Roadmap 8.7 | FR-TAG | AC-UX-03/04 | Belum |
+| Roadmap 8.7 | FR-TAG | AC-TAG-01, AC-UX-03/04 | Sebagian (tag selesai) |
 
 ## 9. Rencana verifikasi
 
@@ -809,7 +817,7 @@ Semua endpoint kecuali yang ditandai publik memakai cookie sesi `mc_auth`. Envel
 | Email | `tests/parse.test.ts`, `tests/handler.test.ts` | Deteksi penyedia, dompet, idempoten | Replay/rate limit |
 | Sheets/kalender | `tests/sheets.test.ts`, `tests/ics.test.ts` | Baris, URL, RFC 5545, token | OAuth callback nyata |
 | Meter/health | `tests/usage.test.ts`, `tests/health.test.ts` | Counter, cron basi | Alert eksternal |
-| Ubah transaksi | `tests/ubah-transaksi.test.ts` | Field, tipe terlarang, batal, tanggal masa depan, isolasi transaksi lain | Filter UI diuji manual |
+| Ubah transaksi + tag | `tests/ubah-transaksi.test.ts`, `tests/pg-repo.test.ts` | Field, tipe terlarang, batal, tanggal masa depan, tag normalisasi/persistensi, isolasi transaksi lain | Filter UI diuji manual |
 | Web | `tests/web.test.ts`, `tests/tombol.test.ts` | UI dasar | Aksesibilitas, mobile |
 
 **Aturan:** setiap FR baru harus punya minimal satu AC dan satu test; test tidak boleh hanya menguji fungsi murni bila ada jalur API yang bisa diuji.

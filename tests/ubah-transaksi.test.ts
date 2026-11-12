@@ -16,6 +16,7 @@ describe("ubah transaksi", () => {
       nominal: 50_000,
       tanggal: HARI,
       label: "lama",
+      tags: "kerja, #Keluarga",
       subPostId: posA.id,
       accountId: dompet.id,
     });
@@ -25,6 +26,7 @@ describe("ubah transaksi", () => {
       tanggal: "2026-01-14",
       nominal: 75_000,
       label: "baru",
+      tags: ["baru", "kerja", "baru"],
       subPostId: posB.id,
       accountId: dompet.id,
       biayaAdmin: 2_500,
@@ -36,6 +38,7 @@ describe("ubah transaksi", () => {
       biayaAdmin: 2_500,
       tanggal: "2026-01-14",
       label: "baru",
+      tags: ["baru", "kerja"],
       subPostId: posB.id,
       accountId: dompet.id,
       status: "berlaku",

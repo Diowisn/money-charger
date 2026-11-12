@@ -114,6 +114,7 @@ CREATE TABLE IF NOT EXISTS transactions (
   wa_message_id       TEXT,
   account_id          BIGINT REFERENCES accounts(id) ON DELETE SET NULL,
   account_id_tujuan   BIGINT REFERENCES accounts(id) ON DELETE SET NULL,
+  tags                TEXT[] NOT NULL DEFAULT '{}',         -- tag bebas, bukan pengganti pos
   hash_prev           TEXT,                                 -- hash transaksi sebelumnya milik user ini
   hash                TEXT,                                 -- SHA-256/HMAC dari isi transaksi + hash_prev
   dibuat_pada         TIMESTAMPTZ NOT NULL DEFAULT now()
@@ -125,7 +126,9 @@ ALTER TABLE transactions ADD COLUMN IF NOT EXISTS biaya_admin BIGINT NOT NULL DE
 ALTER TABLE transactions ADD COLUMN IF NOT EXISTS detail JSONB NOT NULL DEFAULT '{}'::jsonb;
 ALTER TABLE transactions ADD COLUMN IF NOT EXISTS account_id BIGINT REFERENCES accounts(id) ON DELETE SET NULL;
 ALTER TABLE transactions ADD COLUMN IF NOT EXISTS account_id_tujuan BIGINT REFERENCES accounts(id) ON DELETE SET NULL;
+ALTER TABLE transactions ADD COLUMN IF NOT EXISTS tags TEXT[] NOT NULL DEFAULT '{}';
 CREATE INDEX IF NOT EXISTS idx_tx_account ON transactions (account_id, tanggal);
+CREATE INDEX IF NOT EXISTS idx_tx_tags ON transactions USING GIN (tags);
 ALTER TABLE transactions ADD COLUMN IF NOT EXISTS hash_prev TEXT;
 ALTER TABLE transactions ADD COLUMN IF NOT EXISTS hash TEXT;
 

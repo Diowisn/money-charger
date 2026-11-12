@@ -1,5 +1,5 @@
 import type { NextRequest } from "next/server";
-import { emailDikonfigurasi, prosesEmailMasuk, tautkanEmailAkun, verifikasiRahasiaEmail, type EmailMasuk } from "./model";
+import { emailDikonfigurasi, pratinjauEmail, prosesEmailMasuk, tautkanEmailAkun, verifikasiRahasiaEmail, type EmailMasuk } from "./model";
 import { emailGagal, emailOk } from "./view";
 
 export async function terimaEmail(req: NextRequest) {
@@ -32,7 +32,14 @@ export async function terimaEmail(req: NextRequest) {
     penyedia: typeof body.penyedia === "string" ? body.penyedia : typeof body.provider === "string" ? body.provider : undefined,
   };
 
+  const kering =
+    req.nextUrl.searchParams.get("dryRun") === "1" ||
+    req.headers.get("x-email-dry-run") === "1";
+
   try {
+    if (kering) {
+      return Response.json({ ok: true, dicatat: false, pratinjau: await pratinjauEmail(input) });
+    }
     const hasil = await prosesEmailMasuk(input);
     return emailOk(hasil.pesan, hasil.dicatat);
   } catch (e) {
