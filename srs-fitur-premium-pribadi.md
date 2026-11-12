@@ -22,6 +22,7 @@
 | 1.4 | 11 Nov 2026 | Perbaiki heading, status keluarga, tambah arsitektur, aktor, kontrak API, data, flow, NFR, threat model, failure mode, verifikasi, traceability per FR, keputusan terbuka, glosarium. |
 | 1.5 | 11 Nov 2026 | Implementasi `PATCH /api/transactions`, filter pos/dompet, audit perubahan, dan test ledger. |
 | 1.6 | 11 Nov 2026 | Implementasi tag transaksi (schema v10) dan rekap 24 bulan. |
+| 1.7 | 12 Nov 2026 | Implementasi kode pemulihan 2FA (schema v11), login TOTP/kode pemulihan, unduh kode. |
 
 **Konvensi status**
 
@@ -43,15 +44,15 @@ Sudah diimplementasikan:
 - Multi-dompet: tabel `accounts`, saldo per dompet, transfer, net worth.
 - Laporan lanjutan: periode kustom, cetak/simpan PDF, laporan terjadwal ke WhatsApp/email.
 - AI Pro: review bulanan otomatis, tanya jawab seluruh riwayat di web dan WhatsApp (`tanya <pertanyaan>`), deteksi anomali.
-- Keamanan: 2FA TOTP, manajemen sesi, ekspor terenkripsi.
+- Keamanan: 2FA TOTP, kode pemulihan sekali pakai, manajemen sesi, ekspor terenkripsi.
 - Integrasi email bank/e-wallet: deteksi penyedia, dompet sumber, dan pos otomatis.
 - Integrasi kalender `.ics` dan sinkron Google Sheets via OAuth langsung.
 - Peringatan dalam aplikasi.
-- Skema versi v10 (`workspace_members`, nomor WhatsApp anggota, kolom 2FA, `google_sheets`, `email_links`, `transactions.tags`).
+- Skema versi v11 (`workspace_members`, nomor WhatsApp anggota, kolom 2FA, `google_sheets`, `email_links`, `transactions.tags`, `auth_recovery_codes`).
 
 **Ditangguhkan:** kolaborasi keluarga. Tabel `workspace_members`, model peran, dan `tolakPeran` masih ada, tetapi `GET/POST /api/keluarga` mengembalikan `410` dan `pemilikRequest` selalu memakai `userId = actorId`. Jangan menganggap fitur ini aktif sampai isolasi workspace disetujui.
 
-**Belum ada:** template, lampiran struk tersimpan, multi-mata uang, audit UI, recovery 2FA, backup/restore satu klik, API/webhook publik, laporan laba rugi formal, simulasi skenario, aturan auto-kategorisasi buatan pengguna, Telegram, white-label PDF, PIN/biometrik.
+**Belum ada:** template, lampiran struk tersimpan, multi-mata uang, audit UI, backup/restore satu klik, API/webhook publik, laporan laba rugi formal, simulasi skenario, aturan auto-kategorisasi buatan pengguna, Telegram, white-label PDF, PIN/biometrik.
 
 ### 1.1 Aktor dan matriks akses
 
@@ -201,11 +202,12 @@ Sudah diimplementasikan:
 
 - `src/lib/totp.ts`: base32, `kodeTotp`, `verifikasiTotp`, dan `otpauthUri`.
 - Kolom `auth_users.totp_secret` dan `auth_users.totp_aktif` (skema v6); tabel `google_sheets` (skema v7).
-- `src/modules/profile/model.ts`: `mulai2fa`, `aktifkan2fa`, `matikan2fa`; mematikan 2FA wajib password.
-- Login `masuk` mengembalikan status `2fa`; UI login menampilkan kolom kode 6 digit.
+- `src/lib/recovery-code.ts`: pembuatan dan normalisasi kode pemulihan; hash SHA-256 disimpan di `auth_recovery_codes`.
+- `src/modules/profile/model.ts`: `mulai2fa`, `aktifkan2fa`, `gantiKodePemulihan`, `matikan2fa`; mematikan 2FA wajib password dan menghapus kode pemulihan.
+- Login `masuk` menerima TOTP 6 digit atau kode pemulihan sekali pakai; UI login menampilkan kolom kode gabungan.
 - `/api/auth/sessions`: daftar sesi aktif milik sendiri (tanpa mengirim ID sesi saat ini ke client) dan cabut sesi lain.
 - `src/lib/export-enkripsi.ts`: AES-256-GCM + scrypt; `/api/export/encrypted` mengunduh CSV terenkripsi.
-- UI: bagian 2FA, perangkat/sesi, dan ekspor terenkripsi di tab Profil.
+- UI: bagian 2FA (termasuk tampil/unduh kode pemulihan), perangkat/sesi, dan ekspor terenkripsi di tab Profil.
 
 ### 2.10 Impor email bank/e-wallet
 
@@ -256,7 +258,7 @@ Semua endpoint kecuali yang ditandai publik memakai cookie sesi `mc_auth`. Envel
 | `/api/sheets` | POST | Sesi + kelola | `aksi:simpan|sinkron|putus` | Status/sinkron | 400, 401, 403 |
 | `/api/sheets/oauth/start` | GET | Sesi | — | Redirect OAuth `drive.file` | 401, 503 |
 | `/api/keluarga` | GET/POST | Sesi | — | **410 ditangguhkan** | 410 |
-| `/api/profile/2fa` | GET/POST | Sesi | `aksi:mulai|aktifkan|matikan` | Status 2FA/secret | 400, 401 |
+| `/api/profile/2fa` | GET/POST | Sesi | `aksi:mulai|aktifkan|kode-pemulihan|matikan` | Status 2FA/secret/kode pemulihan | 400, 401 |
 | `/api/auth/sessions` | GET/DELETE | Sesi | `id?` | Daftar/cabut sesi | 401 |
 | `/api/export` | GET | Sesi + token sekali pakai | `t` | CSV unduhan | 404 |
 | `/api/export/encrypted` | POST | Sesi | `{password}` min 8 | Berkas terenkripsi | 400, 401 |
@@ -306,7 +308,7 @@ Semua endpoint kecuali yang ditandai publik memakai cookie sesi `mc_auth`. Envel
 4. **Sheets OAuth:** start OAuth → callback menukar code → enkripsi refresh token → buat/pakai spreadsheet → sinkron awal → simpan status. Sinkron harian hanya sekali per hari WIB.
 5. **Email inbound:** verifikasi secret → batasi pengirim → parse → cek `email:<id>` → catat transaksi → audit. Isi email tidak dipercaya untuk `user_id`.
 6. **Kalender:** buat event dari recurring, utang/piutang, target → escape RFC 5545 → lipat baris → sajikan `text/calendar`.
-7. **2FA:** mulai → secret baru + URI → verifikasi kode 6 digit → aktifkan; login meminta kode bila aktif; matikan wajib password. **Recovery code belum ada.**
+7. **2FA:** mulai → secret baru + URI → verifikasi kode 6 digit → aktifkan → tampilkan 10 kode pemulihan sekali pakai; login meminta TOTP atau kode pemulihan bila aktif; matikan wajib password dan menghapus kode pemulihan.
 
 ### 2.16 NFR dan observability
 
@@ -532,7 +534,7 @@ Semua endpoint kecuali yang ditandai publik memakai cookie sesi `mc_auth`. Envel
 |---|---|---|---|
 | Akses data akun lain | IDOR/body `user_id` | `user_id` dari sesi; query ber-scope | Perlu uji negatif rutin |
 | Sesi dicuri | XSS/cookie | HttpOnly, SameSite=Lax, Secure di produksi | Belum ada CSP ketat |
-| 2FA dikalahkan | Phishing/replay | TOTP 6 digit; verifikasi server | Belum ada recovery code; belum ada anti-replay eksplisit |
+| 2FA dikalahkan | Phishing/replay | TOTP 6 digit; kode pemulihan sekali pakai; verifikasi server | Belum ada anti-replay eksplisit |
 | OAuth CSRF | Callback Google | State OAuth | Perlu verifikasi state di callback |
 | Token Google bocor | DB/log | AES-256-GCM; tidak dikirim ke client | Rotasi kunci belum terdokumentasi |
 | Webhook email palsu | Request langsung | Secret + allowlist pengirim | Perlu rate limit/replay window |
@@ -586,6 +588,7 @@ Semua endpoint kecuali yang ditandai publik memakai cookie sesi `mc_auth`. Envel
 - Skema v8 menambahkan isolasi transaksi per akun dan rantai hash.
 - Skema v9 menambahkan `email_links` untuk Apps Script Gmail.
 - Skema v10 menambahkan `transactions.tags` dan index GIN.
+- Skema v11 menambahkan `auth_recovery_codes` (hash kode pemulihan sekali pakai).
 - Jalankan `npm run db:setup` untuk menerapkan skema idempoten dan dompet utama.
 - Sebelum migrasi berisiko, buat snapshot Neon.
 - Marker versi dicatat di `schema_version`.
@@ -609,6 +612,7 @@ Semua endpoint kecuali yang ditandai publik memakai cookie sesi `mc_auth`. Envel
 | v8 | Isolasi per akun + hash ledger | Aditif/backfill |
 | v9 | `email_links` | Aditif |
 | v10 | `transactions.tags` + GIN | Aditif |
+| v11 | `auth_recovery_codes` | Aditif; kode dibuat saat 2FA diaktifkan |
 
 ### 5.2 Aturan migrasi dan rollback
 
@@ -770,13 +774,12 @@ Semua endpoint kecuali yang ditandai publik memakai cookie sesi `mc_auth`. Envel
 - Billing webhook idempoten, invoice, dunning, refund, pajak.
 - Kuota kapasitas, lampiran, AI, dan riwayat.
 - White-label PDF, akuntan eksternal, dukungan prioritas.
-- Gate keamanan: recovery 2FA, audit penuh, backup/restore teruji.
+- Gate keamanan: audit penuh, backup/restore teruji (recovery 2FA selesai).
 
 ### 7.3 Pembersihan wajib
 
 - Jangan menyebut kolaborasi “selesai” selama `/api/keluarga` 410.
 - Tambahkan audit untuk recurring, impor, Sheets, kalender, 2FA, ekspor.
-- Tambahkan recovery code sebelum 2FA diwajibkan.
 - Perluas ekspor agar benar-benar “seluruh data”.
 - Uji negatif IDOR, OAuth state, replay webhook, dan rate limit.
 
@@ -792,7 +795,7 @@ Semua endpoint kecuali yang ditandai publik memakai cookie sesi `mc_auth`. Envel
 | F-PREM-06 | FR-LAP | AC-LAP | Selesai |
 | F-PREM-07 | FR-AI | AC-AI | Selesai |
 | F-PREM-08 | FR-KEL | AC-KEL | Ditangguhkan |
-| F-PREM-09 | FR-SEC, FR-SEC2 | AC-SEC, AC-SEC2 | Sebagian (recovery 2FA belum) |
+| F-PREM-09 | FR-SEC, FR-SEC2 | AC-SEC, AC-SEC2 | Selesai (2FA + recovery) |
 | F-PREM-10 | FR-EML, FR-INT, FR-INT2 | AC-EML, AC-INT, AC-INT2 | Sebagian |
 | Roadmap 8.7 | FR-CAP | AC-CAP | Sebagian (tanpa paywall) |
 | Roadmap 8.7 | FR-ANL | AC-ANL | Belum/Sebagian |
@@ -813,7 +816,7 @@ Semua endpoint kecuali yang ditandai publik memakai cookie sesi `mc_auth`. Envel
 | Laporan | `tests/laporan.test.ts` | Periode, ringkasan, jadwal | Uji filter pos/dompet (belum ada) |
 | AI | `tests/ai-pro.test.ts`, `tests/insight.test.ts`, `tests/handler-ai.test.ts` | Riwayat, anomali, batas | Uji biaya/kuota |
 | Keluarga | `tests/keluarga.test.ts` | Unit `tolakPeran` | API 410 belum diuji end-to-end |
-| Keamanan | `tests/keamanan.test.ts`, `tests/security.test.ts` | 2FA, sesi, ekspor, TOTP | Recovery code belum ada |
+| Keamanan | `tests/keamanan.test.ts`, `tests/security.test.ts`, `tests/recovery-code.test.ts` | 2FA, sesi, ekspor, TOTP, kode pemulihan | Uji pakai-habis end-to-end butuh DB |
 | Email | `tests/parse.test.ts`, `tests/handler.test.ts` | Deteksi penyedia, dompet, idempoten | Replay/rate limit |
 | Sheets/kalender | `tests/sheets.test.ts`, `tests/ics.test.ts` | Baris, URL, RFC 5545, token | OAuth callback nyata |
 | Meter/health | `tests/usage.test.ts`, `tests/health.test.ts` | Counter, cron basi | Alert eksternal |
@@ -835,7 +838,7 @@ Semua endpoint kecuali yang ditandai publik memakai cookie sesi `mc_auth`. Envel
 ### 10.2 Keputusan terbuka
 
 1. Re-enable keluarga: syarat isolasi, audit, dan persetujuan anggota.
-2. Recovery 2FA: format, jumlah kode, dan alur unduh.
+2. Recovery 2FA: format `XXXXX-XXXXX`, 10 kode sekali pakai, unduh dari Profil.
 3. Lampiran: enkripsi, ukuran, retensi, dan biaya storage.
 4. Multi-mata uang: sumber kurs, pembulatan, dan laporan.
 5. API publik: skema API key, scope, rate limit, dan audit.

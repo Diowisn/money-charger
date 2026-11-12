@@ -1,5 +1,6 @@
 import { hashPassword, verifyPassword } from "@/lib/auth";
 import { getPool } from "@/lib/pg-repo";
+import { buatKodePemulihan, hashKodePemulihan } from "@/lib/recovery-code";
 import { buatSecret, otpauthUri, verifikasiTotp } from "@/lib/totp";
 import type { ProfilAkun } from "@/lib/types";
 import { AksiError } from "@/lib/web-actions";
@@ -82,20 +83,53 @@ export async function mulai2fa(userId: string, email: string) {
   return { secret, uri: otpauthUri(email, secret) };
 }
 
-export async function aktifkan2fa(userId: string, kode: string): Promise<boolean> {
+export async function aktifkan2fa(userId: string, kode: string): Promise<string[] | null> {
   const hasil = await getPool().query<{ totp_secret: string | null }>("SELECT totp_secret FROM auth_users WHERE id = $1", [userId]);
   const secret = hasil.rows[0]?.totp_secret;
-  if (!secret || !verifikasiTotp(secret, kode)) return false;
+  if (!secret || !verifikasiTotp(secret, kode)) return null;
   await getPool().query("UPDATE auth_users SET totp_aktif = TRUE WHERE id = $1", [userId]);
-  return true;
+  return gantiKodePemulihan(userId);
+}
+
+export async function gantiKodePemulihan(userId: string): Promise<string[]> {
+  const kode = buatKodePemulihan();
+  const client = await getPool().connect();
+  try {
+    await client.query("BEGIN");
+    await client.query("DELETE FROM auth_recovery_codes WHERE user_id = $1", [userId]);
+    for (const item of kode) {
+      await client.query(
+        "INSERT INTO auth_recovery_codes (user_id, code_hash) VALUES ($1, $2) ON CONFLICT DO NOTHING",
+        [userId, hashKodePemulihan(item)],
+      );
+    }
+    await client.query("COMMIT");
+    return kode;
+  } catch (e) {
+    await client.query("ROLLBACK");
+    throw e;
+  } finally {
+    client.release();
+  }
 }
 
 export async function matikan2fa(userId: string, password: string): Promise<boolean> {
   const hasil = await getPool().query<{ password_hash: string | null }>("SELECT password_hash FROM auth_users WHERE id = $1", [userId]);
   const hash = hasil.rows[0]?.password_hash;
   if (!hash || !(await verifyPassword(password, hash))) return false;
-  await getPool().query("UPDATE auth_users SET totp_aktif = FALSE, totp_secret = NULL WHERE id = $1", [userId]);
-  return true;
+  const client = await getPool().connect();
+  try {
+    await client.query("BEGIN");
+    await client.query("UPDATE auth_users SET totp_aktif = FALSE, totp_secret = NULL WHERE id = $1", [userId]);
+    await client.query("DELETE FROM auth_recovery_codes WHERE user_id = $1", [userId]);
+    await client.query("COMMIT");
+    return true;
+  } catch (e) {
+    await client.query("ROLLBACK");
+    throw e;
+  } finally {
+    client.release();
+  }
 }
 
 export async function gantiPassword(userId: string, passwordLama: string, passwordBaru: string): Promise<boolean> {

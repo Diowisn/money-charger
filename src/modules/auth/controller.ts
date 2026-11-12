@@ -20,7 +20,7 @@ export async function login(req: Request) {
     const body = (await req.json()) as { password?: unknown; email?: unknown; kode2fa?: unknown };
     password = typeof body?.password === "string" ? body.password : "";
     email = typeof body?.email === "string" ? body.email.trim().toLowerCase() : "";
-    kode2fa = typeof body?.kode2fa === "string" ? body.kode2fa.replace(/\D/g, "").slice(0, 6) : "";
+    kode2fa = typeof body?.kode2fa === "string" ? body.kode2fa.trim().toUpperCase().slice(0, 32) : "";
   } catch {
     password = "";
   }
@@ -33,7 +33,7 @@ export async function login(req: Request) {
   if (hasil.status === "gagal") {
     await catatAudit(aktorWeb(ip), "login_gagal");
     await new Promise((resolve) => setTimeout(resolve, 350));
-    return loginGagal("Password atau kode 2FA salah.", 401);
+    return loginGagal("Password, kode 2FA, atau kode pemulihan salah.", 401);
   }
   await catatAudit(aktorWeb(ip), "login_berhasil");
   return loginBerhasil(hasil.token);

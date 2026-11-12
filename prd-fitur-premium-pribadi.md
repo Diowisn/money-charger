@@ -22,6 +22,7 @@
 | 1.4 | 11 Nov 2026 | Lengkapi alur, prioritas, NFR, privasi, operasi, roadmap, matriks fitur, paywall, dan traceability. |
 | 1.5 | 11 Nov 2026 | Implementasi ubah transaksi dan filter pos/dompet. |
 | 1.6 | 11 Nov 2026 | Implementasi tag transaksi dan rekap 24 bulan. |
+| 1.7 | 12 Nov 2026 | Implementasi kode pemulihan 2FA sekali pakai. |
 
 **Konvensi status**
 
@@ -55,7 +56,7 @@ Membuat Money-Charger terasa seperti aplikasi keuangan kelas berbayar untuk pema
 - **Fondasi inti sudah ada:** autentikasi per akun, transaksi, pos/kategori, dompet, ringkasan, pencarian, ekspor, piutang/utang, target tabungan, dan asisten AI.
 - **Lapisan premium pribadi sudah ada:** wawasan, transaksi otomatis, impor CSV, digest WhatsApp, multi-dompet, laporan lanjutan, AI Pro, keamanan akun, email transaksi, kalender `.ics`, Google Sheets, dan meter pemakaian.
 - **Kolaborasi keluarga ditangguhkan:** model, tabel, dan pengujian peran masih ada, tetapi API `/api/keluarga` sengaja mengembalikan `410` karena berbagi data lintas akun belum diizinkan. Dokumen ini tidak boleh lagi menyebut fitur tersebut “selesai” sampai keputusan dan threat model workspace disetujui.
-- **Yang belum ada dan menjadi kandidat berikutnya:** template input, lampiran struk tersimpan, multi-mata uang, audit log lengkap dengan UI, recovery 2FA, backup/restore satu klik, API/webhook publik, laporan laba rugi/arus kas formal, simulasi skenario, otomatisasi aturan, Telegram, dan white-label PDF.
+- **Yang belum ada dan menjadi kandidat berikutnya:** template input, lampiran struk tersimpan, multi-mata uang, audit log lengkap dengan UI, backup/restore satu klik, API/webhook publik, laporan laba rugi/arus kas formal, simulasi skenario, otomatisasi aturan, Telegram, dan white-label PDF.
 - **Paywall/billing tetap di luar lingkup** selama aplikasi dipakai pribadi.
 
 Matriks status per fitur ada di bagian 8. Detail teknis ada di [SRS](./srs-fitur-premium-pribadi.md).
@@ -185,7 +186,7 @@ Matriks status per fitur ada di bagian 8. Detail teknis ada di [SRS](./srs-fitur
 | Kuota Google/AI/WhatsApp habis | Fitur otomatis gagal | Backoff, batas laju, meter pemakaian, fallback tanpa AI |
 | Webhook email dipalsukan | Transaksi palsu | `EMAIL_INBOUND_SECRET`, `EMAIL_ALLOWED_SENDERS`, idempoten `email:<id>` |
 | Anggota workspace salah akses | Kebocoran data | Fitur keluarga tetap ditangguhkan sampai isolasi dan audit disetujui |
-| 2FA perangkat hilang | Akun tidak bisa diakses | **Belum ada recovery code**; tambahkan sebelum mengaktifkan 2FA sebagai wajib |
+| 2FA perangkat hilang | Akun tidak bisa diakses | 10 kode pemulihan sekali pakai; kode bisa dibuat ulang dari Profil |
 | Ekspor tidak lengkap | Data tidak bisa dipindahkan | Ekspor saat ini hanya transaksi; tambahkan seluruh entitas pada P2 |
 | Dokumen dan kode tidak sinkron | Keputusan salah | Status di dokumen harus mengikuti kode; review setiap rilis |
 
@@ -286,7 +287,7 @@ Matriks status per fitur ada di bagian 8. Detail teknis ada di [SRS](./srs-fitur
 | API dan webhook publik | Belum | Webhook internal email/Sheets ada; API key publik belum |
 | PDF white-label | Belum | Cetak browser belum mendukung logo/identitas usaha |
 | Backup otomatis terjadwal + restore satu klik | Sebagian | Backup Neon dan ekspor; orkestrasi restore belum |
-| 2FA | Selesai | TOTP; recovery code belum |
+| 2FA | Selesai | TOTP + 10 kode pemulihan sekali pakai |
 | PIN/biometrik | Belum | Belum ada |
 | Audit log lengkap | Sebagian | Lihat 8.6 |
 | Ekspor seluruh data kapan saja | Sebagian | Ekspor terenkripsi saat ini hanya transaksi |
@@ -300,7 +301,7 @@ Matriks status per fitur ada di bagian 8. Detail teknis ada di [SRS](./srs-fitur
 |---|---|---|---|
 | P2 | Ubah transaksi + filter pos/dompet **(selesai)** | Koreksi data tanpa hapus; pencarian lebih cepat | Edit tercatat audit; filter bekerja di riwayat |
 | P2 | Template + lampiran struk | Input lebih cepat dan bukti tersimpan | Template CRUD; lampiran terhubung transaksi |
-| P2 | Recovery 2FA + audit UI + ekspor penuh | Keamanan dan kepercayaan | Recovery code sekali pakai; audit bisa dicari; ekspor semua entitas |
+| P2 | Audit UI + ekspor penuh **(recovery 2FA selesai)** | Keamanan dan kepercayaan | Audit bisa dicari; ekspor semua entitas |
 | P2 | Re-enable kolaborasi/approval | Nilai keluarga | Isolasi workspace, audit akses, dan AC-KEL lulus |
 | P2 | Laporan laba rugi/arus kas + simulasi | Analisis lebih dalam | Laporan formal dan simulasi tanpa mutasi; rekap 24 bulan sudah ada |
 | P2 | API/webhook publik + ekspor akuntansi | Integrasi | API key, scope, rate limit, dokumentasi, audit |
@@ -369,9 +370,9 @@ Matriks status per fitur ada di bagian 8. Detail teknis ada di [SRS](./srs-fitur
 ### 9.9 Login 2FA dan pemulihan
 
 - **Aktor:** pemilik.
-- **Langkah:** login password; bila 2FA aktif, masukkan kode TOTP 6 digit; sesi dibuat.
-- **Sukses:** sesi valid 30 hari; sesi lain bisa dicabut.
-- **Gagal:** kode salah ditolak; perangkat hilang **belum ada recovery code** — ini gap yang harus ditutup pada P2.
+- **Langkah:** login password; bila 2FA aktif, masukkan kode TOTP 6 digit atau kode pemulihan sekali pakai; sesi dibuat.
+- **Sukses:** sesi valid 30 hari; sesi lain bisa dicabut; kode pemulihan yang dipakai langsung hangus.
+- **Gagal:** kode salah atau kode pemulihan yang sudah dipakai ditolak; kode baru bisa dibuat dari Profil setelah login.
 
 ### 9.10 Ekspor dan pemulihan
 
@@ -417,14 +418,14 @@ Matriks status per fitur ada di bagian 8. Detail teknis ada di [SRS](./srs-fitur
 
 - Semua API premium memakai sesi; `user_id` dari sesi, bukan body.
 - Peran ditolak di server (`tolakPeran`), bukan hanya disembunyikan di UI.
-- 2FA TOTP; mematikan 2FA wajib password; sesi lain bisa dicabut.
+- 2FA TOTP + kode pemulihan sekali pakai; mematikan 2FA wajib password; sesi lain bisa dicabut.
 - Ekspor terenkripsi AES-256-GCM + scrypt; password tidak disimpan.
 - Webhook email wajib secret dan allowlist pengirim; idempoten per `email:<id>`.
 - Google OAuth memakai `drive.file`; token dienkripsi; URL webhook Apps Script dibatasi `script.google.com`.
 - Token feed kalender 32 byte acak, hanya baca `.ics`, dapat diganti.
 - Rate limit AI web dan WhatsApp; batas ukuran body/CSV.
 - Audit untuk aksi sensitif: login, 2FA, sesi, ekspor, dompet, transaksi, recurring, impor, laporan, Sheets, kalender, keluarga.
-- **Gap:** audit belum mencakup semua aksi premium; belum ada recovery code 2FA; belum ada PIN/biometrik.
+- **Gap:** audit belum mencakup semua aksi premium; belum ada PIN/biometrik.
 
 ### 11.3 Persetujuan dan transparansi
 
@@ -514,7 +515,7 @@ Jadwalkan berkala; `/api/health` memperingatkan bila cron belum pernah jalan ata
 ### 13.3 Keputusan terbuka
 
 1. Apakah kolaborasi keluarga diaktifkan kembali? Jika ya, bagaimana isolasi workspace, persetujuan anggota, dan audit akses?
-2. Apakah 2FA diwajibkan? Jika ya, recovery code harus ada sebelum diwajibkan.
+2. Apakah 2FA diwajibkan untuk semua akun? Recovery code sekali pakai sudah tersedia.
 3. Berapa target RPO/RTO backup dan seberapa sering uji restore?
 4. Apakah lampiran struk disimpan? Jika ya, enkripsi, ukuran maksimum, dan retensi?
 5. Apakah multi-mata uang dibutuhkan? Jika ya, sumber kurs dan pembulatan?
@@ -607,7 +608,7 @@ Paywall hanya dibuat jika aplikasi dipublikasikan. Prinsip: fitur inti tetap nya
 | OCR/auto-kategorisasi/otomatisasi | Terbatas | Penuh |
 | Kolaborasi/approval/akuntan | Tidak | Ya |
 | Google Sheets/API/white-label | Tidak | Ya |
-| 2FA/recovery/audit lengkap | 2FA dasar | Recovery + audit penuh |
+| 2FA/recovery/audit lengkap | 2FA dasar + recovery | Audit penuh |
 | Dukungan | Standar | Prioritas |
 
 ### 16.2 Kebutuhan billing

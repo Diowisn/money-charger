@@ -372,14 +372,14 @@ export default function LoginForm({
                 {sandi}
                 {perlu2fa ? (
                   <label>
-                    Kode 2FA
+                    Kode 2FA atau kode pemulihan
                     <input
-                      inputMode="numeric"
                       autoComplete="one-time-code"
-                      maxLength={6}
+                      maxLength={32}
+                      placeholder="123456 atau ABCDE-12345"
                       value={kode2fa}
                       onChange={(e) => {
-                        setKode2fa(e.target.value.replace(/\D/g, "").slice(0, 6));
+                        setKode2fa(e.target.value.toUpperCase());
                         if (error) setError(null);
                       }}
                     />

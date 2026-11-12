@@ -56,6 +56,10 @@ async function main() {
     "INSERT INTO schema_version (version, description) VALUES ($1, $2) ON CONFLICT (version) DO NOTHING",
     [10, "Tag transaksi (transactions.tags)."],
   );
+  await getPool().query(
+    "INSERT INTO schema_version (version, description) VALUES ($1, $2) ON CONFLICT (version) DO NOTHING",
+    [11, "Kode pemulihan 2FA sekali pakai (auth_recovery_codes)."],
+  );
   const users = await getPool().query<{ id: string }>("SELECT id FROM auth_users");
   for (const user of users.rows) {
     await new PgRepo(undefined, undefined, user.id).backfillLedger();
@@ -65,7 +69,7 @@ async function main() {
      SELECT id, email FROM auth_users
      ON CONFLICT (user_id) DO NOTHING`,
   );
-  console.log("Skema siap. Baseline skema v1-v10 tercatat; rantai hash transaksi diisi.");
+  console.log("Skema siap. Baseline skema v1-v11 tercatat; rantai hash transaksi diisi.");
   console.log(`Email terdaftar: ${email.rowCount ?? 0} akun baru.`);
 
   const seeded = await new PgRepo().seed(nomor);

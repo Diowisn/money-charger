@@ -56,6 +56,8 @@ export function Profil({
   const [secret2fa, setSecret2fa] = useState<{ secret: string; uri: string } | null>(null);
   const [kode2fa, setKode2fa] = useState("");
   const [sandi2fa, setSandi2fa] = useState("");
+  const [sisaKodePemulihan, setSisaKodePemulihan] = useState(0);
+  const [kodePemulihan, setKodePemulihan] = useState<string[]>([]);
   const [sandiEkspor, setSandiEkspor] = useState("");
   const [emailHapus, setEmailHapus] = useState("");
   const [passwordHapus, setPasswordHapus] = useState("");
@@ -71,7 +73,10 @@ export function Profil({
   }, [profil?.nama, profil?.email, profil?.telepon, profil?.tanggalLahir, profil?.avatar, nama]);
 
   useEffect(() => {
-    if (bagian === "ubah-profil") void muatSesi();
+    if (bagian === "ubah-profil") {
+      void muatSesi();
+      void muat2fa();
+    }
   }, [bagian]);
 
   async function pilihFoto(file: File | undefined) {
@@ -174,6 +179,16 @@ export function Profil({
     }
   }
 
+  async function muat2fa() {
+    try {
+      const res = await fetch("/api/profile/2fa", { cache: "no-store", credentials: "same-origin" });
+      const j = (await res.json().catch(() => ({}))) as { ok?: boolean; sisaKodePemulihan?: number };
+      if (res.ok && j.ok) setSisaKodePemulihan(j.sisaKodePemulihan ?? 0);
+    } catch {
+      // Status kode pemulihan bersifat informatif; abaikan bila gagal.
+    }
+  }
+
   async function muatSesi() {
     try {
       const res = await fetch("/api/auth/sessions", { cache: "no-store", credentials: "same-origin" });
@@ -217,16 +232,69 @@ export function Profil({
   }
 
   async function aktifkan2fa() {
-    const ok = await kirim("/api/profile/2fa", "POST", { aksi: "aktifkan", kode: kode2fa });
-    if (ok) {
+    try {
+      const res = await fetch("/api/profile/2fa", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ aksi: "aktifkan", kode: kode2fa }),
+      });
+      const j = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string; kodePemulihan?: string[] };
+      if (!res.ok || !j.ok) {
+        setGalatProfil(j.error ?? "Gagal mengaktifkan 2FA.");
+        return;
+      }
       setSecret2fa(null);
       setKode2fa("");
+      setKodePemulihan(j.kodePemulihan ?? []);
+      setSisaKodePemulihan(j.kodePemulihan?.length ?? 0);
+      setGalatProfil(null);
+    } catch {
+      setGalatProfil("Tidak bisa menghubungi server.");
     }
+  }
+
+  async function buatKodePemulihanBaru() {
+    try {
+      const res = await fetch("/api/profile/2fa", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ aksi: "kode-pemulihan" }),
+      });
+      const j = (await res.json().catch(() => ({}))) as { ok?: boolean; error?: string; kodePemulihan?: string[] };
+      if (!res.ok || !j.ok) {
+        setGalatProfil(j.error ?? "Gagal membuat kode pemulihan.");
+        return;
+      }
+      setKodePemulihan(j.kodePemulihan ?? []);
+      setSisaKodePemulihan(j.kodePemulihan?.length ?? 0);
+      setGalatProfil(null);
+    } catch {
+      setGalatProfil("Tidak bisa menghubungi server.");
+    }
+  }
+
+  function unduhKodePemulihan() {
+    const isi = [
+      "Money-Charger — kode pemulihan 2FA",
+      "Setiap kode hanya bisa dipakai sekali. Simpan di tempat aman.",
+      "",
+      ...kodePemulihan,
+    ].join("\n");
+    const url = URL.createObjectURL(new Blob([isi], { type: "text/plain;charset=utf-8" }));
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "money-charger-kode-pemulihan.txt";
+    a.click();
+    URL.revokeObjectURL(url);
   }
 
   async function matikan2fa() {
     const ok = await kirim("/api/profile/2fa", "POST", { aksi: "matikan", password: sandi2fa });
-    if (ok) setSandi2fa("");
+    if (ok) {
+      setSandi2fa("");
+      setKodePemulihan([]);
+      setSisaKodePemulihan(0);
+    }
   }
 
   async function unduhEnkripsi() {
@@ -409,6 +477,23 @@ export function Profil({
             ) : null}
             {profil?.duaFaktorAktif ? (
               <div className="form">
+                <p className="muted kecil">
+                  Sisa kode pemulihan: {sisaKodePemulihan}. Buat kode baru bila habis atau hilang; kode lama langsung tidak berlaku.
+                </p>
+                <Tombol varian="sekunder" lebar onClick={() => void buatKodePemulihanBaru()}>
+                  Buat kode pemulihan baru
+                </Tombol>
+                {kodePemulihan.length ? (
+                  <>
+                    <p className="muted kecil">
+                      Simpan kode ini sekarang. Setiap kode hanya bisa dipakai sekali dan tidak akan ditampilkan lagi.
+                    </p>
+                    <pre className="kode-secret">{kodePemulihan.join("\n")}</pre>
+                    <Tombol varian="sekunder" lebar onClick={() => unduhKodePemulihan()}>
+                      Unduh kode pemulihan
+                    </Tombol>
+                  </>
+                ) : null}
                 <label>
                   Password untuk mematikan 2FA
                   <input type="password" autoComplete="current-password" value={sandi2fa} onChange={(e) => setSandi2fa(e.target.value)} />

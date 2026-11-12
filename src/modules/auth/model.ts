@@ -1,6 +1,7 @@
 import { randomBytes } from "node:crypto";
 import { createSession, hashPassword, hashToken, verifyPassword } from "@/lib/auth";
 import { getPool, PgRepo } from "@/lib/pg-repo";
+import { hashKodePemulihan, normalkanKodePemulihan } from "@/lib/recovery-code";
 import { verifikasiTotp } from "@/lib/totp";
 
 export async function jumlahPengguna(): Promise<number> {
@@ -57,9 +58,28 @@ export async function masuk(email: string, password: string, kode2fa = ""): Prom
   if (akun.totp_aktif) {
     if (!akun.totp_secret) return { status: "gagal" };
     if (!kode2fa) return { status: "2fa" };
-    if (!verifikasiTotp(akun.totp_secret, kode2fa)) return { status: "gagal" };
+    const totpSah = /^\d{6}$/.test(kode2fa) && verifikasiTotp(akun.totp_secret, kode2fa);
+    if (!totpSah && !(await pakaiKodePemulihan(akun.id, kode2fa))) return { status: "gagal" };
   }
   return { status: "ok", token: await createSession(akun.id) };
+}
+
+export async function jumlahKodePemulihan(userId: string): Promise<number> {
+  const hasil = await getPool().query<{ n: number }>(
+    "SELECT COUNT(*)::int AS n FROM auth_recovery_codes WHERE user_id = $1 AND used_at IS NULL",
+    [userId],
+  );
+  return hasil.rows[0]?.n ?? 0;
+}
+
+export async function pakaiKodePemulihan(userId: string, kode: string): Promise<boolean> {
+  const normal = normalkanKodePemulihan(kode);
+  if (normal.length !== 10) return false;
+  const hasil = await getPool().query(
+    "UPDATE auth_recovery_codes SET used_at = now() WHERE user_id = $1 AND code_hash = $2 AND used_at IS NULL",
+    [userId, hashKodePemulihan(normal)],
+  );
+  return (hasil.rowCount ?? 0) > 0;
 }
 
 export async function cabutSemuaSesi(userId: string): Promise<void> {

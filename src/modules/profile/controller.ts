@@ -3,7 +3,8 @@ import { bacaBody, galat, ok } from "@/lib/api";
 import { userIdDariRequest } from "@/lib/auth";
 import { AksiError } from "@/lib/web-actions";
 import { logoutBerhasil } from "@/modules/auth/view";
-import { aktifkan2fa, ambilProfil, gantiPassword, hapusAkun, matikan2fa, mulai2fa, ubahProfil } from "./model";
+import { jumlahKodePemulihan } from "@/modules/auth/model";
+import { aktifkan2fa, ambilProfil, gantiKodePemulihan, gantiPassword, hapusAkun, matikan2fa, mulai2fa, ubahProfil } from "./model";
 
 async function userId(req: NextRequest): Promise<string | Response> {
   const id = await userIdDariRequest(req);
@@ -102,7 +103,7 @@ export async function get2fa(req: NextRequest) {
   try {
     const profil = await ambilProfil(id);
     if (!profil) return Response.json({ ok: false, error: "Akun tidak ditemukan." }, { status: 404 });
-    return ok({ aktif: profil.duaFaktorAktif });
+    return ok({ aktif: profil.duaFaktorAktif, sisaKodePemulihan: await jumlahKodePemulihan(id) });
   } catch (e) {
     return galat(e);
   }
@@ -121,8 +122,13 @@ export async function post2fa(req: NextRequest) {
     }
     if (aksi === "aktifkan") {
       const kode = String(body.kode ?? "").replace(/\D/g, "").slice(0, 6);
-      if (!(await aktifkan2fa(id, kode))) throw new AksiError("Kode 2FA tidak cocok.");
-      return ok({ pesan: "2FA aktif." });
+      const kodePemulihan = await aktifkan2fa(id, kode);
+      if (!kodePemulihan) throw new AksiError("Kode 2FA tidak cocok.");
+      return ok({ pesan: "2FA aktif. Simpan kode pemulihan sekarang.", kodePemulihan });
+    }
+    if (aksi === "kode-pemulihan") {
+      if (!(await ambilProfil(id))?.duaFaktorAktif) throw new AksiError("Aktifkan 2FA dulu.");
+      return ok({ pesan: "Kode pemulihan baru dibuat; kode lama tidak berlaku.", kodePemulihan: await gantiKodePemulihan(id) });
     }
     if (aksi === "matikan") {
       if (!(await matikan2fa(id, String(body.password ?? "")))) throw new AksiError("Password tidak cocok.");

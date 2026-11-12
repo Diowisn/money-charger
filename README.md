@@ -27,6 +27,7 @@ Acuan: [PRD Money-Charger SaaS](./prd-catatan-keuangan-whatsapp.md) dan [SRS](./
 | `src/modules/profile/` | Modul HMVC profil akun: nama, email, foto, password, 2FA, hapus akun |
 | `src/modules/export/` | Modul HMVC unduh CSV dan ekspor terenkripsi |
 | `src/lib/totp.ts` | TOTP 2FA tanpa dependensi tambahan |
+| `src/lib/recovery-code.ts` | Kode pemulihan 2FA sekali pakai (hash SHA-256) |
 | `src/lib/export-enkripsi.ts` | Enkripsi ekspor AES-256-GCM dengan scrypt |
 | `src/modules/health/` | Modul HMVC diagnosa kesiapan |
 | `src/modules/outbox/` | Endpoint terjaga untuk memproses ulang balasan WhatsApp tertunda |
@@ -185,7 +186,7 @@ dijalankan setelah respons. Balasan disimpan di outbox; bila Meta gagal, retry m
 worker tiap 10 menit. Isi repository secrets `APP_BASE_URL` dan `CRON_SECRET` untuk mengaktifkannya.
 Payload job selesai dibersihkan setelah 7 hari, job gagal setelah 30 hari; outbox 30 hari; audit 180 hari.
 
-`Keluar semua` di dashboard menghapus semua baris sesi akun. Daftar sesi di tab Profil dapat mencabut sesi lain satu per satu; 2FA TOTP opt-in dan ekspor CSV terenkripsi juga tersedia di sana.
+`Keluar semua` di dashboard menghapus semua baris sesi akun. Daftar sesi di tab Profil dapat mencabut sesi lain satu per satu; 2FA TOTP opt-in, kode pemulihan sekali pakai, dan ekspor CSV terenkripsi juga tersedia di sana.
 
 #### Backup dan restore melalui Neon
 
@@ -352,7 +353,7 @@ Isi dashboard:
 - **Target**: buat target tabungan (nama, nominal, target tanggal opsional), lihat saran sisihan per bulan/minggu, tambah tabungan sebagian demi sebagian, otomatis "Tercapai" saat terkumpul mencapai target.
 - **Tren pengeluaran**: grafik batang 14 hari terakhir di Ringkasan, lengkap dengan total, rata-rata, dan hari tertinggi.
 - **Asisten**: tanya jawab bebas tentang kondisi keuangan (pos paling boros, sisa uang, saran menabung) yang dijawab dari data dashboard, bukan tebakan.
-- **Profil & keamanan**: ubah profil dan password, aktifkan 2FA TOTP, lihat/cabut sesi perangkat lain, dan unduh cadangan CSV terenkripsi AES-256-GCM.
+- **Profil & keamanan**: ubah profil dan password, aktifkan 2FA TOTP dengan 10 kode pemulihan sekali pakai, lihat/cabut sesi perangkat lain, dan unduh cadangan CSV terenkripsi AES-256-GCM.
 
 Perubahan dari web dan WhatsApp memakai database yang sama. Dashboard menyegarkan data otomatis setiap 5 detik dan saat tab kembali aktif/fokus, jadi transaksi dari WhatsApp muncul tanpa hard reload. Respons dashboard memakai `no-store` agar tidak tertahan cache browser/CDN. Semua API dashboard wajib login; `/api/health` hanya
 memberi status ringkas tanpa `HEALTH_TOKEN`.
