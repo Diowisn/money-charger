@@ -7,7 +7,7 @@ import { DetailDialog, KonfirmasiDialog, ScanDialog } from "./view/dialog";
 import { INTERVAL_LIVE_MS, temaAwal } from "./view/format";
 import { kompresGambar } from "./view/gambar";
 import { IkonLainnya, IkonRekap, IkonRingkasan, IkonTambah, IkonTransaksi, IkonWawasan } from "./view/ikon";
-import { JUDUL_TAB, MENU_SAMPING, TAB_UTAMA, indukTab } from "./view/menu";
+import { JUDUL_TAB, MENU_SAMPING, TAB_UTAMA } from "./view/menu";
 import { Asisten } from "./view/tab-asisten";
 import { Dompet } from "./view/tab-dompet";
 import { Impor } from "./view/tab-impor";
@@ -44,6 +44,7 @@ export default function Dashboard({ awal, emailSetupSiap = false }: { awal: Dash
   const inputScanRef = useRef<HTMLInputElement>(null);
   const inputUploadRef = useRef<HTMLInputElement>(null);
   const dataRef = useRef(awal);
+  const knownTxIdsRef = useRef(new Set(awal.transaksi.map((tx) => tx.id)));
   const sibukRef = useRef(false);
   const urutanRef = useRef(0);
 
@@ -91,6 +92,15 @@ export default function Dashboard({ awal, emailSetupSiap = false }: { awal: Dash
         setStatusLive("terputus");
         if (!senyap) setPesan({ jenis: "error", teks: j.error ?? "Gagal memuat data." });
         return;
+      }
+      const transaksiEmailBaru = j.data.transaksi.filter(
+        (tx) => !knownTxIdsRef.current.has(tx.id) && tx.detail?.sumber === "email",
+      );
+      for (const tx of j.data.transaksi) knownTxIdsRef.current.add(tx.id);
+      if (transaksiEmailBaru.length) {
+        const tx = transaksiEmailBaru[0];
+        const sumber = transaksiEmailBaru.length > 1 ? `${transaksiEmailBaru.length} transaksi email baru` : `Transaksi email masuk: ${tx.label || tx.subPost || "Transaksi"} Rp${tx.nominal.toLocaleString("id-ID")}`;
+        setPesan({ jenis: "ok", teks: sumber });
       }
       if (JSON.stringify(j.data) !== JSON.stringify(dataRef.current)) {
         dataRef.current = j.data;
@@ -292,27 +302,14 @@ export default function Dashboard({ awal, emailSetupSiap = false }: { awal: Dash
           <button
             className="cn-top-ikon"
             type="button"
-            onClick={() => navigasiKe(tab === "ringkasan" ? "lainnya" : indukTab(tab))}
-            aria-label={tab === "ringkasan" ? "Buka menu" : `Kembali ke ${JUDUL_TAB[indukTab(tab)].toLowerCase()}`}
+            onClick={() => navigasiKe("lainnya")}
+            aria-label="Buka menu lainnya"
           >
-            {tab === "ringkasan" ? (
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
-                <path d="M4 7h16M4 12h16M4 17h10" />
-              </svg>
-            ) : (
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                <path d="M15 5l-7 7 7 7" />
-              </svg>
-            )}
-          </button>
-          <h1>{tab === "ringkasan" ? "Dashboard" : JUDUL_TAB[tab]}</h1>
-          <button className="cn-top-ikon" type="button" onClick={() => navigasiKe("lainnya")} aria-label="Menu lainnya">
-            <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-              <circle cx="12" cy="5" r="1.7" />
-              <circle cx="12" cy="12" r="1.7" />
-              <circle cx="12" cy="19" r="1.7" />
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+              <path d="M4 7h16M4 12h16M4 17h10" />
             </svg>
           </button>
+          <h1>{tab === "ringkasan" ? "Dashboard" : JUDUL_TAB[tab]}</h1>
         </header>
 
         {pesan ? (
