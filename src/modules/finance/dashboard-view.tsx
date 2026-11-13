@@ -53,15 +53,17 @@ export default function Dashboard({ awal, emailSetupSiap = false }: { awal: Dash
   }, [awal]);
 
   useEffect(() => {
-    const status = new URLSearchParams(window.location.search).get("sheets");
+    const params = new URLSearchParams(window.location.search);
+    const status = params.get("sheets");
     if (status !== "ok" && status !== "gagal") return;
+    const sebab = params.get("sebab");
     setTab("laporan");
     setPesan({
       jenis: status === "ok" ? "ok" : "error",
       teks:
         status === "ok"
           ? "Google Sheets terhubung. Spreadsheet privat dibuat dan transaksi disalin otomatis."
-          : "Koneksi Google Sheets gagal. Coba hubungkan ulang dari tab Laporan.",
+          : `Koneksi Google Sheets gagal. Coba hubungkan ulang dari tab Laporan.${sebab ? ` (${sebab})` : ""}`,
     });
     window.history.replaceState({}, "", window.location.pathname);
   }, []);
@@ -288,24 +290,29 @@ export default function Dashboard({ awal, emailSetupSiap = false }: { awal: Dash
       <div className="app-main">
         <header className="cn-top">
           <button
-            className="header-back"
+            className="cn-top-ikon"
             type="button"
             onClick={() => navigasiKe(tab === "ringkasan" ? "lainnya" : indukTab(tab))}
-            aria-label={tab === "ringkasan" ? "Buka menu lainnya" : `Kembali ke ${JUDUL_TAB[indukTab(tab)].toLowerCase()}`}
+            aria-label={tab === "ringkasan" ? "Buka menu" : `Kembali ke ${JUDUL_TAB[indukTab(tab)].toLowerCase()}`}
           >
-            {tab === "ringkasan" ? "☰" : "←"}
+            {tab === "ringkasan" ? (
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+                <path d="M4 7h16M4 12h16M4 17h10" />
+              </svg>
+            ) : (
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M15 5l-7 7 7 7" />
+              </svg>
+            )}
           </button>
-          <h1>{JUDUL_TAB[tab]}</h1>
-          <div className="cn-top-kanan">
-            <span className={`status-live ${statusLive}`} role="status" aria-live="polite">
-              <i /> {statusLive === "hidup" ? "Tersinkron" : "Terputus"}
-              {jamTerakhir ? <span className="cn-jam">{jamTerakhir}</span> : null}
-            </span>
-            <button className="header-avatar" type="button" onClick={() => navigasiKe("profil")} aria-label="Buka profil">
-              {data.profil?.avatar ? <img src={data.profil.avatar} alt="" /> : (nama.trim().charAt(0) || "M").toUpperCase()}
-              <span>{nama || "Profil"}</span>
-            </button>
-          </div>
+          <h1>{tab === "ringkasan" ? "Dashboard" : JUDUL_TAB[tab]}</h1>
+          <button className="cn-top-ikon" type="button" onClick={() => navigasiKe("lainnya")} aria-label="Menu lainnya">
+            <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+              <circle cx="12" cy="5" r="1.7" />
+              <circle cx="12" cy="12" r="1.7" />
+              <circle cx="12" cy="19" r="1.7" />
+            </svg>
+          </button>
         </header>
 
         {pesan ? (

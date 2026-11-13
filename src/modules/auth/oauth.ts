@@ -192,8 +192,10 @@ export async function callback(request: NextRequest, provider: Provider) {
   const gagal = NextResponse.redirect(new URL("/login?error=oauth", request.url));
   const hapusState = { httpOnly: true, sameSite: "lax" as const, secure: process.env.NODE_ENV === "production", path: `/api/auth/oauth/${provider}/callback`, maxAge: 0 };
   gagal.cookies.set(STATE_COOKIE, "", hapusState);
-  const gagalSheets = () => {
-    const r = NextResponse.redirect(new URL("/?sheets=gagal", request.url));
+  const gagalSheets = (sebab?: string) => {
+    const url = new URL("/?sheets=gagal", request.url);
+    if (sebab) url.searchParams.set("sebab", sebab.slice(0, 200));
+    const r = NextResponse.redirect(url);
     r.cookies.set(STATE_COOKIE, "", hapusState);
     return r;
   };
@@ -216,13 +218,13 @@ export async function callback(request: NextRequest, provider: Provider) {
       if ("tolak" in auth) return NextResponse.redirect(new URL("/login", request.url));
       if (tolakPeran(auth, "kelola")) return gagalSheets();
       const profil = await providerProfile(provider, code, request);
-      if (!profil.refreshToken) return gagalSheets();
+      if (!profil.refreshToken) return gagalSheets("Google tidak memberikan refresh token. Cabut akses aplikasi di akun Google lalu hubungkan ulang.");
       const status = await simpanKoneksiSheets(auth.userId, {
         refreshToken: profil.refreshToken,
         accessToken: profil.accessToken,
         email: profil.email,
       });
-      const sukses = NextResponse.redirect(new URL(status.terakhir ? "/?sheets=ok" : "/?sheets=gagal", request.url));
+      const sukses = NextResponse.redirect(new URL(status.mode === "google" ? "/?sheets=ok" : "/?sheets=gagal", request.url));
       sukses.cookies.set(STATE_COOKIE, "", hapusState);
       return sukses;
     }
@@ -234,7 +236,10 @@ export async function callback(request: NextRequest, provider: Provider) {
     success.cookies.set(AUTH_COOKIE, token, opsiCookie());
     success.cookies.set(STATE_COOKIE, "", hapusState);
     return success;
-  } catch {
-    return sheetsIntent ? gagalSheets() : gagal;
+  } catch (error) {
+    if (sheetsIntent) console.error("Koneksi Google Sheets gagal:", error);
+    return sheetsIntent
+      ? gagalSheets(error instanceof Error ? error.message : "Kesalahan tidak dikenal saat menghubungkan Google Sheets.")
+      : gagal;
   }
 }

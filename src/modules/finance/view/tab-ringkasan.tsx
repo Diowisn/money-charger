@@ -1,9 +1,25 @@
-import { Tombol } from "@/components/tombol";
+import { Fragment, useMemo, useState } from "react";
 import type { DashboardData } from "@/lib/dashboard";
-import { rp, tanggalPendek } from "./format";
-import { IkonKeluar, IkonMasuk, IkonRekap, IkonTarget, IkonTransaksi, IkonWawasan, SaldoIlustrasi } from "./ikon";
-import { BarisTransaksi, GrafikArea } from "./komponen";
+import { BULAN_PENDEK, labelBulan, mundurBulan, rp, tanggalPendek } from "./format";
+import { IkonKeluar, IkonMasuk, IkonRekap, IkonTarget, IkonTransaksi } from "./ikon";
 import type { Tab } from "./tipe";
+
+const WARNA_DONUT = ["#173e35", "#b9f27c", "#8fae9a", "#d7e7c4", "#e8f0dd"];
+
+function persen(sekarang: number, sebelumnya: number): number | null {
+  if (sebelumnya <= 0) return null;
+  return Math.round(((sekarang - sebelumnya) / sebelumnya) * 1000) / 10;
+}
+
+function Pill({ nilai, jenis }: { nilai: number | null; jenis: "naik" | "turun" }) {
+  if (nilai === null) return <span className="dh-pill netral">Baru</span>;
+  const positif = nilai >= 0;
+  return (
+    <span className={`dh-pill ${jenis === "naik" ? (positif ? "hijau" : "merah") : positif ? "merah" : "hijau"}`}>
+      {positif ? "+" : ""}{nilai}%
+    </span>
+  );
+}
 
 export function Ringkasan({
   data,
@@ -17,179 +33,331 @@ export function Ringkasan({
   catat: (tipe: "in" | "out") => void;
 }) {
   const r = data.ringkasan;
-  const w = data.wawasan;
-  const terbaru = data.transaksi.filter((t) => t.status === "berlaku").slice(0, 5);
-  const aman = data.sisaAman;
-  const kategori = data.perubahanKategori.slice(0, 5);
-  const totalKategori = Math.max(1, kategori.reduce((s, k) => s + Math.abs(k.sekarang), 0));
+  const [rentang, setRentang] = useState(6);
+  const bulanIni = data.hariIni.slice(0, 7);
+  const [tahun, bulan] = data.hariIni.split("-").map(Number);
+  const bulanLalu = mundurBulan(tahun, bulan, 1);
+
+  const txBulanLalu = useMemo(
+    () => data.transaksi.filter((t) => t.status === "berlaku" && t.tanggal.startsWith(bulanLalu)),
+    [data.transaksi, bulanLalu],
+  );
+  const masukLalu = txBulanLalu.filter((t) => t.tipe === "in" || t.tipe === "gaji" || t.tipe === "bonus").reduce((s, t) => s + t.nominal, 0);
+  const keluarLalu = txBulanLalu.filter((t) => t.tipe === "out").reduce((s, t) => s + t.nominal + t.biayaAdmin, 0);
+  const deltaMasuk = persen(r.pendapatanBulanIni, masukLalu);
+  const deltaKeluar = persen(r.pengeluaranBulanIni, keluarLalu);
+  const deltaTabungan = persen(r.tabungan, data.pengaturan.tabunganAwal);
+
+  const arus = useMemo(
+    () =>
+      Array.from({ length: rentang }, (_, i) => {
+        const kunci = mundurBulan(tahun, bulan, rentang - 1 - i);
+        const isi = data.transaksi.filter((t) => t.status === "berlaku" && t.tanggal.startsWith(kunci));
+        return {
+          kunci,
+          masuk: isi.filter((t) => t.tipe === "in" || t.tipe === "gaji" || t.tipe === "bonus").reduce((s, t) => s + t.nominal, 0),
+          keluar: isi.filter((t) => t.tipe === "out").reduce((s, t) => s + t.nominal + t.biayaAdmin, 0),
+        };
+      }),
+    [data.transaksi, tahun, bulan, rentang],
+  );
+  const puncak = arus.reduce((maks, a) => Math.max(maks, a.masuk, a.keluar), 1);
+  const puncakIdx = arus.reduce((idx, a, i) => (Math.max(a.masuk, a.keluar) > Math.max(arus[idx].masuk, arus[idx].keluar) ? i : idx), 0);
+
+  const kategori = useMemo(() => {
+    const dasar = data.grup
+      .map((g) => ({ nama: g.nama, total: g.terpakai }))
+      .filter((k) => k.total > 0)
+      .sort((a, b) => b.total - a.total);
+    const total = dasar.reduce((s, k) => s + k.total, 0);
+    const utama = dasar.slice(0, 4);
+    const sisa = dasar.slice(4).reduce((s, k) => s + k.total, 0);
+    const items = sisa > 0 ? [...utama, { nama: "Lainnya", total: sisa }] : utama;
+    return { total, items: items.map((k) => ({ ...k, porsi: total > 0 ? k.total / total : 0 })) };
+  }, [data.grup]);
+
+  const donut = useMemo(() => {
+    let derajat = 0;
+    return kategori.items
+      .map((k, i) => {
+        const mulai = derajat;
+        derajat += k.porsi * 360;
+        return `${WARNA_DONUT[i % WARNA_DONUT.length]} ${mulai}deg ${derajat}deg`;
+      })
+      .join(", ");
+  }, [kategori]);
+
   const goals = data.goals.filter((g) => g.status === "aktif").slice(0, 3);
-  const dompet = data.dompet.daftar.slice(0, 2);
-  const skor = w.skor;
+  const terbaru = data.transaksi.slice(0, 5);
+  const limit = data.sisaAman;
+  const persenLimit = limit && limit.perHari > 0 ? Math.min(100, Math.round((limit.rataHarian / limit.perHari) * 100)) : 0;
+
+  const aktivitas = useMemo(() => {
+    const daftar = [
+      ...data.goals.slice(0, 2).map((g) => ({ id: `g${g.id}`, teks: `Target ${g.nama} dibuat`, waktu: g.tanggal })),
+      ...data.piutang.slice(0, 2).map((d) => ({
+        id: `d${d.id}`,
+        teks: `${d.jenis === "piutang" ? "Piutang" : "Utang"} ${d.nama} dicatat`,
+        waktu: d.tanggal,
+      })),
+      ...data.otomatis
+        .filter((o) => o.terakhirJalan)
+        .slice(0, 2)
+        .map((o) => ({ id: `o${o.id}`, teks: `Aturan ${o.nama} dijalankan`, waktu: o.terakhirJalan as string })),
+    ];
+    return daftar.sort((a, b) => (a.waktu < b.waktu ? 1 : -1)).slice(0, 4);
+  }, [data.goals, data.piutang, data.otomatis]);
 
   return (
-    <div className="cn-dash">
-      <section className="cn-kiri">
-        <article className="saldo-kartu">
-          <div className="saldo-teks">
-            <p className="saldo-label">Total saldo</p>
-            <p className="saldo-angka">{rp(r.saldo)}</p>
-            <p className="saldo-sub">{nama || "Money-Charger"} · {data.periode.aktif ? `hari ke-${data.periode.hariKe}` : "periode awal"}</p>
-          </div>
-          <SaldoIlustrasi />
-        </article>
-
-        <div className="aksi-cepat" aria-label="Aksi cepat">
-          <button type="button" onClick={() => catat("in")}><span className="aksi-ikon masuk"><IkonMasuk aktif={false} /></span><span>Pemasukan</span></button>
-          <button type="button" onClick={() => catat("out")}><span className="aksi-ikon keluar"><IkonKeluar aktif={false} /></span><span>Pengeluaran</span></button>
-          <button type="button" onClick={() => navigasi("riwayat")}><span className="aksi-ikon"><IkonTransaksi aktif={false} /></span><span>Transaksi</span></button>
-          <button type="button" onClick={() => navigasi("rekap")}><span className="aksi-ikon"><IkonRekap aktif={false} /></span><span>Rekap</span></button>
+    <div className="dh">
+      <section className="dh-hero">
+        <div className="dh-hero-top">
+          <span className="dh-logo">
+            <img src="/icon-192.png" alt="" width={26} height={26} />
+          </span>
+          <span className="dh-signal" aria-hidden="true">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+              <path d="M4 12a11 11 0 0 1 16 0" />
+              <path d="M7.5 15.5a6.5 6.5 0 0 1 9 0" />
+              <circle cx="12" cy="19" r="1" fill="currentColor" />
+            </svg>
+          </span>
         </div>
-
-        {aman ? (
-          <article className="kartu sisa-aman">
-            <div className="baris-antara">
-              <h2>Batas harian</h2>
-              <span className={`badge ${aman.perHari >= aman.rataHarian ? "tipe-in" : "tipe-out"}`}>
-                {aman.perHari >= aman.rataHarian ? "Aman" : "Ketat"}
-              </span>
-            </div>
-            <p className="angka">{rp(aman.perHari)}<span className="muted kecil"> /hari</span></p>
-            <p className="muted kecil">{rp(aman.rataHarian)} rata belanja · sisa {rp(r.sisaUang)} untuk {aman.hariTersisa} hari</p>
-            <div className="bar tebal"><span style={{ width: `${Math.min(100, Math.round((aman.rataHarian / Math.max(1, aman.perHari || 1)) * 100))}%` }} /></div>
-          </article>
-        ) : null}
-
-        <article className="kartu">
-          <div className="baris-antara">
-            <h2>Target</h2>
-            <Tombol varian="tautan" onClick={() => navigasi("target")}>Tambah</Tombol>
+        <p className="dh-nama">{nama || "Money-Charger"}</p>
+        <div className="dh-hero-bawah">
+          <div>
+            <p className="dh-label">Saldo</p>
+            <p className="dh-saldo">{rp(r.saldo)}</p>
           </div>
-          <p className="angka">{rp(r.goalTerkumpulAktif)}</p>
-          <p className="muted kecil">dari target {rp(r.goalTargetAktif)}</p>
-          <ul className="cn-rencana">
-            {goals.map((g) => (
-              <li key={g.id}>
-                <div className="baris-antara"><b>{g.nama}</b><span className="muted kecil">{Math.round(g.progres * 100)}%</span></div>
-                <div className="bar tipis"><span style={{ width: `${Math.round(g.progres * 100)}%` }} /></div>
-                <p className="muted kecil">{rp(g.terkumpul)} / {rp(g.targetNominal)}</p>
-              </li>
-            ))}
-            {!goals.length ? <li className="muted kecil">Belum ada target aktif.</li> : null}
-          </ul>
-        </article>
-      </section>
-
-      <section className="cn-tengah">
-        <div className="stat-row">
-          <article className="stat-kartu">
-            <span className="stat-ikon"><IkonMasuk aktif={false} /></span>
-            <p className="stat-label">Pemasukan</p>
-            <p className="angka">{rp(r.pendapatanBulanIni)}</p>
-            <p className="muted kecil">Bulan ini</p>
-          </article>
-          <article className="stat-kartu">
-            <span className="stat-ikon"><IkonKeluar aktif={false} /></span>
-            <p className="stat-label">Pengeluaran</p>
-            <p className="angka">{rp(r.pengeluaranBulanIni)}</p>
-            <p className="muted kecil">Bulan ini</p>
-          </article>
-          <article className="stat-kartu">
-            <span className="stat-ikon"><IkonTarget aktif={false} /></span>
-            <p className="stat-label">Tabungan</p>
-            <p className="angka">{rp(r.tabungan)}</p>
-            <p className="muted kecil">Saldo tersimpan</p>
-          </article>
-          <article className="stat-kartu">
-            <span className="stat-ikon"><IkonWawasan aktif={false} /></span>
-            <p className="stat-label">Investasi</p>
-            <p className="angka">{rp(r.investasi)}</p>
-            <p className="muted kecil">Saldo investasi</p>
-          </article>
-        </div>
-
-        <article className="kartu">
-          <div className="baris-antara">
+          <div className="dh-mini">
             <div>
-              <h2>Arus kas</h2>
-              <p className="angka">{rp(r.saldo)}</p>
+              <span>Sisa/hari</span>
+              <b>{rp(limit?.perHari ?? 0)}</b>
             </div>
-            <span className="badge">14 hari</span>
+            <div>
+              <span>Hari</span>
+              <b>{limit?.hariTersisa ?? 0}</b>
+            </div>
           </div>
-          <GrafikArea nilai={data.tren.map((t) => t.pengeluaran)} warna="#173e35" label="Pengeluaran 14 hari" />
-          <div className="cn-sumbu">
-            {data.tren.filter((_, i) => i % 2 === 0).map((t) => (
-              <span key={t.tanggal}>{Number(t.tanggal.slice(8))}</span>
-            ))}
-          </div>
-        </article>
-
-        <article className="kartu">
-          <div className="baris-antara">
-            <h2>Transaksi terakhir</h2>
-            <Tombol varian="tautan" onClick={() => navigasi("riwayat")}>Lihat semua</Tombol>
-          </div>
-          <ul className="daftar-transaksi daftar-rapi">
-            {terbaru.map((t) => <BarisTransaksi key={t.id} tx={t} />)}
-            {!terbaru.length ? <li className="kosong"><p className="muted">Belum ada transaksi.</p></li> : null}
-          </ul>
-        </article>
+        </div>
       </section>
 
-      <section className="cn-kanan">
-        <article className="kartu">
-          <div className="baris-antara"><h2>Skor keuangan</h2><span className="badge hijau">{skor}%</span></div>
-          <p className="muted kecil">Kualitas keuangan</p>
-          <p className="angka">{w.label}</p>
-          <div className="bar tebal"><span style={{ width: `${skor}%` }} /></div>
-        </article>
+      <div className="dh-aksi">
+        <button type="button" onClick={() => catat("in")}>
+          <span className="dh-ikon"><IkonMasuk aktif={false} /></span>
+          <span>Masuk</span>
+        </button>
+        <button type="button" onClick={() => catat("out")}>
+          <span className="dh-ikon"><IkonKeluar aktif={false} /></span>
+          <span>Keluar</span>
+        </button>
+        <button type="button" onClick={() => navigasi("riwayat")}>
+          <span className="dh-ikon"><IkonTransaksi aktif={false} /></span>
+          <span>Riwayat</span>
+        </button>
+        <button type="button" onClick={() => navigasi("rekap")}>
+          <span className="dh-ikon"><IkonRekap aktif={false} /></span>
+          <span>Rekap</span>
+        </button>
+      </div>
 
-        <article className="kartu">
-          <div className="baris-antara"><h2>Dompet</h2><Tombol varian="tautan" onClick={() => navigasi("dompet")}>Kelola</Tombol></div>
-          <p className="muted kecil">Total saldo</p>
-          <p className="angka">{rp(data.dompet.total)}</p>
-          <ul className="cn-dompet">
-            {dompet.map((d, i) => (
-              <li key={d.id} className={i === 0 ? "gelap" : ""}>
-                <b>{d.nama}</b>
-                <span>{rp(d.saldo)}</span>
-              </li>
-            ))}
-            {!dompet.length ? <li className="muted kecil">Belum ada dompet.</li> : null}
-          </ul>
+      <div className="dh-ringkas">
+        <article className="dh-kartu dh-ringkas-item">
+          <span className="dh-ikon"><IkonMasuk aktif={false} /></span>
+          <div className="dh-ringkas-teks">
+            <p className="dh-angka">{rp(r.pendapatanBulanIni)}</p>
+            <p className="dh-sub">Total pemasukan</p>
+          </div>
+          <Pill nilai={deltaMasuk} jenis="naik" />
+          <button type="button" className="dh-dots" aria-label="Detail pemasukan" onClick={() => navigasi("rekap")}>⋯</button>
         </article>
-
-        <article className="kartu">
-          <h2>Komposisi pengeluaran</h2>
-          <ul className="cn-legend">
-            {kategori.map((k) => {
-              const persen = Math.round((Math.abs(k.sekarang) / totalKategori) * 100);
-              return (
-                <li key={k.nama}>
-                  <span className="badge">{persen}%</span>
-                  <span>{k.nama}</span>
-                  <b>{rp(k.sekarang)}</b>
-                </li>
-              );
-            })}
-            {!kategori.length ? <li className="muted kecil">Belum ada kategori bulan ini.</li> : null}
-          </ul>
+        <article className="dh-kartu dh-ringkas-item">
+          <span className="dh-ikon"><IkonKeluar aktif={false} /></span>
+          <div className="dh-ringkas-teks">
+            <p className="dh-angka">{rp(r.pengeluaranBulanIni)}</p>
+            <p className="dh-sub">Total pengeluaran</p>
+          </div>
+          <Pill nilai={deltaKeluar} jenis="turun" />
+          <button type="button" className="dh-dots" aria-label="Detail pengeluaran" onClick={() => navigasi("riwayat")}>⋯</button>
         </article>
+        <article className="dh-kartu dh-ringkas-item">
+          <span className="dh-ikon"><IkonTarget aktif={false} /></span>
+          <div className="dh-ringkas-teks">
+            <p className="dh-angka">{rp(r.tabungan)}</p>
+            <p className="dh-sub">Total tabungan</p>
+          </div>
+          <Pill nilai={deltaTabungan} jenis="naik" />
+          <button type="button" className="dh-dots" aria-label="Detail tabungan" onClick={() => navigasi("target")}>⋯</button>
+        </article>
+      </div>
 
-        <article className="kartu">
-          <h2>Aktivitas</h2>
-          <ul className="cn-aktivitas">
-            {terbaru.slice(0, 4).map((t) => (
-              <li key={t.id}>
-                <span className="avatar-uang kecil">{(t.subPost ?? t.label ?? "?").charAt(0).toUpperCase()}</span>
-                <div>
-                  <b>{t.subPost ?? t.label ?? "Transaksi"}</b>
-                  <p className="muted kecil">{tanggalPendek(t.tanggal)}</p>
+      <section className="dh-kartu">
+        <div className="dh-head">
+          <h2>Arus kas</h2>
+          <select className="dh-pilih" value={rentang} onChange={(e) => setRentang(Number(e.target.value))} aria-label="Rentang arus kas">
+            <option value={6}>6 bulan</option>
+            <option value={12}>12 bulan</option>
+          </select>
+        </div>
+        <p className="dh-sub">Total saldo</p>
+        <div className="dh-cash-total">
+          <b>{rp(r.saldo)}</b>
+          <span className="dh-legenda">
+            <i className="gelap" /> Masuk
+            <i className="lime" /> Keluar
+          </span>
+        </div>
+        <div className="dh-chart">
+          {arus.map((a, i) => (
+            <div className="dh-chart-kolom" key={a.kunci}>
+              <div className="dh-chart-batang">
+                <span className="masuk" style={{ height: `${Math.max(3, (a.masuk / puncak) * 100)}%` }} />
+                <span className="keluar" style={{ height: `${Math.max(3, (a.keluar / puncak) * 100)}%` }} />
+              </div>
+              <span className="dh-chart-label">{BULAN_PENDEK[Number(a.kunci.slice(5)) - 1]}</span>
+              {i === puncakIdx ? (
+                <span className={`dh-tooltip${i === 0 ? " kiri" : i === arus.length - 1 ? " kanan" : ""}`}>
+                  <b>{labelBulan(a.kunci)}</b>
+                  <span>Masuk {rp(a.masuk)}</span>
+                  <span>Keluar {rp(a.keluar)}</span>
+                </span>
+              ) : null}
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {limit ? (
+        <section className="dh-kartu">
+          <div className="dh-head">
+            <h2>Batas harian</h2>
+          </div>
+          <div className="dh-limit">
+            <p><b>{rp(limit.perHari)}</b> <span className="dh-sub">dari {rp(r.sisaUang)}</span></p>
+            <b className="dh-persen">{persenLimit}%</b>
+          </div>
+          <div className="dh-bar"><span style={{ width: `${Math.max(3, persenLimit)}%` }} /></div>
+        </section>
+      ) : null}
+
+      <section className="dh-kartu">
+        <div className="dh-head">
+          <h2>Rencana tabungan</h2>
+          <button type="button" className="dh-tautan" onClick={() => navigasi("target")}>+ Tambah</button>
+        </div>
+        <p className="dh-sub">Total terkumpul</p>
+        <p className="dh-angka besar">{rp(r.goalTerkumpulAktif)}</p>
+        <ul className="dh-goal">
+          {goals.map((g) => (
+            <li key={g.id}>
+              <div className="dh-goal-head">
+                <span className="dh-ikon kecil"><IkonTarget aktif={false} /></span>
+                <b>{g.nama}</b>
+                <button type="button" className="dh-dots" aria-label={`Detail ${g.nama}`} onClick={() => navigasi("target")}>⋯</button>
+              </div>
+              <div className="dh-bar"><span style={{ width: `${Math.max(2, Math.round(g.progres * 100))}%` }} /></div>
+              <div className="dh-goal-kaki">
+                <span>{rp(g.terkumpul)} <b>{Math.round(g.progres * 100)}%</b></span>
+                <span>Target {rp(g.targetNominal)}</span>
+              </div>
+            </li>
+          ))}
+          {!goals.length ? <li className="dh-sub">Belum ada rencana tabungan aktif.</li> : null}
+        </ul>
+      </section>
+
+      <section className="dh-kartu">
+        <div className="dh-head">
+          <h2>Statistik</h2>
+          <span className="dh-pilih statis">Bulan ini</span>
+        </div>
+        <div className="dh-donut">
+          <div className="dh-donut-cincin" style={{ background: kategori.total > 0 ? `conic-gradient(${donut})` : "#e8f0dd" }}>
+            <div>
+              <span>Total pengeluaran</span>
+              <b>{rp(kategori.total)}</b>
+            </div>
+          </div>
+        </div>
+        <ul className="dh-stat">
+          {kategori.items.map((k, i) => (
+            <li key={k.nama}>
+              <span className="dh-chip" style={{ background: WARNA_DONUT[i % WARNA_DONUT.length] }}>
+                {Math.round(k.porsi * 100)}%
+              </span>
+              <span>{k.nama}</span>
+              <b>{rp(k.total)}</b>
+            </li>
+          ))}
+          {!kategori.items.length ? <li className="dh-sub">Belum ada pengeluaran bulan ini.</li> : null}
+        </ul>
+      </section>
+
+      <section className="dh-kartu">
+        <div className="dh-head">
+          <h2>Transaksi terakhir</h2>
+          <button type="button" className="dh-tautan" onClick={() => navigasi("riwayat")}>Semua</button>
+        </div>
+        <div className="dh-tabel-head">
+          <span>Transaksi</span>
+          <span>Tanggal</span>
+          <span className="kanan">Nominal</span>
+        </div>
+        <ul className="dh-tabel">
+          {terbaru.map((t) => {
+            const keluar = t.tipe === "out";
+            const judul = t.subPost ?? t.label ?? "Tanpa pos";
+            return (
+              <li key={t.id} onClick={() => navigasi("riwayat")} role="button" tabIndex={0}>
+                <div className="dh-tx">
+                  <span className={keluar ? "dh-avatar" : "dh-avatar masuk"}>{(judul.trim().charAt(0) || "?").toUpperCase()}</span>
+                  <div>
+                    <b>{judul}</b>
+                    <p>{t.tags.length ? `#${t.tags[0]}` : keluar ? "Pengeluaran" : "Pemasukan"}</p>
+                  </div>
+                </div>
+                <span className="dh-tx-tanggal">{tanggalPendek(t.tanggal)}</span>
+                <div className="dh-tx-nilai">
+                  <b className={keluar ? "keluar" : "masuk"}>{keluar ? "−" : "+"} {rp(keluar ? t.nominal + t.biayaAdmin : t.nominal)}</b>
+                  <span className={`dh-status ${t.status === "batal" ? "pending" : "selesai"}`}>
+                    {t.status === "batal" ? "Batal" : "Selesai"}
+                  </span>
                 </div>
               </li>
-            ))}
-          </ul>
-        </article>
+            );
+          })}
+          {!terbaru.length ? <li className="dh-sub">Belum ada transaksi.</li> : null}
+        </ul>
       </section>
+
+      <section className="dh-kartu">
+        <div className="dh-head">
+          <h2>Aktivitas terbaru</h2>
+          <span className="dh-sub">Ringkasan</span>
+        </div>
+        <ul className="dh-aktivitas">
+          {aktivitas.map((a, i) => (
+            <Fragment key={a.id}>
+              {i === 0 || (a.waktu === data.hariIni) !== (aktivitas[i - 1].waktu === data.hariIni) ? (
+                <li className="dh-grup">{a.waktu === data.hariIni ? "Hari ini" : "Sebelumnya"}</li>
+              ) : null}
+              <li>
+                <span className="dh-avatar">{(a.teks.trim().charAt(0) || "?").toUpperCase()}</span>
+                <div>
+                  <b>{a.teks}</b>
+                  <p>{a.waktu === data.hariIni ? "Hari ini" : tanggalPendek(a.waktu)}</p>
+                </div>
+              </li>
+            </Fragment>
+          ))}
+          {!aktivitas.length ? <li className="dh-sub">Belum ada aktivitas.</li> : null}
+        </ul>
+      </section>
+
+      <footer className="dh-kaki">
+        <p>© 2026 Money-Charger</p>
+        <p className="dh-sub">Pencatatan keuangan pribadi · tersinkron otomatis</p>
+      </footer>
     </div>
   );
 }
