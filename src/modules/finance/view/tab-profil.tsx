@@ -3,7 +3,7 @@ import { Tombol } from "@/components/tombol";
 import type { DashboardData } from "@/lib/dashboard";
 import { unduhXlsx } from "@/lib/xlsx";
 import { fileKeAvatar } from "./gambar";
-import { NAMA_TIPE } from "./format";
+import { NAMA_TIPE, rp } from "./format";
 import {
   IkonHapus,
   IkonKeluar,
@@ -336,67 +336,102 @@ export function Profil({
   }
 
   return (
-    <div className="profil">
+    <div className="cn-halaman">
       {bagian === "profil" ? (
         <>
-          <section className="profil-head">
+          <article className="saldo-kartu cn-span profil-hero">
             <span className="profil-avatar besar">
               <img src={avatarTampil || "/icon-192.png"} alt="" width={96} height={96} />
             </span>
-            <h2>{namaTampil}</h2>
-            <p className="muted">{profil?.email ?? "Memuat akun..."}</p>
-            <span className={`status-live ${statusLive}`}>
-              <i /> {statusLive === "hidup" ? "Tersinkron" : "Koneksi terputus"}
-            </span>
+            <div className="saldo-teks">
+              <p className="saldo-label">Profil saya</p>
+              <p className="saldo-angka">{namaTampil}</p>
+              <p className="saldo-sub">{profil?.email ?? "Memuat akun..."}</p>
+              <span className={`status-live ${statusLive}`}>
+                <i /> {statusLive === "hidup" ? "Tersinkron" : "Koneksi terputus"}
+              </span>
+            </div>
             <Tombol varian="sekunder" onClick={() => navigasi("ubah-profil")}>
               Edit profil
             </Tombol>
-          </section>
+          </article>
 
-          <section className="profil-daftar">
-            <button type="button" onClick={() => navigasi("ubah-profil")}>
-              <IkonKunci aktif={false} />
-              <span>{profil?.punyaPassword ? "Ubah password" : "Buat password"}</span>
-              <IkonPanah />
-            </button>
-            <button type="button" onClick={() => void unduhXlsx(data.transaksi, NAMA_TIPE)}>
-              <IkonRekap aktif={false} />
-              <span>Cadangan (ekspor .xlsx)</span>
-              <IkonPanah />
-            </button>
-            <button type="button" onClick={() => setTema(tema === "gelap" ? "terang" : "gelap")}>
-              <IkonMata buka={tema === "gelap"} />
-              <span>Tema {tema === "gelap" ? "gelap" : "terang"}</span>
-              <IkonPanah />
-            </button>
-            <button type="button" onClick={() => void hapusCache()}>
-              <IkonHapus aktif={false} />
-              <span>Hapus cache</span>
-              <IkonPanah />
-            </button>
-            <button type="button" className="keluar" onClick={() => void keluar()}>
-              <IkonKeluar aktif={false} />
-              <span>Log out</span>
-              <IkonPanah />
-            </button>
+          <div className="stat-row cn-span">
+            <article className="stat-kartu">
+              <p className="stat-label">Saldo</p>
+              <p className="angka">{rp(data.ringkasan.saldo)}</p>
+            </article>
+            <article className="stat-kartu">
+              <p className="stat-label">Tabungan</p>
+              <p className="angka">{rp(data.ringkasan.tabungan)}</p>
+            </article>
+            <article className="stat-kartu">
+              <p className="stat-label">Investasi</p>
+              <p className="angka">{rp(data.ringkasan.investasi)}</p>
+            </article>
+            <article className="stat-kartu">
+              <p className="stat-label">Target aktif</p>
+              <p className="angka">{data.goals.filter((g) => g.status === "aktif").length}</p>
+            </article>
+          </div>
+
+          <section className="kartu cn-span">
+            <div className="baris-antara">
+              <h2>Pengaturan akun</h2>
+              <span className="badge">Akun</span>
+            </div>
+            <div className="cn-pengaturan">
+              <button type="button" onClick={() => navigasi("ubah-profil")}>
+                <IkonKunci aktif={false} />
+                <span>{profil?.punyaPassword ? "Ubah password" : "Buat password"}</span>
+                <IkonPanah />
+              </button>
+              <button type="button" onClick={() => void unduhXlsx(data.transaksi, NAMA_TIPE)}>
+                <IkonRekap aktif={false} />
+                <span>Cadangan (ekspor .xlsx)</span>
+                <IkonPanah />
+              </button>
+              <button type="button" onClick={() => setTema(tema === "gelap" ? "terang" : "gelap")}>
+                <IkonMata buka={tema === "gelap"} />
+                <span>Tema {tema === "gelap" ? "gelap" : "terang"}</span>
+                <IkonPanah />
+              </button>
+              <button type="button" onClick={() => void hapusCache()}>
+                <IkonHapus aktif={false} />
+                <span>Hapus cache</span>
+                <IkonPanah />
+              </button>
+              <button type="button" className="keluar" onClick={() => void keluar()}>
+                <IkonKeluar aktif={false} />
+                <span>Log out</span>
+                <IkonPanah />
+              </button>
+            </div>
           </section>
         </>
       ) : null}
 
       {bagian === "ubah-profil" ? (
         <>
-          <section className="profil-head">
+          <article className="saldo-kartu cn-span profil-hero">
             <span className="profil-avatar besar">
               <img src={avatarTampil || "/icon-192.png"} alt="" width={96} height={96} />
             </span>
-            <button type="button" className="tautan" onClick={() => fotoRef.current?.click()} disabled={sibukProfil}>
-              Ganti foto
-            </button>
-            {avatarTampil ? (
-              <button type="button" className="tautan muted" onClick={() => { setAvatarDraf(null); setAvatarTampil(null); }}>
-                Hapus foto
+            <div className="saldo-teks">
+              <p className="saldo-label">Edit profil</p>
+              <p className="saldo-angka">{namaTampil}</p>
+              <p className="saldo-sub">{profil?.email ?? "Memuat akun..."}</p>
+            </div>
+            <div className="cn-hero-aksi">
+              <button type="button" className="tautan" onClick={() => fotoRef.current?.click()} disabled={sibukProfil}>
+                Ganti foto
               </button>
-            ) : null}
+              {avatarTampil ? (
+                <button type="button" className="tautan muted" onClick={() => { setAvatarDraf(null); setAvatarTampil(null); }}>
+                  Hapus foto
+                </button>
+              ) : null}
+            </div>
             <input
               ref={fotoRef}
               type="file"
@@ -407,7 +442,7 @@ export function Profil({
                 event.target.value = "";
               }}
             />
-          </section>
+          </article>
 
           <section className="kartu profil-bagian">
             <h2>Edit profil</h2>
@@ -548,7 +583,7 @@ export function Profil({
       ) : null}
 
       {bagian === "ubah-profil" ? (
-        <section className="kartu profil-bagian bahaya">
+        <section className="kartu profil-bagian bahaya cn-span">
           <h2>Hapus akun</h2>
           <p className="muted kecil">
             Tindakan permanen. Semua data keuangan milik akun ini ikut terhapus.

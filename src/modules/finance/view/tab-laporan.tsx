@@ -140,8 +140,23 @@ export function Laporan({ data, kirim, sibuk }: { data: DashboardData; kirim: Ki
   const aktifJadwal = data.pengaturan.laporanAktif;
 
   return (
-    <div className="laporan">
-      <section className="kartu laporan-kontrol">
+    <div className="cn-halaman">
+      <article className="saldo-kartu cn-span">
+        <div className="saldo-teks">
+          <p className="saldo-label">Arus bersih periode</p>
+          <p className="saldo-angka">{laporan ? rp(laporan.ringkasan.bersih) : "—"}</p>
+          <div className="cn-hero-mini">
+            <span>Masuk <b>{laporan ? rp(laporan.ringkasan.masuk) : "—"}</b></span>
+            <span>Keluar <b>{laporan ? rp(laporan.ringkasan.keluar) : "—"}</b></span>
+            <span>Transaksi <b>{laporan ? laporan.ringkasan.jumlahTransaksi : "—"}</b></span>
+          </div>
+        </div>
+        <span className="badge hijau">
+          {memuat ? "Memuat..." : laporan ? `${laporan.jumlahHari} hari` : "—"}
+        </span>
+      </article>
+
+      <section className="kartu cn-span">
         <div className="baris-antara">
           <div>
             <p className="eyebrow">LAPORAN</p>
@@ -189,50 +204,44 @@ export function Laporan({ data, kirim, sibuk }: { data: DashboardData; kirim: Ki
               }}
             />
           </label>
-          <span className="muted kecil">{memuat ? "Memuat laporan..." : laporan ? `${laporan.jumlahHari} hari` : ""}</span>
+          <span className="muted kecil">
+            {laporan ? `${tanggalPendek(laporan.dari)} – ${tanggalPendek(laporan.sampai)}` : memuat ? "Memuat laporan..." : ""}
+          </span>
         </div>
         {galat ? <p className="pesan-galat">{galat}</p> : null}
       </section>
 
       {laporan ? (
-        <div className="laporan-isi">
-          <header className="laporan-kop">
-            <div>
-              <p className="eyebrow">MONEY-CHARGER</p>
-              <h2>Laporan {labelBulan(laporan.dari)}</h2>
-              <p className="muted">
-                {tanggalPendek(laporan.dari)} sampai {tanggalPendek(laporan.sampai)} · {laporan.jumlahHari} hari
-              </p>
-            </div>
-            <span className="badge">{laporan.ringkasan.jumlahTransaksi} transaksi</span>
-          </header>
-
-          <section className="laporan-grid">
-            <div className="kartu laporan-metrik">
-              <p className="muted kecil">Pemasukan</p>
+        <>
+          <div className="stat-row cn-span">
+            <article className="stat-kartu">
+              <p className="stat-label">Pemasukan</p>
               <p className="angka masuk">{rp(laporan.ringkasan.masuk)}</p>
-            </div>
-            <div className="kartu laporan-metrik">
-              <p className="muted kecil">Pengeluaran</p>
+              <p className="muted kecil">Periode terpilih</p>
+            </article>
+            <article className="stat-kartu">
+              <p className="stat-label">Pengeluaran</p>
               <p className="angka keluar">{rp(laporan.ringkasan.keluar)}</p>
-              {laporan.ringkasan.biayaAdmin ? (
-                <p className="muted kecil">Termasuk biaya admin {rp(laporan.ringkasan.biayaAdmin)}</p>
-              ) : null}
-            </div>
-            <div className="kartu laporan-metrik">
-              <p className="muted kecil">Arus bersih</p>
+              <p className="muted kecil">
+                {laporan.ringkasan.biayaAdmin ? `Termasuk admin ${rp(laporan.ringkasan.biayaAdmin)}` : "Tanpa biaya admin"}
+              </p>
+            </article>
+            <article className="stat-kartu">
+              <p className="stat-label">Arus bersih</p>
               <p className={`angka ${laporan.ringkasan.bersih < 0 ? "keluar" : "masuk"}`}>{rp(laporan.ringkasan.bersih)}</p>
-            </div>
-            <div className="kartu laporan-metrik">
-              <p className="muted kecil">Rata-rata pengeluaran harian</p>
+              <p className="muted kecil">Masuk − keluar</p>
+            </article>
+            <article className="stat-kartu">
+              <p className="stat-label">Rata-rata harian</p>
               <p className="angka">{rp(laporan.ringkasan.rataHarian)}</p>
-            </div>
-          </section>
+              <p className="muted kecil">Pengeluaran / hari</p>
+            </article>
+          </div>
 
           <section className="kartu">
             <div className="baris-antara">
               <h2>Pengeluaran per pos</h2>
-              <span className="muted kecil">{laporan.kategori.length} pos</span>
+              <span className="badge">{laporan.kategori.length} pos</span>
             </div>
             {laporan.kategori.length ? (
               <table className="laporan-tabel">
@@ -268,6 +277,7 @@ export function Laporan({ data, kirim, sibuk }: { data: DashboardData; kirim: Ki
           <section className="kartu">
             <div className="baris-antara">
               <h2>Ringkasan per jenis</h2>
+              <span className="badge">{laporan.tipe.length} jenis</span>
             </div>
             <table className="laporan-tabel">
               <thead>
@@ -292,11 +302,12 @@ export function Laporan({ data, kirim, sibuk }: { data: DashboardData; kirim: Ki
           <section className="kartu">
             <div className="baris-antara">
               <h2>Saldo dompet saat ini</h2>
-              <span className="badge">{rp(laporan.totalDompet)}</span>
+              <span className="badge hijau">{rp(laporan.totalDompet)}</span>
             </div>
-            <ul className="laporan-dompet">
+            <ul className="cn-legend">
               {laporan.dompet.map((item) => (
                 <li key={item.id}>
+                  <span className="avatar-uang">{(item.nama.trim().charAt(0) || "?").toUpperCase()}</span>
                   <span>{item.nama}</span>
                   <b>{rp(item.saldo)}</b>
                 </li>
@@ -305,10 +316,10 @@ export function Laporan({ data, kirim, sibuk }: { data: DashboardData; kirim: Ki
             </ul>
           </section>
 
-          <section className="kartu">
+          <section className="kartu cn-span">
             <div className="baris-antara">
               <h2>Daftar transaksi</h2>
-              <span className="muted kecil">{laporan.transaksi.length} catatan</span>
+              <span className="badge">{laporan.transaksi.length} catatan</span>
             </div>
             {laporan.transaksi.length ? (
               <div className="laporan-tabel-gulir">
@@ -342,7 +353,7 @@ export function Laporan({ data, kirim, sibuk }: { data: DashboardData; kirim: Ki
               <p className="muted kecil">Tidak ada transaksi pada periode ini.</p>
             )}
           </section>
-        </div>
+        </>
       ) : null}
 
       <section className="kartu laporan-jadwal">

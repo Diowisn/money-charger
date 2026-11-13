@@ -30,6 +30,8 @@ export function Otomatis({
     data.email?.terhubung &&
       (!emailTerakhir || Date.now() - Date.parse(emailTerakhir) > 86_400_000),
   );
+  const aktif = data.otomatis.filter((rule) => rule.aktif);
+  const totalBulanan = aktif.reduce((s, rule) => s + rule.nominal, 0);
 
   async function salinLangganan() {
     setPesanKalender(null);
@@ -73,10 +75,24 @@ export function Otomatis({
   }
 
   return (
-    <div className="tumpuk dua-kolom">
+    <div className="cn-halaman">
+      <article className="saldo-kartu cn-span">
+        <div className="saldo-teks">
+          <p className="saldo-label">Tagihan otomatis per bulan</p>
+          <p className="saldo-angka">{rp(totalBulanan)}</p>
+          <div className="cn-hero-mini">
+            <span>Aktif <b>{aktif.length} aturan</b></span>
+            <span>Dijeda <b>{data.otomatis.length - aktif.length}</b></span>
+            <span>Total aturan <b>{data.otomatis.length}</b></span>
+          </div>
+        </div>
+      </article>
+
       <section className="kartu">
-        <span className="badge hijau">Otomatis</span>
-        <h2>Transaksi Berulang</h2>
+        <div className="baris-antara">
+          <h2>Transaksi berulang</h2>
+          <span className="badge hijau">Otomatis</span>
+        </div>
         <p className="muted kecil">
           Catat tagihan atau langganan yang sama setiap bulan. Transaksi dibuat otomatis pada tanggal yang dipilih saat worker berjalan.
         </p>
@@ -114,30 +130,28 @@ export function Otomatis({
 
       <section className="kartu">
         <div className="baris-antara">
-          <h2>Aturan Saya</h2>
-          <div className="baris-tombol">
-            <TautanTombol varian="sekunder" ukuran="kecil" href="/api/kalender" download>
-              Unduh kalender (.ics)
-            </TautanTombol>
-            <Tombol varian="sekunder" ukuran="kecil" onClick={() => void salinLangganan()} disabled={sibuk}>
-              Salin URL langganan
-            </Tombol>
-          </div>
+          <h2>Aturan saya</h2>
+          <span className="badge">{data.otomatis.length} aturan</span>
+        </div>
+        <div className="baris-tombol">
+          <TautanTombol varian="sekunder" ukuran="kecil" href="/api/kalender" download>
+            Unduh kalender (.ics)
+          </TautanTombol>
+          <Tombol varian="sekunder" ukuran="kecil" onClick={() => void salinLangganan()} disabled={sibuk}>
+            Salin URL langganan
+          </Tombol>
         </div>
         <p className="muted kecil">
           Berisi tagihan berulang, jatuh tempo utang/piutang, dan target tabungan 6 bulan ke depan. URL langganan
           membuat kalender ikut diperbarui otomatis.
         </p>
         {pesanKalender ? <p className="muted kecil">{pesanKalender}</p> : null}
-        <ul className="daftar-transaksi">
+        <ul className="cn-rule">
           {data.otomatis.map((rule) => (
             <li key={rule.id}>
-              <div className="transaksi-kiri" style={{ flex: 1 }}>
-                <div style={{ flex: 1 }}>
-                  <div className="baris-antara">
-                    <p className="nama-transaksi">{rule.nama}</p>
-                    <span className={`badge ${rule.aktif ? "hijau" : ""}`}>{rule.aktif ? "Aktif" : "Dijeda"}</span>
-                  </div>
+              <div className="baris-antara">
+                <div>
+                  <b>{rule.nama}</b>
                   <p className="muted kecil">
                     {rp(rule.nominal)} · tanggal {rule.hari} · {rule.subPost ?? "tanpa pos"}
                   </p>
@@ -146,6 +160,7 @@ export function Otomatis({
                     {rule.terakhirJalan ? ` · terakhir ${rule.terakhirJalan}` : ""}
                   </p>
                 </div>
+                <span className={`badge ${rule.aktif ? "hijau" : ""}`}>{rule.aktif ? "Aktif" : "Dijeda"}</span>
               </div>
               <div className="baris-tombol">
                 <Tombol ukuran="kecil" onClick={() => void ubahStatus(rule.id, !rule.aktif)} disabled={sibuk}>
@@ -157,13 +172,13 @@ export function Otomatis({
               </div>
             </li>
           ))}
-          {!data.otomatis.length ? <li className="kosong">Belum ada transaksi berulang.</li> : null}
+          {!data.otomatis.length ? <li className="muted kecil">Belum ada transaksi berulang.</li> : null}
         </ul>
       </section>
 
-      <section className="kartu">
+      <section className="kartu cn-span">
         <div className="baris-antara">
-          <h2>Email Bank/E-Wallet</h2>
+          <h2>Email bank/e-wallet</h2>
           <span className={`badge ${emailBasi ? "tipe-out" : data.email?.terhubung ? "hijau" : ""}`}>
             {emailBasi ? "Perlu dicek" : data.email?.terhubung ? "Tertaut" : data.email?.terdaftar ? "Terdaftar" : emailSetupSiap ? "Siap dipasang" : "Belum"}
           </span>

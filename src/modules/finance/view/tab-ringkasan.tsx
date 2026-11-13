@@ -1,6 +1,6 @@
 import { Tombol } from "@/components/tombol";
 import type { DashboardData } from "@/lib/dashboard";
-import { BULAN_PENDEK, rp, tanggalPendek } from "./format";
+import { rp, tanggalPendek } from "./format";
 import { IkonKeluar, IkonMasuk, IkonRekap, IkonTarget, IkonTransaksi, IkonWawasan, SaldoIlustrasi } from "./ikon";
 import { BarisTransaksi, GrafikArea } from "./komponen";
 import type { Tab } from "./tipe";
@@ -183,7 +183,7 @@ export function Ringkasan({
                 <span className="avatar-uang kecil">{(t.subPost ?? t.label ?? "?").charAt(0).toUpperCase()}</span>
                 <div>
                   <b>{t.subPost ?? t.label ?? "Transaksi"}</b>
-                  <p className="muted kecil">{tanggalPendek(t.tanggal)} · {BULAN_PENDEK[Number(t.tanggal.slice(5, 7)) - 1]}</p>
+                  <p className="muted kecil">{tanggalPendek(t.tanggal)}</p>
                 </div>
               </li>
             ))}

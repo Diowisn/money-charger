@@ -59,22 +59,39 @@ export function Piutang({
   const totalUtang = aktif.filter((d) => d.jenis === "utang").reduce((s, d) => s + d.sisa, 0);
 
   return (
-    <div className="tumpuk dua-kolom">
-      <section className="grid-2 lebar">
-        <div className="kartu">
-          <p className="label">Piutang Aktif</p>
+    <div className="cn-halaman">
+      <article className="saldo-kartu cn-span">
+        <div className="saldo-teks">
+          <p className="saldo-label">Posisi piutang &amp; utang</p>
+          <p className="saldo-angka">{rp(totalPiutang - totalUtang)}</p>
+          <div className="cn-hero-mini">
+            <span>Piutang <b>{rp(totalPiutang)}</b></span>
+            <span>Utang <b>{rp(totalUtang)}</b></span>
+            <span>Aktif <b>{aktif.length}</b></span>
+          </div>
+        </div>
+      </article>
+
+      <div className="stat-row stat-dua cn-span">
+        <article className="stat-kartu">
+          <p className="stat-label">Piutang aktif</p>
           <p className="angka">{rp(totalPiutang)}</p>
-          <p className="muted">Orang berutang ke kita</p>
-        </div>
-        <div className="kartu">
-          <p className="label">Utang Aktif</p>
+          <p className="muted kecil">Orang berutang ke kita</p>
+        </article>
+        <article className="stat-kartu">
+          <p className="stat-label">Utang aktif</p>
           <p className="angka">{rp(totalUtang)}</p>
-          <p className="muted">Kita berutang</p>
-        </div>
-      </section>
+          <p className="muted kecil">Kita berutang</p>
+        </article>
+      </div>
 
       <section className="kartu">
-        <h2>Catat Piutang/Utang</h2>
+        <div className="baris-antara">
+          <h2>Catat piutang/utang</h2>
+          <span className={`badge ${jenis === "piutang" ? "tipe-in" : "tipe-out"}`}>
+            {jenis === "piutang" ? "Piutang" : "Utang"}
+          </span>
+        </div>
         <div className="form">
           <label>
             Jenis
@@ -99,74 +116,69 @@ export function Piutang({
             Catatan (opsional)
             <input value={catatan} onChange={(e) => setCatatan(e.target.value)} placeholder="contoh pinjam untuk..." />
           </label>
-          <Tombol
-            lebar
-            onClick={() => void tambah()}
-            disabled={sibuk || !nama || !nominal}
-          >
+          <Tombol lebar onClick={() => void tambah()} disabled={sibuk || !nama || !nominal}>
             Simpan
           </Tombol>
         </div>
       </section>
 
       <section className="kartu">
-        <h2>Aktif</h2>
-        <ul className="daftar-transaksi">
+        <div className="baris-antara">
+          <h2>Aktif</h2>
+          <span className="badge">{aktif.length} catatan</span>
+        </div>
+        <ul className="cn-goal">
           {aktif.map((d) => (
             <li key={d.id}>
-              <div className="transaksi-kiri">
-                <span className={`badge ${d.jenis === "piutang" ? "tipe-in" : "tipe-out"}`}>
-                  {d.jenis === "piutang" ? "Piutang" : "Utang"}
+              <div className="baris-antara">
+                <span className="baris-antara">
+                  <span className={`badge ${d.jenis === "piutang" ? "tipe-in" : "tipe-out"}`}>
+                    {d.jenis === "piutang" ? "Piutang" : "Utang"}
+                  </span>
+                  <b>{d.nama}</b>
                 </span>
-                <div>
-                  <p className="nama-transaksi">{d.nama}</p>
-                  <p className="muted kecil">
-                    Sisa {rp(d.sisa)} dari {rp(d.nominal)}
-                    {d.jatuhTempo ? ` · tempo ${d.jatuhTempo}${d.lewatTempo ? " (lewat)" : ""}` : ""}
-                  </p>
-                  <div className="baris-tombol" style={{ marginTop: 6 }}>
-                    <InputRupiah
-                      placeholder="Bayar sebagian"
-                      value={bayarInput[d.id] ?? ""}
-                      onChange={(nilai) => setBayarInput((b) => ({ ...b, [d.id]: nilai }))}
-                    />
-                    <Tombol varian="sekunder" onClick={() => void bayar(d.id, false)} disabled={sibuk}>
-                      Bayar
-                    </Tombol>
-                    <Tombol onClick={() => void bayar(d.id, true)} disabled={sibuk}>
-                      Lunas
-                    </Tombol>
-                  </div>
-                </div>
+                <b className={d.jenis === "piutang" ? "ringkas-jumlah masuk" : "ringkas-jumlah"}>{rp(d.sisa)}</b>
               </div>
-              <div className="transaksi-kanan">
+              <p className="muted kecil">
+                Sisa {rp(d.sisa)} dari {rp(d.nominal)}
+                {d.jatuhTempo ? ` · tempo ${d.jatuhTempo}${d.lewatTempo ? " (lewat)" : ""}` : ""}
+              </p>
+              <div className="baris-tombol">
+                <InputRupiah
+                  placeholder="Bayar sebagian"
+                  value={bayarInput[d.id] ?? ""}
+                  onChange={(nilai) => setBayarInput((b) => ({ ...b, [d.id]: nilai }))}
+                />
+                <Tombol varian="sekunder" onClick={() => void bayar(d.id, false)} disabled={sibuk}>
+                  Bayar
+                </Tombol>
+                <Tombol onClick={() => void bayar(d.id, true)} disabled={sibuk}>
+                  Lunas
+                </Tombol>
                 <Tombol varian="bahaya" ukuran="kecil" onClick={() => void batal(d.id, d.nama)} disabled={sibuk}>
                   Batal
                 </Tombol>
               </div>
             </li>
           ))}
-          {!aktif.length ? <li className="kosong">Belum ada piutang/utang aktif.</li> : null}
+          {!aktif.length ? <li className="muted kecil">Belum ada piutang/utang aktif.</li> : null}
         </ul>
       </section>
 
       {selesai.length ? (
-        <section className="kartu lebar">
-          <h2>Riwayat</h2>
-          <ul className="daftar-transaksi">
+        <section className="kartu cn-span">
+          <div className="baris-antara">
+            <h2>Riwayat</h2>
+            <span className="badge">{selesai.length} catatan</span>
+          </div>
+          <ul className="cn-legend">
             {selesai.map((d) => (
-              <li key={d.id} className={d.status === "batal" ? "batal" : undefined}>
-                <div className="transaksi-kiri">
-                  <span className={`badge ${d.jenis === "piutang" ? "tipe-in" : "tipe-out"}`}>
-                    {d.jenis === "piutang" ? "Piutang" : "Utang"}
-                  </span>
-                  <div>
-                    <p className="nama-transaksi">{d.nama}</p>
-                    <p className="muted kecil">
-                      {rp(d.nominal)} · {d.status === "lunas" ? "lunas" : "dibatalkan"}
-                    </p>
-                  </div>
-                </div>
+              <li key={d.id}>
+                <span className={`badge ${d.jenis === "piutang" ? "tipe-in" : "tipe-out"}`}>
+                  {d.jenis === "piutang" ? "Piutang" : "Utang"}
+                </span>
+                <span>{d.nama}</span>
+                <b>{rp(d.nominal)} · {d.status === "lunas" ? "lunas" : "dibatalkan"}</b>
               </li>
             ))}
           </ul>

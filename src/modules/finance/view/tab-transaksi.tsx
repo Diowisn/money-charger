@@ -6,6 +6,15 @@ import { NAMA_TIPE, labelBulan, rp, tanggalPendek } from "./format";
 import { InputRupiah } from "./input-rupiah";
 import type { Kirim, MintaKonfirmasi, Tab } from "./tipe";
 
+const LABEL_JENIS: Record<string, string> = {
+  out: "Pengeluaran",
+  in: "Pemasukan",
+  gaji: "Gaji",
+  bonus: "Bonus",
+  tarik: "Tarik",
+  pindah: "Pindah",
+};
+
 export function Transaksi({
   data,
   kirim,
@@ -83,6 +92,12 @@ export function Transaksi({
   const halamanAman = Math.min(halaman, totalHalaman);
   const tampil = tersaring.slice((halamanAman - 1) * PER_HALAMAN, halamanAman * PER_HALAMAN);
 
+  const totalKeluar = tersaring.filter((t) => t.tipe === "out").reduce((s, t) => s + t.nominal + t.biayaAdmin, 0);
+  const totalMasuk = tersaring.filter((t) => t.tipe !== "out").reduce((s, t) => s + t.nominal, 0);
+
+  const posTerpilih = posAktif.find((p) => String(p.id) === subPostId);
+  const dompetTerpilih = data.dompet.daftar.find((a) => String(a.id) === accountId);
+
   async function simpan() {
     const body: Record<string, unknown> = { tipe, nominal: Number(nominal), tanggal, label: label || null, tags };
     if (tipe === "out") {
@@ -121,168 +136,193 @@ export function Transaksi({
     await kirim("/api/transactions", "DELETE", { id });
   }
 
-  return (
-    <div className={mode === "catat" ? "tumpuk layar-catat" : "tumpuk layar-riwayat"}>
-      {mode === "catat" ? (
-      <section className="kartu form-transaksi">
-        <div className="section-title">
-          <div>
-            <p className="eyebrow">TRANSAKSI BARU</p>
-            <h2>Catat transaksi</h2>
+  if (mode === "catat") {
+    return (
+      <div className="cn-halaman cn-catat">
+        <section className="kartu">
+          <div className="section-title">
+            <div>
+              <p className="eyebrow">TRANSAKSI BARU</p>
+              <h2>Catat transaksi</h2>
+            </div>
+            <span className="badge">{data.hariIni}</span>
           </div>
-          <span className="badge">{data.hariIni}</span>
-        </div>
-        <div className="form form-transaksi-grid">
-          <fieldset className="segmented">
-            <legend>Jenis transaksi</legend>
-            {([
-              ["out", "Pengeluaran"],
-              ["in", "Pemasukan"],
-              ["gaji", "Gaji"],
-              ["bonus", "Bonus"],
-              ["tarik", "Tarik"],
-              ["pindah", "Pindah"],
-            ] as [string, string][]).map(([value, label]) => (
-              <button
-                key={value}
-                type="button"
-                className={tipe === value ? "segmented-item aktif" : "segmented-item"}
-                aria-pressed={tipe === value}
-                onClick={() => setTipe(value)}
-              >
-                {label}
-              </button>
-            ))}
-          </fieldset>
+          <div className="form form-transaksi-grid">
+            <fieldset className="segmented">
+              <legend>Jenis transaksi</legend>
+              {Object.entries(LABEL_JENIS).map(([value, teks]) => (
+                <button
+                  key={value}
+                  type="button"
+                  className={tipe === value ? "segmented-item aktif" : "segmented-item"}
+                  aria-pressed={tipe === value}
+                  onClick={() => setTipe(value)}
+                >
+                  {teks}
+                </button>
+              ))}
+            </fieldset>
 
-          <label>
-            Nominal (Rp)
-            <InputRupiah value={nominal} onChange={setNominal} placeholder="contoh 50.000" />
-          </label>
-
-          <label>
-            Tanggal
-            <input type="date" max={data.hariIni} value={tanggal} onChange={(e) => setTanggal(e.target.value)} />
-          </label>
-
-          <label>
-            Catatan (opsional)
-            <input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="contoh makan siang" />
-          </label>
-
-          <label>
-            Tag (opsional, pisahkan koma)
-            <input value={tags} onChange={(e) => setTags(e.target.value)} placeholder="contoh keluarga, kerja" />
-          </label>
-
-          {tipe === "out" || tipe === "in" || tipe === "gaji" || tipe === "bonus" ? (
-            <label>
-              Dompet
-              <select value={accountId} onChange={(e) => setAccountId(e.target.value)}>
-                <option value="">Dompet utama</option>
-                {data.dompet.daftar.map((akun) => (
-                  <option key={akun.id} value={akun.id}>
-                    {akun.nama} ({rp(akun.saldo)})
-                  </option>
-                ))}
-              </select>
+            <label className="lebar">
+              Nominal (Rp)
+              <InputRupiah value={nominal} onChange={setNominal} placeholder="contoh 50.000" />
             </label>
-          ) : null}
 
-          {tipe === "out" ? (
-            <>
+            <label>
+              Tanggal
+              <input type="date" max={data.hariIni} value={tanggal} onChange={(e) => setTanggal(e.target.value)} />
+            </label>
+
+            <label>
+              Catatan (opsional)
+              <input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="contoh makan siang" />
+            </label>
+
+            <label>
+              Tag (opsional, pisahkan koma)
+              <input value={tags} onChange={(e) => setTags(e.target.value)} placeholder="contoh keluarga, kerja" />
+            </label>
+
+            {tipe === "out" || tipe === "in" || tipe === "gaji" || tipe === "bonus" ? (
               <label>
-                Pos (opsional)
-                <select value={subPostId} onChange={(e) => setSubPostId(e.target.value)}>
-                  <option value="">Belum dipetakan</option>
-                  {posAktif.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.grup} · {p.nama}
+                Dompet
+                <select value={accountId} onChange={(e) => setAccountId(e.target.value)}>
+                  <option value="">Dompet utama</option>
+                  {data.dompet.daftar.map((akun) => (
+                    <option key={akun.id} value={akun.id}>
+                      {akun.nama} ({rp(akun.saldo)})
                     </option>
                   ))}
                 </select>
               </label>
-              <label className="cek">
-                <input
-                  type="checkbox"
-                  checked={biayaAdminAktif}
-                  onChange={(e) => setBiayaAdminAktif(e.target.checked)}
-                />
-                <span>Ada biaya admin</span>
-              </label>
-              {biayaAdminAktif ? (
+            ) : null}
+
+            {tipe === "out" ? (
+              <>
                 <label>
-                  Nominal biaya admin (Rp)
-                  <InputRupiah value={biayaAdmin} onChange={setBiayaAdmin} placeholder="contoh 2.500" />
+                  Pos (opsional)
+                  <select value={subPostId} onChange={(e) => setSubPostId(e.target.value)}>
+                    <option value="">Belum dipetakan</option>
+                    {posAktif.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.grup} · {p.nama}
+                      </option>
+                    ))}
+                  </select>
                 </label>
-              ) : null}
-            </>
-          ) : null}
+                <label className="cek">
+                  <input
+                    type="checkbox"
+                    checked={biayaAdminAktif}
+                    onChange={(e) => setBiayaAdminAktif(e.target.checked)}
+                  />
+                  <span>Ada biaya admin</span>
+                </label>
+                {biayaAdminAktif ? (
+                  <label>
+                    Nominal biaya admin (Rp)
+                    <InputRupiah value={biayaAdmin} onChange={setBiayaAdmin} placeholder="contoh 2.500" />
+                  </label>
+                ) : null}
+              </>
+            ) : null}
 
-          {tipe === "in" || tipe === "bonus" ? (
-            <label>
-              Wadah tujuan
-              <select value={wadah} onChange={(e) => setWadah(e.target.value)}>
-                {tipe === "bonus" ? <option value="">Otomatis (bagi Jajan &amp; Saldo)</option> : null}
-                <option value="saldo">Saldo</option>
-                <option value="tabungan">Tabungan</option>
-                <option value="investasi">Investasi</option>
-              </select>
-            </label>
-          ) : null}
+            {tipe === "in" || tipe === "bonus" ? (
+              <label>
+                Wadah tujuan
+                <select value={wadah} onChange={(e) => setWadah(e.target.value)}>
+                  {tipe === "bonus" ? <option value="">Otomatis (bagi Jajan &amp; Saldo)</option> : null}
+                  <option value="saldo">Saldo</option>
+                  <option value="tabungan">Tabungan</option>
+                  <option value="investasi">Investasi</option>
+                </select>
+              </label>
+            ) : null}
 
-          {tipe === "tarik" || tipe === "pindah" ? (
-            <label>
-              Dari wadah
-              <select value={wadahAsal} onChange={(e) => setWadahAsal(e.target.value)}>
-                <option value="saldo">Saldo</option>
-                <option value="tabungan">Tabungan</option>
-                <option value="investasi">Investasi</option>
-              </select>
-            </label>
-          ) : null}
+            {tipe === "tarik" || tipe === "pindah" ? (
+              <label>
+                Dari wadah
+                <select value={wadahAsal} onChange={(e) => setWadahAsal(e.target.value)}>
+                  <option value="saldo">Saldo</option>
+                  <option value="tabungan">Tabungan</option>
+                  <option value="investasi">Investasi</option>
+                </select>
+              </label>
+            ) : null}
 
-          {(tipe === "tarik" || tipe === "pindah") && wadahAsal === "saldo" ? (
-            <label>
-              Dompet asal
-              <select value={accountId} onChange={(e) => setAccountId(e.target.value)}>
-                <option value="">Dompet utama</option>
-                {data.dompet.daftar.map((akun) => (
-                  <option key={akun.id} value={akun.id}>
-                    {akun.nama} ({rp(akun.saldo)})
-                  </option>
-                ))}
-              </select>
-            </label>
-          ) : null}
+            {(tipe === "tarik" || tipe === "pindah") && wadahAsal === "saldo" ? (
+              <label>
+                Dompet asal
+                <select value={accountId} onChange={(e) => setAccountId(e.target.value)}>
+                  <option value="">Dompet utama</option>
+                  {data.dompet.daftar.map((akun) => (
+                    <option key={akun.id} value={akun.id}>
+                      {akun.nama} ({rp(akun.saldo)})
+                    </option>
+                  ))}
+                </select>
+              </label>
+            ) : null}
 
-          {tipe === "pindah" ? (
-            <label>
-              Ke wadah
-              <select value={wadahTujuan} onChange={(e) => setWadahTujuan(e.target.value)}>
-                <option value="saldo">Saldo</option>
-                <option value="tabungan">Tabungan</option>
-                <option value="investasi">Investasi</option>
-              </select>
-            </label>
-          ) : null}
+            {tipe === "pindah" ? (
+              <label>
+                Ke wadah
+                <select value={wadahTujuan} onChange={(e) => setWadahTujuan(e.target.value)}>
+                  <option value="saldo">Saldo</option>
+                  <option value="tabungan">Tabungan</option>
+                  <option value="investasi">Investasi</option>
+                </select>
+              </label>
+            ) : null}
 
-          {tipe === "gaji" ? (
-            <label className="cek">
-              <input type="checkbox" checked={paksa} onChange={(e) => setPaksa(e.target.checked)} />
-              <span>Paksa catat meski jaraknya dekat dengan gaji terakhir</span>
-            </label>
-          ) : null}
+            {tipe === "gaji" ? (
+              <label className="cek">
+                <input type="checkbox" checked={paksa} onChange={(e) => setPaksa(e.target.checked)} />
+                <span>Paksa catat meski jaraknya dekat dengan gaji terakhir</span>
+              </label>
+            ) : null}
 
-          <Tombol lebar onClick={() => void simpan()} disabled={sibuk || !nominal}>
-            {sibuk ? "Menyimpan..." : "Simpan transaksi"}
-          </Tombol>
+            <Tombol lebar onClick={() => void simpan()} disabled={sibuk || !nominal}>
+              {sibuk ? "Menyimpan..." : "Simpan transaksi"}
+            </Tombol>
+          </div>
+        </section>
+
+        <aside className="kartu cn-ringkas">
+          <span className="badge hijau">{LABEL_JENIS[tipe] ?? tipe}</span>
+          <p className="muted kecil">Nominal</p>
+          <p className="angka-besar">{rp(Number(nominal || 0) + (tipe === "out" && biayaAdminAktif ? Number(biayaAdmin || 0) : 0))}</p>
+          <ul className="cn-ringkas-daftar">
+            <li><span>Tanggal</span><b>{tanggalPendek(tanggal)}</b></li>
+            <li><span>Dompet</span><b>{dompetTerpilih?.nama ?? "Dompet utama"}</b></li>
+            {tipe === "out" ? <li><span>Pos</span><b>{posTerpilih ? `${posTerpilih.grup} · ${posTerpilih.nama}` : "Belum dipetakan"}</b></li> : null}
+            {tipe === "in" || tipe === "bonus" ? <li><span>Wadah</span><b>{wadah || "Otomatis"}</b></li> : null}
+            {tipe === "tarik" || tipe === "pindah" ? <li><span>Dari</span><b>{wadahAsal}</b></li> : null}
+            {tipe === "pindah" ? <li><span>Ke</span><b>{wadahTujuan}</b></li> : null}
+            {label ? <li><span>Catatan</span><b>{label}</b></li> : null}
+            {tags ? <li><span>Tag</span><b>{tags}</b></li> : null}
+          </ul>
+          <p className="muted kecil">Transaksi langsung memperbarui saldo dompet, tabungan, dan rekap bulan ini.</p>
+        </aside>
+      </div>
+    );
+  }
+
+  return (
+    <div className="cn-halaman">
+      <article className="saldo-kartu cn-span">
+        <div className="saldo-teks">
+          <p className="saldo-label">Total pengeluaran tersaring</p>
+          <p className="saldo-angka">{rp(totalKeluar)}</p>
+          <div className="cn-hero-mini">
+            <span>Masuk <b>{rp(totalMasuk)}</b></span>
+            <span>Catatan <b>{tersaring.length}</b></span>
+            <span>Filter <b>{bulanFilter === "semua" ? "Semua bulan" : labelBulan(bulanFilter)}</b></span>
+          </div>
         </div>
-      </section>
-      ) : null}
+      </article>
 
-      {mode === "riwayat" ? (
-      <section className="kartu riwayat-panel">
+      <section className="kartu cn-span">
         <div className="section-title">
           <div>
             <p className="eyebrow">TRANSAKSI</p>
@@ -296,13 +336,7 @@ export function Transaksi({
           </span>
         </div>
 
-        <div className="filter-riwayat">
-          <Tombol varian="sekunder" onClick={() => void unduhXlsx(data.transaksi, NAMA_TIPE)}>
-            Ekspor rekap (.xlsx)
-          </Tombol>
-          <span className="muted kecil">Satu sheet per bulan, plus ringkasan, kategori, dan transaksi dibatalkan.</span>
-        </div>
-        <div className="filter-riwayat">
+        <div className="cn-filter">
           <label className="filter-jenis">
             Bulan
             <select
@@ -384,6 +418,15 @@ export function Transaksi({
               placeholder="Cari transaksi"
             />
           </label>
+          <Tombol varian="sekunder" onClick={() => void unduhXlsx(data.transaksi, NAMA_TIPE)}>
+            Ekspor .xlsx
+          </Tombol>
+        </div>
+
+        <div className="cn-thead">
+          <span aria-hidden="true" />
+          <span>Transaksi</span>
+          <span className="kanan">Nominal</span>
         </div>
         <ul className="daftar-transaksi daftar-rapi">
           {tampil.map((t) => {
@@ -411,6 +454,7 @@ export function Transaksi({
                   <p className="ringkas-nama">{judul}</p>
                   <p className="muted kecil">
                     {tanggalPendek(t.tanggal)} · {NAMA_TIPE[t.tipe] ?? t.tipe}
+                    {t.tags.length ? ` · ${t.tags.map((tag) => `#${tag}`).join(" ")}` : ""}
                   </p>
                 </div>
                 <div className="transaksi-kanan">
@@ -438,36 +482,38 @@ export function Transaksi({
             <li className="kosong">{data.transaksi.length ? "Tidak ada catatan yang cocok." : "Belum ada transaksi."}</li>
           ) : null}
         </ul>
-        <Tombol className="tombol-grafik" lebar onClick={() => navigasi("rekap")}>
-          Lihat Grafik
-        </Tombol>
-        {totalHalaman > 1 ? (
-          <nav className="paginasi" aria-label="Halaman transaksi">
-            <button
-              type="button"
-              className="panah-halaman"
-              onClick={() => setHalaman((h) => Math.max(1, h - 1))}
-              disabled={halamanAman <= 1}
-              aria-label="Halaman sebelumnya"
-              title="Halaman sebelumnya"
-            >
-              ←
-            </button>
-            <span aria-live="polite">{halamanAman} / {totalHalaman}</span>
-            <button
-              type="button"
-              className="panah-halaman"
-              onClick={() => setHalaman((h) => Math.min(totalHalaman, h + 1))}
-              disabled={halamanAman >= totalHalaman}
-              aria-label="Halaman berikutnya"
-              title="Halaman berikutnya"
-            >
-              →
-            </button>
-          </nav>
-        ) : null}
+
+        <div className="cn-tabel-kaki">
+          <Tombol varian="tautan" onClick={() => navigasi("rekap")}>
+            Lihat grafik rekap
+          </Tombol>
+          {totalHalaman > 1 ? (
+            <nav className="paginasi" aria-label="Halaman transaksi">
+              <button
+                type="button"
+                className="panah-halaman"
+                onClick={() => setHalaman((h) => Math.max(1, h - 1))}
+                disabled={halamanAman <= 1}
+                aria-label="Halaman sebelumnya"
+                title="Halaman sebelumnya"
+              >
+                ←
+              </button>
+              <span aria-live="polite">{halamanAman} / {totalHalaman}</span>
+              <button
+                type="button"
+                className="panah-halaman"
+                onClick={() => setHalaman((h) => Math.min(totalHalaman, h + 1))}
+                disabled={halamanAman >= totalHalaman}
+                aria-label="Halaman berikutnya"
+                title="Halaman berikutnya"
+              >
+                →
+              </button>
+            </nav>
+          ) : null}
+        </div>
       </section>
-      ) : null}
     </div>
   );
 }

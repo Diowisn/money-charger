@@ -87,24 +87,20 @@ export function Asisten({ data, kirim, sibuk: sibukAksi }: { data: DashboardData
   }
 
   return (
-    <div className="tumpuk sempit">
+    <div className="cn-halaman cn-asisten">
       <section className="kartu">
-        <h2>Tanya Asisten</h2>
+        <div className="baris-antara">
+          <div>
+            <p className="eyebrow">ASISTEN</p>
+            <h2>Tanya asisten</h2>
+          </div>
+          <span className={`badge ${data.pengaturan.aiReviewAktif ? "hijau" : ""}`}>
+            Review {data.pengaturan.aiReviewAktif ? "aktif" : "mati"}
+          </span>
+        </div>
         <p className="muted">
           Jawaban memakai data keuangan dan riwayat transaksi. Asisten tidak mengubah transaksi.
         </p>
-        <div className="baris-antara">
-          <span className="muted kecil">
-            Review bulanan otomatis: {data.pengaturan.aiReviewAktif ? "aktif" : "mati"}
-          </span>
-          <Tombol
-            varian="sekunder"
-            disabled={sibukAksi}
-            onClick={() => void kirim("/api/pengaturan", "POST", { aiReviewAktif: !data.pengaturan.aiReviewAktif })}
-          >
-            {data.pengaturan.aiReviewAktif ? "Matikan review" : "Aktifkan review"}
-          </Tombol>
-        </div>
 
         {riwayat.length === 0 ? (
           <div className="saran-chat">
@@ -147,16 +143,34 @@ export function Asisten({ data, kirim, sibuk: sibukAksi }: { data: DashboardData
             Kirim
           </Tombol>
         </form>
-        <p className="muted kecil">
-          {riwayat.length ? (
-            <Tombol varian="tautan" onClick={() => setRiwayat([])}>
-              Bersihkan percakapan
-            </Tombol>
-          ) : (
-            "Butuh GROQ_API_KEY agar asisten aktif."
-          )}
-        </p>
+        {riwayat.length ? (
+          <Tombol varian="tautan" onClick={() => setRiwayat([])}>
+            Bersihkan percakapan
+          </Tombol>
+        ) : (
+          <p className="muted kecil">Butuh GROQ_API_KEY agar asisten aktif.</p>
+        )}
       </section>
+
+      <aside className="kartu cn-ringkas">
+        <span className="badge hijau">Pintar</span>
+        <p className="muted kecil">Review bulanan otomatis</p>
+        <p className="angka">{data.pengaturan.aiReviewAktif ? "Aktif" : "Mati"}</p>
+        <Tombol
+          varian="sekunder"
+          lebar
+          disabled={sibukAksi}
+          onClick={() => void kirim("/api/pengaturan", "POST", { aiReviewAktif: !data.pengaturan.aiReviewAktif })}
+        >
+          {data.pengaturan.aiReviewAktif ? "Matikan review" : "Aktifkan review"}
+        </Tombol>
+        <p className="muted kecil">Contoh pertanyaan</p>
+        <ul className="cn-daftar-pil">
+          {SARAN_TANYA.map((s) => (
+            <li key={s}>{s}</li>
+          ))}
+        </ul>
+      </aside>
     </div>
   );
 }

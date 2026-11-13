@@ -8,17 +8,16 @@ export function Wawasan({ data, kirim, sibuk }: { data: DashboardData; kirim: Ki
   const kategori = data.perubahanKategori;
 
   return (
-    <div className="wawasan">
-      <section className="kartu wawasan-skor">
-        <div>
-          <span className="badge hijau">Wawasan</span>
-          <h2>Kesehatan Finansial</h2>
-          <p className="wawasan-predikat">{w.label}</p>
-          <p className="muted kecil">Dihitung dari anggaran, tabungan, dana darurat, dan arus saldo.</p>
+    <div className="cn-halaman">
+      <article className="saldo-kartu cn-span wawasan-hero">
+        <div className="saldo-teks">
+          <p className="saldo-label">Kesehatan finansial</p>
+          <p className="saldo-angka">{w.label}</p>
+          <p className="saldo-sub">Dihitung dari anggaran, tabungan, dana darurat, dan arus saldo.</p>
         </div>
         <div
-          className="skor-bulat"
-          style={{ background: `conic-gradient(var(--hijau) ${w.skor * 3.6}deg, var(--garis) 0)` }}
+          className="skor-bulat terang"
+          style={{ background: `conic-gradient(#c8f58a ${w.skor * 3.6}deg, rgba(255,255,255,.18) 0)` }}
           role="img"
           aria-label={`Skor kesehatan finansial ${w.skor} dari 100`}
         >
@@ -27,32 +26,34 @@ export function Wawasan({ data, kirim, sibuk }: { data: DashboardData; kirim: Ki
             <span>/100</span>
           </div>
         </div>
-      </section>
+      </article>
 
-      <section className="wawasan-grid">
-        <div className="kartu wawasan-metrik">
-          <p className="muted kecil">Proyeksi pengeluaran bulan ini</p>
+      <div className="stat-row cn-span">
+        <article className="stat-kartu">
+          <p className="stat-label">Proyeksi pengeluaran</p>
           <p className="angka">{rp(w.proyeksiPengeluaran)}</p>
-          <p className="muted kecil">Berdasarkan kecepatan belanja sampai hari ini.</p>
-        </div>
-        <div className="kartu wawasan-metrik">
-          <p className="muted kecil">Proyeksi saldo akhir bulan</p>
+          <p className="muted kecil">Kecepatan belanja sampai hari ini</p>
+        </article>
+        <article className="stat-kartu">
+          <p className="stat-label">Proyeksi saldo akhir</p>
           <p className={`angka ${w.proyeksiSaldo < 0 ? "delta-naik" : "delta-turun"}`}>{rp(w.proyeksiSaldo)}</p>
-          <p className="muted kecil">Sisa saldo jika pola pengeluaran berlanjut.</p>
-        </div>
-        <div className="kartu wawasan-metrik">
-          <p className="muted kecil">Rasio tabungan + investasi</p>
+          <p className="muted kecil">Jika pola belanja berlanjut</p>
+        </article>
+        <article className="stat-kartu">
+          <p className="stat-label">Rasio tabungan</p>
           <p className="angka">{Math.round(w.rasioTabungan * 100)}%</p>
-          <p className="muted kecil">Bagian dari total rencana periode ini.</p>
-        </div>
-      </section>
+          <p className="muted kecil">Bagian dari total rencana</p>
+        </article>
+      </div>
 
       <section className="kartu">
         <div className="baris-antara">
           <h2>Peringatan</h2>
-          <span className={`badge ${w.peringatan.length ? "tipe-out" : "hijau"}`}>{w.peringatan.length ? `${w.peringatan.length} hal` : "Aman"}</span>
+          <span className={`badge ${w.peringatan.length ? "tipe-out" : "hijau"}`}>
+            {w.peringatan.length ? `${w.peringatan.length} hal` : "Aman"}
+          </span>
         </div>
-        <ul className="wawasan-daftar">
+        <ul className="cn-daftar-pil">
           {w.peringatan.map((item) => (
             <li key={item}>{item}</li>
           ))}
@@ -67,7 +68,7 @@ export function Wawasan({ data, kirim, sibuk }: { data: DashboardData; kirim: Ki
             {w.anomali.length ? `${w.anomali.length} temuan` : "Tidak ada"}
           </span>
         </div>
-        <ul className="wawasan-daftar">
+        <ul className="cn-daftar-pil">
           {w.anomali.map((item) => (
             <li key={item}>{item}</li>
           ))}
@@ -77,7 +78,7 @@ export function Wawasan({ data, kirim, sibuk }: { data: DashboardData; kirim: Ki
 
       <section className="kartu">
         <h2>Yang perlu diperhatikan</h2>
-        <ul className="wawasan-daftar">
+        <ul className="cn-daftar-pil">
           {w.faktor.map((faktor) => (
             <li key={faktor}>{faktor}</li>
           ))}
@@ -86,15 +87,16 @@ export function Wawasan({ data, kirim, sibuk }: { data: DashboardData; kirim: Ki
 
       <section className="kartu">
         <div className="baris-antara">
-          <h2>Langganan Terdeteksi</h2>
+          <h2>Langganan terdeteksi</h2>
           <span className="badge">{rp(w.totalLangganan)}/bulan</span>
         </div>
-        <ul className="wawasan-daftar">
+        <ul className="cn-legend">
           {w.langganan.map((item) => (
-            <li key={`${item.nama}-${item.terakhir}`} className="baris-antara">
+            <li key={`${item.nama}-${item.terakhir}`}>
+              <span className="avatar-uang masuk">{(item.nama.trim().charAt(0) || "?").toUpperCase()}</span>
               <span>
-                <b>{item.nama}</b>
-                <small className="muted"> · terakhir {item.terakhir}, berikutnya sekitar {item.perkiraanBerikut}</small>
+                {item.nama}
+                <small className="muted kecil blok">Terakhir {item.terakhir} · berikutnya {item.perkiraanBerikut}</small>
               </span>
               <b>{rp(item.nominal)}</b>
             </li>
@@ -125,14 +127,14 @@ export function Wawasan({ data, kirim, sibuk }: { data: DashboardData; kirim: Ki
       </section>
 
       <section className="kartu">
-        <h2>Perubahan Kategori</h2>
-        <ul className="wawasan-daftar">
+        <h2>Perubahan kategori</h2>
+        <ul className="cn-legend">
           {kategori.map((item) => (
-            <li key={item.nama} className="baris-antara">
+            <li key={item.nama}>
+              <span className={`badge ${item.delta > 0 ? "tipe-out" : "hijau"}`}>{item.delta > 0 ? "Naik" : "Turun"}</span>
               <span>{item.nama}</span>
               <b className={item.delta > 0 ? "delta-naik" : "delta-turun"}>
-                {item.delta > 0 ? "+" : ""}
-                {rp(item.delta)}
+                {item.delta > 0 ? "+" : ""}{rp(item.delta)}
               </b>
             </li>
           ))}

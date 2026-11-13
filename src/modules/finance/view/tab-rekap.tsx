@@ -36,32 +36,35 @@ export function Rekap({ data, navigasi }: { data: DashboardData; navigasi: (tab:
   );
 
   const maks = Math.max(1, ...agregat.flatMap((a) => [a.masuk, a.keluar]));
+  const totalMasuk = agregat.reduce((s, a) => s + a.masuk, 0);
+  const totalKeluar = agregat.reduce((s, a) => s + a.keluar, 0);
   const bulanAktif = data.transaksi.filter(
     (t) => t.status === "berlaku" && t.tanggal.startsWith(bulanIni),
   );
+  const kategoriMaks = Math.max(1, ...data.perubahanKategori.map((k) => Math.abs(k.delta)));
 
   return (
-    <div className="rekap">
-      <section className="rekap-saldo">
-        <p className="saldo-label">Saldo saat ini</p>
-        <p className="saldo-angka">{rp(r.saldo)}</p>
-      </section>
-
-      <section className="rekap-total">
-        <div className="rekap-total-kartu masuk">
-          <p>Total Pemasukan</p>
-          <b>{rp(r.pendapatanBulanIni)}</b>
+    <div className="cn-halaman">
+      <article className="saldo-kartu cn-span">
+        <div className="saldo-teks">
+          <p className="saldo-label">Saldo saat ini</p>
+          <p className="saldo-angka">{rp(r.saldo)}</p>
+          <div className="cn-hero-mini">
+            <span>Masuk <b>{rp(r.pendapatanBulanIni)}</b></span>
+            <span>Keluar <b>{rp(r.pengeluaranBulanIni)}</b></span>
+            <span>Selisih <b>{rp(r.pendapatanBulanIni - r.pengeluaranBulanIni)}</b></span>
+          </div>
         </div>
-        <div className="rekap-total-kartu keluar">
-          <p>Total Pengeluaran</p>
-          <b>{rp(r.pengeluaranBulanIni)}</b>
-        </div>
-      </section>
+      </article>
 
-      <section className="kartu rekap-grafik">
+      <section className="kartu">
         <div className="baris-antara">
-          <h2>Rekap {rentang} Bulan</h2>
+          <div>
+            <h2>Arus kas {rentang} bulan</h2>
+            <p className="muted kecil">Masuk {rp(totalMasuk)} · keluar {rp(totalKeluar)}</p>
+          </div>
           <select
+            className="select-mini"
             aria-label="Rentang rekap"
             value={rentang}
             onChange={(event) => setRentang(Number(event.target.value))}
@@ -96,20 +99,22 @@ export function Rekap({ data, navigasi }: { data: DashboardData; navigasi: (tab:
         </div>
       </section>
 
-      <section className="kartu rekap-kategori">
+      <section className="kartu">
         <div className="baris-antara">
-          <h2>Perubahan Kategori</h2>
-          <span className="muted kecil">
+          <h2>Perubahan kategori</h2>
+          <span className="badge">
             vs {labelBulan(mundurBulan(Number(bulanIni.slice(0, 4)), Number(bulanIni.slice(5, 7)), 1))}
           </span>
         </div>
-        <ul>
+        <ul className="cn-legend">
           {data.perubahanKategori.map((item) => (
             <li key={item.nama}>
-              <span>{item.nama}</span>
               <span className={item.delta > 0 ? "delta-naik" : "delta-turun"}>
-                {item.delta > 0 ? "+" : ""}
-                {rp(item.delta)}
+                {item.delta > 0 ? "+" : ""}{rp(item.delta)}
+              </span>
+              <span>{item.nama}</span>
+              <span className="cn-track">
+                <i style={{ width: `${Math.max(6, Math.round((Math.abs(item.delta) / kategoriMaks) * 100))}%` }} />
               </span>
             </li>
           ))}
@@ -119,10 +124,13 @@ export function Rekap({ data, navigasi }: { data: DashboardData; navigasi: (tab:
         </ul>
       </section>
 
-      <section className="kartu rekap-tren">
+      <section className="kartu cn-span">
         <div className="baris-antara">
-          <h2>Tren 14 Hari</h2>
-          <span className="muted kecil">{rp(data.tren.reduce((s, t) => s + t.pengeluaran, 0))}</span>
+          <div>
+            <h2>Tren 14 hari</h2>
+            <p className="muted kecil">Total pengeluaran {rp(data.tren.reduce((s, t) => s + t.pengeluaran, 0))}</p>
+          </div>
+          <span className="badge hijau">Harian</span>
         </div>
         <GrafikArea
           nilai={data.tren.map((t) => t.pengeluaran)}
@@ -131,12 +139,17 @@ export function Rekap({ data, navigasi }: { data: DashboardData; navigasi: (tab:
         />
       </section>
 
-      <section className="kartu rekap-terakhir">
+      <section className="kartu cn-span">
         <div className="baris-antara">
           <h2>Rekap {labelBulan(bulanIni)}</h2>
           <Tombol varian="tautan" onClick={() => navigasi("riwayat")}>
             Lihat semua
           </Tombol>
+        </div>
+        <div className="cn-thead">
+          <span aria-hidden="true" />
+          <span>Transaksi</span>
+          <span className="kanan">Nominal</span>
         </div>
         <ul className="daftar-transaksi daftar-rapi">
           {bulanAktif.slice(0, 6).map((t) => (

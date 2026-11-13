@@ -22,10 +22,25 @@ export function Impor({ kirim, sibuk }: { kirim: Kirim; sibuk: boolean }) {
   }
 
   return (
-    <div className="tumpuk dua-kolom">
-      <section className="kartu">
+    <div className="cn-halaman">
+      <article className="saldo-kartu cn-span">
+        <div className="saldo-teks">
+          <p className="saldo-label">Impor mutasi</p>
+          <p className="saldo-angka">CSV</p>
+          <div className="cn-hero-mini">
+            <span>Maksimal <b>1000 baris</b></span>
+            <span>Duplikat <b>dilewati</b></span>
+            <span>Format <b>tanggal,tipe,nominal</b></span>
+          </div>
+        </div>
         <span className="badge hijau">Impor</span>
-        <h2>Impor Mutasi CSV</h2>
+      </article>
+
+      <section className="kartu">
+        <div className="baris-antara">
+          <h2>Impor mutasi CSV</h2>
+          <span className="badge">{namaFile || "Belum ada file"}</span>
+        </div>
         <p className="muted kecil">
           Format wajib: <code>tanggal,tipe,nominal</code>. Opsional: <code>label,pos,biaya_admin,wadah</code>.
           Tipe menerima out/in, keluar/masuk, debit/kredit. Duplikat dengan isi sama dilewati.
@@ -43,13 +58,15 @@ export function Impor({ kirim, sibuk }: { kirim: Kirim; sibuk: boolean }) {
         <Tombol lebar onClick={() => void impor()} disabled={sibuk || !csv.trim()}>
           Impor sekarang
         </Tombol>
-        {namaFile ? <p className="muted kecil">File: {namaFile}</p> : null}
       </section>
 
       <section className="kartu">
-        <h2>Contoh & Aturan</h2>
+        <div className="baris-antara">
+          <h2>Contoh &amp; aturan</h2>
+          <span className="badge">Panduan</span>
+        </div>
         <pre className="kode-contoh">{CONTOH}</pre>
-        <ul className="wawasan-daftar">
+        <ul className="cn-daftar-pil">
           <li>Tanggal: <code>YYYY-MM-DD</code> atau <code>DD/MM/YYYY</code>.</li>
           <li>Nominal: angka rupiah; titik/koma ribuan diterima.</li>
           <li>Pos dicocokkan dengan nama/alias pos yang sudah ada. Kosongkan bila belum tahu.</li>

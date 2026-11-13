@@ -45,6 +45,9 @@ export function Pos({
   ]);
 
   const posAktif = data.posSemua.filter((p) => p.aktif);
+  const totalJatah = posAktif.reduce((s, p) => s + p.jatahRencana, 0);
+  const totalTerpakai = posAktif.reduce((s, p) => s + p.terpakai, 0);
+  const totalSisa = Math.max(0, totalJatah - totalTerpakai);
 
   async function tambah() {
     const ok = await kirim("/api/pos", "POST", {
@@ -90,10 +93,42 @@ export function Pos({
   }
 
   return (
-    <div className="tumpuk dua-kolom">
-      <div className="tumpuk kolom">
-        <section className="kartu">
-          <h2>Tambah Pos</h2>
+    <div className="cn-halaman">
+      <article className="saldo-kartu cn-span">
+        <div className="saldo-teks">
+          <p className="saldo-label">Jatah pos aktif</p>
+          <p className="saldo-angka">{rp(totalJatah)}</p>
+          <div className="cn-hero-mini">
+            <span>Terpakai <b>{rp(totalTerpakai)}</b></span>
+            <span>Sisa <b>{rp(totalSisa)}</b></span>
+            <span>Aktif <b>{posAktif.length} pos</b></span>
+          </div>
+        </div>
+      </article>
+
+      <div className="stat-row cn-span">
+        <article className="stat-kartu">
+          <p className="stat-label">Jatah rencana</p>
+          <p className="angka">{rp(totalJatah)}</p>
+          <p className="muted kecil">Total pos aktif</p>
+        </article>
+        <article className="stat-kartu">
+          <p className="stat-label">Terpakai</p>
+          <p className="angka">{rp(totalTerpakai)}</p>
+          <p className="muted kecil">Periode berjalan</p>
+        </article>
+        <article className="stat-kartu">
+          <p className="stat-label">Sisa jatah</p>
+          <p className="angka">{rp(totalSisa)}</p>
+          <p className="muted kecil">Belum terpakai</p>
+        </article>
+      </div>
+
+      <section className="kartu">
+        <div className="baris-antara">
+          <h2>Tambah pos</h2>
+          <span className="badge hijau">Baru</span>
+        </div>
         <div className="form">
           <label>
             Grup
@@ -121,7 +156,10 @@ export function Pos({
       </section>
 
       <section className="kartu">
-        <h2>Kelola Pos</h2>
+        <div className="baris-antara">
+          <h2>Kelola pos</h2>
+          <span className="badge">Edit</span>
+        </div>
         <div className="form">
           <label>
             Pilih pos aktif
@@ -151,23 +189,31 @@ export function Pos({
           </Tombol>
         </div>
       </section>
-      </div>
 
-      <section className="kartu">
-        <h2>Daftar Pos</h2>
-        <div className="tabel">
+      <section className="kartu cn-span">
+        <div className="baris-antara">
+          <h2>Daftar pos</h2>
+          <span className="badge">{data.grup.length} grup</span>
+        </div>
+        <div className="cn-grup-pos">
           {data.grup.map((g) => (
-            <div key={g.id} className="blok-pos">
+            <div key={g.id} className="cn-grup-kartu">
               <p className="label">{g.nama}</p>
               <ul>
-                {g.pos.map((p) => (
-                  <li key={p.id}>
-                    <span>{p.nama}</span>
-                    <span className="muted">
-                      {rp(p.jatahRencana)} · terpakai {rp(p.terpakai)}
-                    </span>
-                  </li>
-                ))}
+                {g.pos.map((p) => {
+                  const persen = p.jatahRencana > 0 ? Math.min(100, Math.round((p.terpakai / p.jatahRencana) * 100)) : 0;
+                  return (
+                    <li key={p.id}>
+                      <div className="baris-antara">
+                        <span>{p.nama}</span>
+                        <span className="muted kecil">{rp(p.terpakai)} / {rp(p.jatahRencana)}</span>
+                      </div>
+                      <div className={`bar tipis ${persen >= 100 ? "lebih" : ""}`}>
+                        <span style={{ width: `${persen}%` }} />
+                      </div>
+                    </li>
+                  );
+                })}
                 {!g.pos.length ? <li className="muted">Belum ada pos aktif.</li> : null}
               </ul>
             </div>
@@ -176,12 +222,15 @@ export function Pos({
       </section>
 
       {data.bolehSetup ? (
-        <section className="kartu lebar">
-          <h2>Setup Awal</h2>
+        <section className="kartu cn-span">
+          <div className="baris-antara">
+            <h2>Setup awal</h2>
+            <span className="badge hijau">Terbuka</span>
+          </div>
           <p className="muted">
             Hanya bisa diubah sebelum gaji pertama. Setelah gaji masuk, pengaturan ini dikunci.
           </p>
-          <div className="form">
+          <div className="form form-baris">
             <label>
               Tanggal mulai
               <input
@@ -212,34 +261,37 @@ export function Pos({
                 onChange={(investasiAwal) => setSetup({ ...setup, investasiAwal })}
               />
             </label>
-            <Tombol lebar onClick={() => void simpanSetup()} disabled={sibuk}>
+            <Tombol onClick={() => void simpanSetup()} disabled={sibuk}>
               Simpan setup
             </Tombol>
           </div>
         </section>
       ) : (
-        <section className="kartu lebar">
-          <h2>Pengaturan Terkunci</h2>
+        <section className="kartu cn-span">
+          <div className="baris-antara">
+            <h2>Pengaturan terkunci</h2>
+            <span className="badge">Terkunci</span>
+          </div>
           <p className="muted">
             Gaji pertama sudah tercatat. Setup awal tidak bisa diubah lagi dari web.
           </p>
-          <div className="grid-3">
-            <div>
-              <p className="label">Tanggal mulai</p>
-              <p>{data.pengaturan.tanggalMulai ?? "-"}</p>
-            </div>
-            <div>
-              <p className="label">Saldo awal</p>
-              <p>{rp(data.pengaturan.saldoAwal)}</p>
-            </div>
-            <div>
-              <p className="label">Tabungan awal</p>
-              <p>{rp(data.pengaturan.tabunganAwal)}</p>
-            </div>
-            <div>
-              <p className="label">Investasi awal</p>
-              <p>{rp(data.pengaturan.investasiAwal)}</p>
-            </div>
+          <div className="stat-row">
+            <article className="stat-kartu">
+              <p className="stat-label">Tanggal mulai</p>
+              <p className="angka kecil">{data.pengaturan.tanggalMulai ?? "-"}</p>
+            </article>
+            <article className="stat-kartu">
+              <p className="stat-label">Saldo awal</p>
+              <p className="angka">{rp(data.pengaturan.saldoAwal)}</p>
+            </article>
+            <article className="stat-kartu">
+              <p className="stat-label">Tabungan awal</p>
+              <p className="angka">{rp(data.pengaturan.tabunganAwal)}</p>
+            </article>
+            <article className="stat-kartu">
+              <p className="stat-label">Investasi awal</p>
+              <p className="angka">{rp(data.pengaturan.investasiAwal)}</p>
+            </article>
           </div>
         </section>
       )}
