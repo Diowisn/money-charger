@@ -4283,3 +4283,212 @@ button.utama:hover {
 .profil {
   grid-template-columns: minmax(0, 1fr);
 }
+
+/* ---------- Coinest layout ---------- */
+
+.app {
+  padding: 18px 24px 40px 280px;
+  background: #f3f6ef;
+}
+
+.sidebar {
+  width: 248px;
+  padding: 22px 16px 16px;
+  background: linear-gradient(180deg, #e8f2dc 0%, #f4f8ef 100%);
+  border-right: 0;
+}
+
+.sidebar-nav {
+  overflow: auto;
+  gap: 2px;
+  padding-right: 4px;
+}
+
+.sidebar-promo {
+  display: grid;
+  gap: 12px;
+  margin-top: auto;
+  padding: 18px 16px;
+  border-radius: 22px;
+  background:
+    radial-gradient(90px 70px at 90% 18%, rgba(185, 242, 124, 0.28), transparent 70%),
+    #173e35;
+  color: #f4fbf0;
+}
+
+.sidebar-promo p {
+  margin: 0;
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+
+.sidebar-promo-ikon {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.sidebar-promo-ikon svg { width: 20px; height: 20px; }
+
+.sidebar-promo-tombol {
+  min-height: 40px;
+  border-radius: 12px;
+  background: #c8f58a;
+  color: #173e35;
+}
+
+.app-main { max-width: none; }
+
+.cn-top {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 16px;
+}
+
+.cn-top h1 {
+  flex: 1;
+  margin: 0;
+  font-size: 1.55rem;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+}
+
+.cn-top-kanan {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.cn-jam { margin-left: 6px; color: var(--muted); font-weight: 600; }
+
+.header-avatar {
+  display: flex;
+  width: auto;
+  gap: 8px;
+  padding: 4px 10px 4px 4px;
+  border-radius: 999px;
+  font-size: 0.82rem;
+}
+
+.header-avatar span { max-width: 120px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.cn-dash {
+  display: grid;
+  grid-template-columns: 280px minmax(0, 1.4fr) 300px;
+  gap: 14px;
+  align-items: start;
+}
+
+.cn-kiri, .cn-tengah, .cn-kanan, .cn-halaman {
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+}
+
+.cn-tengah .stat-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+
+.cn-sumbu {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 0.68rem;
+}
+
+.cn-rencana, .cn-legend, .cn-aktivitas, .cn-dompet {
+  display: grid;
+  gap: 10px;
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.cn-dompet li {
+  display: grid;
+  gap: 2px;
+  padding: 12px;
+  border-radius: 16px;
+  background: #eef6e4;
+}
+
+.cn-dompet li.gelap { background: #173e35; color: #f4fbf0; }
+
+.cn-legend li, .cn-aktivitas li {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  gap: 8px;
+}
+
+.cn-aktivitas li { grid-template-columns: auto 1fr; }
+.cn-aktivitas b, .cn-legend span:nth-child(2) { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.cn-halaman { grid-template-columns: minmax(280px, 360px) minmax(0, 1fr); align-items: start; }
+.cn-halaman > .lebar, .cn-span { grid-column: 1 / -1; }
+.cn-panel { padding: 18px; border: 1px solid var(--garis); border-radius: 22px; background: #f3f8ec; }
+.cn-tabel { width: 100%; border-collapse: collapse; }
+.cn-tabel th, .cn-tabel td { padding: 12px 8px; border-bottom: 1px solid var(--garis); text-align: left; font-size: 0.84rem; }
+.cn-tabel th { color: var(--muted); font-size: 0.72rem; font-weight: 650; background: #f3f8ec; }
+.cn-tabel td b { font-variant-numeric: tabular-nums; }
+
+[data-theme="dark"] .app { background: var(--bg); }
+[data-theme="dark"] .sidebar { background: #102019; }
+[data-theme="dark"] .cn-panel, [data-theme="dark"] .cn-tabel th, [data-theme="dark"] .cn-dompet li { background: #1b2e25; color: var(--teks); }
+[data-theme="dark"] .cn-dompet li.gelap { background: #0d1c16; }
+
+@media (max-width: 1280px) {
+  .cn-dash { grid-template-columns: 260px minmax(0, 1fr); }
+  .cn-kanan { grid-column: 1 / -1; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 959px) {
+  .app { padding: 12px 12px calc(96px + env(safe-area-inset-bottom)); }
+  .sidebar { display: none; }
+  .cn-top h1 { font-size: 1.15rem; text-align: center; }
+  .cn-jam, .header-avatar span, .status-live { display: none; }
+  .header-back { display: grid; }
+  .cn-dash, .cn-halaman, .cn-kanan { grid-template-columns: 1fr; }
+  .cn-tengah .stat-row { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (min-width: 960px) {
+  .header-back { display: none; }
+  .sidebar { display: flex; }
+}
+
+.rekap, .wawasan, .profil, .tumpuk.dua-kolom, .tumpuk.rencana-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  align-items: start;
+}
+
+.rekap > .rekap-saldo,
+.rekap > .rekap-grafik,
+.wawasan > .wawasan-skor,
+.profil > :first-child,
+.tumpuk > .lebar,
+.rencana-grid > .kartu:first-child {
+  grid-column: 1 / -1;
+}
+
+.riwayat-panel .daftar-transaksi {
+  display: grid;
+}
+
+.riwayat-panel .item-transaksi {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1.4fr) minmax(0, .8fr) auto;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 4px;
+}
+
+@media (max-width: 900px) {
+  .rekap, .wawasan, .profil, .tumpuk.dua-kolom, .tumpuk.rencana-grid,
+  .riwayat-panel .item-transaksi { grid-template-columns: 1fr; }
+}

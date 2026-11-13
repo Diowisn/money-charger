@@ -7,7 +7,7 @@ import { DetailDialog, KonfirmasiDialog, ScanDialog } from "./view/dialog";
 import { INTERVAL_LIVE_MS, temaAwal } from "./view/format";
 import { kompresGambar } from "./view/gambar";
 import { IkonLainnya, IkonRekap, IkonRingkasan, IkonTambah, IkonTransaksi, IkonWawasan } from "./view/ikon";
-import { JUDUL_TAB, MENU_IDENTITAS, MENU_SAMPING, TAB_UTAMA, indukTab } from "./view/menu";
+import { JUDUL_TAB, MENU_SAMPING, TAB_UTAMA, indukTab } from "./view/menu";
 import { Asisten } from "./view/tab-asisten";
 import { Dompet } from "./view/tab-dompet";
 import { Impor } from "./view/tab-impor";
@@ -257,17 +257,10 @@ export default function Dashboard({ awal, emailSetupSiap = false }: { awal: Dash
     <div className="app">
       <aside className="sidebar">
         <div className="sidebar-merek">
-          <img src="/icon-192.png" alt="" width={42} height={42} />
-          <div>
-            <b>Money-Charger</b>
-            <span>Keuangan pribadi</span>
-          </div>
+          <img src="/icon-192.png" alt="" width={36} height={36} />
+          <b>Money-Charger</b>
         </div>
-        <Tombol className="sidebar-cat-button" lebar onClick={() => catat("out")}>
-          <span aria-hidden="true">＋</span> Catat transaksi
-        </Tombol>
         <nav className="sidebar-nav" aria-label="Navigasi utama">
-          <p className="sidebar-label">MENU</p>
           {MENU_SAMPING.map(([id, label, Ikon]) => (
             <button
               key={id}
@@ -280,54 +273,40 @@ export default function Dashboard({ awal, emailSetupSiap = false }: { awal: Dash
               <span>{label}</span>
             </button>
           ))}
-          <p className="sidebar-label jarak">IDENTITAS DIRI</p>
-          {MENU_IDENTITAS.map(([id, label, Ikon]) => (
-            <button
-              key={id}
-              type="button"
-              className={tab === id ? "sidebar-link aktif" : "sidebar-link"}
-              aria-current={tab === id ? "page" : undefined}
-              onClick={() => navigasiKe(id)}
-            >
-              <Ikon aktif={tab === id} />
-              <span>{label}</span>
-            </button>
-          ))}
         </nav>
-        <div className="sidebar-status">
-          <span className={`status-live ${statusLive}`} role="status" aria-live="polite">
-            <i /> {statusLive === "hidup" ? "Tersinkron" : "Koneksi terputus"}
+        <div className="sidebar-promo">
+          <span className="sidebar-promo-ikon" aria-hidden="true">
+            <IkonTambah aktif />
           </span>
-          {jamTerakhir ? <span className="muted kecil">Pembaruan {jamTerakhir}</span> : null}
+          <p>Catat pemasukan, pengeluaran, dan target dari satu tempat.</p>
+          <Tombol className="sidebar-promo-tombol" onClick={() => catat("out")}>
+            Catat sekarang
+          </Tombol>
         </div>
       </aside>
 
       <div className="app-main">
-        {tab !== "ringkasan" ? (
-          <header className="app-header">
-            <button
-              className="header-back"
-              type="button"
-              onClick={() => navigasiKe(indukTab(tab))}
-              aria-label={`Kembali ke ${JUDUL_TAB[indukTab(tab)].toLowerCase()}`}
-            >
-              ←
+        <header className="cn-top">
+          <button
+            className="header-back"
+            type="button"
+            onClick={() => navigasiKe(tab === "ringkasan" ? "lainnya" : indukTab(tab))}
+            aria-label={tab === "ringkasan" ? "Buka menu lainnya" : `Kembali ke ${JUDUL_TAB[indukTab(tab)].toLowerCase()}`}
+          >
+            {tab === "ringkasan" ? "☰" : "←"}
+          </button>
+          <h1>{JUDUL_TAB[tab]}</h1>
+          <div className="cn-top-kanan">
+            <span className={`status-live ${statusLive}`} role="status" aria-live="polite">
+              <i /> {statusLive === "hidup" ? "Tersinkron" : "Terputus"}
+              {jamTerakhir ? <span className="cn-jam">{jamTerakhir}</span> : null}
+            </span>
+            <button className="header-avatar" type="button" onClick={() => navigasiKe("profil")} aria-label="Buka profil">
+              {data.profil?.avatar ? <img src={data.profil.avatar} alt="" /> : (nama.trim().charAt(0) || "M").toUpperCase()}
+              <span>{nama || "Profil"}</span>
             </button>
-            <h1>{JUDUL_TAB[tab]}</h1>
-            <button
-              className="header-avatar"
-              type="button"
-              onClick={() => navigasiKe("profil")}
-              aria-label="Buka profil"
-            >
-              {data.profil?.avatar ? (
-                <img src={data.profil.avatar} alt="" />
-              ) : (
-                (nama.trim().charAt(0) || "M").toUpperCase()
-              )}
-            </button>
-          </header>
-        ) : null}
+          </div>
+        </header>
 
         {pesan ? (
           <div className={`toast ${pesan.jenis}`} role="status">
