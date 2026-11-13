@@ -1496,6 +1496,38 @@ label.cek > span { font-size: 0.72rem; }
    ============================================================ */
 @media (min-width: 960px) {
   .bottom-nav { display: none; }
+  .app { padding: 0 28px 32px 92px; }
+  .sidebar { width: 72px; align-items: center; padding: 20px 8px; background: #edf4e9; border: 0; }
+  .sidebar-merek { justify-content: center; padding: 0 0 24px; }
+  .sidebar-merek b, .sidebar-link span, .sidebar-promo { display: none; }
+  .sidebar-nav { width: 100%; gap: 8px; }
+  .sidebar-link { justify-content: center; width: 48px; height: 48px; padding: 0; border-radius: 50%; }
+  .sidebar-link svg { width: 21px; height: 21px; }
+  .sidebar-link.aktif { box-shadow: none; }
+  .app-main { max-width: 1180px; }
+  .cn-top { grid-template-columns: 1fr auto; position: static; margin-bottom: 16px; padding: 20px 0 12px; }
+  .cn-top h1 { text-align: left; font-size: 1.25rem; }
+  .cn-top-ikon:first-child { display: none; }
+  .dh { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+  .dh-hero { grid-column: 1 / -1; padding: 14px 20px; border: 1px solid var(--dh-garis); background: var(--dh-kartu); color: var(--dh-teks); box-shadow: none; }
+  .dh-hero-top, .dh-nama { display: none; }
+  .dh-hero-bawah { align-items: center; }
+  .dh-label, .dh-mini span { color: var(--dh-muted); }
+  .dh-mini b { color: var(--dh-teks); }
+  .dh-aksi { grid-column: 1 / -1; grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .dh-ringkas { grid-column: 1 / -1; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+  .dh > .dh-kartu:nth-of-type(1), .dh > .dh-kartu:nth-of-type(4), .dh > .dh-kartu:nth-of-type(5) { grid-column: 1 / -1; }
+  .dh-kartu { border-radius: 17px; padding: 18px; }
+  .dh-chart { height: 210px; }
+  .dh-chart-batang { height: 160px; }
+}
+@media (min-width: 960px) {
+  .dh > .dh-kartu:nth-of-type(2), .dh > .dh-kartu:nth-of-type(3), .dh > .dh-kartu:nth-of-type(6), .dh > .dh-kartu:nth-of-type(7) { grid-column: span 1; }
+}
+@media (max-width: 959px) {
+  .dh { max-width: 680px; margin: 0 auto; }
+  .dh-hero { border-radius: 18px; }
+  .dh-kartu, .dh-ringkas-item { border-radius: 16px; }
 }
 @media (max-width: 959px) {
   .app { padding: 0 18px calc(84px + env(safe-area-inset-bottom)); }
