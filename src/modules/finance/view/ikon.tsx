@@ -191,8 +191,8 @@ export function SaldoIlustrasi() {
       <rect x="8" y="40" width="76" height="44" rx="10" fill="rgba(255,255,255,0.18)" />
       <rect x="24" y="30" width="76" height="44" rx="10" fill="rgba(255,255,255,0.28)" />
       <rect x="40" y="20" width="76" height="44" rx="10" fill="rgba(255,255,255,0.9)" />
-      <circle cx="96" cy="42" r="9" fill="#7fc8f3" />
-      <path d="M96 37v10M92 40h8M92 44h8" stroke="#2b86bd" strokeWidth="1.6" strokeLinecap="round" />
+      <circle cx="96" cy="42" r="9" fill="#b9f27c" />
+      <path d="M96 37v10M92 40h8M92 44h8" stroke="#173e35" strokeWidth="1.6" strokeLinecap="round" />
       <circle cx="112" cy="70" r="11" fill="rgba(255,255,255,0.24)" />
       <circle cx="112" cy="70" r="6" fill="rgba(255,255,255,0.5)" />
       <path d="M18 82h168" stroke="rgba(255,255,255,0.16)" strokeLinecap="round" />

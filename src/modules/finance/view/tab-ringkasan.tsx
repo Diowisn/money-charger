@@ -1,7 +1,7 @@
 import { Tombol } from "@/components/tombol";
 import type { DashboardData } from "@/lib/dashboard";
 import { rp } from "./format";
-import { IkonKeluar, IkonMasuk, IkonRekap, IkonTransaksi, SaldoIlustrasi } from "./ikon";
+import { IkonKeluar, IkonMasuk, IkonRekap, IkonTarget, IkonTransaksi, IkonWawasan, SaldoIlustrasi } from "./ikon";
 import { BarisTransaksi } from "./komponen";
 import type { Tab } from "./tipe";
 
@@ -46,6 +46,41 @@ export function Ringkasan({
           </p>
         </div>
         <SaldoIlustrasi />
+      </section>
+
+      <section className="stat-row" aria-label="Ringkasan bulan ini">
+        <article className="stat-kartu">
+          <span className="stat-ikon">
+            <IkonMasuk aktif={false} />
+          </span>
+          <p className="stat-label">Pemasukan</p>
+          <p className="angka">{rp(r.pendapatanBulanIni)}</p>
+          <p className="muted kecil">Bulan ini</p>
+        </article>
+        <article className="stat-kartu">
+          <span className="stat-ikon">
+            <IkonKeluar aktif={false} />
+          </span>
+          <p className="stat-label">Pengeluaran</p>
+          <p className="angka">{rp(r.pengeluaranBulanIni)}</p>
+          <p className="muted kecil">Bulan ini</p>
+        </article>
+        <article className="stat-kartu">
+          <span className="stat-ikon">
+            <IkonTarget aktif={false} />
+          </span>
+          <p className="stat-label">Tabungan</p>
+          <p className="angka">{rp(r.tabungan)}</p>
+          <p className="muted kecil">Saldo tersimpan</p>
+        </article>
+        <article className="stat-kartu">
+          <span className="stat-ikon">
+            <IkonWawasan aktif={false} />
+          </span>
+          <p className="stat-label">Investasi</p>
+          <p className="angka">{rp(r.investasi)}</p>
+          <p className="muted kecil">Saldo investasi</p>
+        </article>
       </section>
 
       {aman ? (
