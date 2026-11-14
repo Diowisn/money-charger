@@ -1,7 +1,12 @@
-import type { DashboardData } from "@/lib/dashboard";
+import type { DashboardData, TxView } from "@/lib/dashboard";
 import type { Tema } from "./tipe";
 
 export const INTERVAL_LIVE_MS = 5000;
+
+/** Transaksi baru dari email yang belum pernah terlihat oleh sesi dashboard ini. */
+export function transaksiEmailBaru(transaksi: TxView[], dikenal: ReadonlySet<number>): TxView[] {
+  return transaksi.filter((tx) => !dikenal.has(tx.id) && tx.detail?.sumber === "email");
+}
 
 export const NAMA_TIPE: Record<string, string> = {
   out: "Pengeluaran",

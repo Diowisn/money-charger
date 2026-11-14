@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState, type ReactElement } from "rea
 import { Tombol } from "@/components/tombol";
 import type { DashboardData, TxView } from "@/lib/dashboard";
 import { DetailDialog, KonfirmasiDialog, ScanDialog } from "./view/dialog";
-import { INTERVAL_LIVE_MS, temaAwal } from "./view/format";
+import { INTERVAL_LIVE_MS, temaAwal, transaksiEmailBaru as saringTransaksiEmailBaru } from "./view/format";
 import { kompresGambar } from "./view/gambar";
 import { IkonLainnya, IkonRekap, IkonRingkasan, IkonTambah, IkonTransaksi, IkonWawasan } from "./view/ikon";
 import { JUDUL_TAB, MENU_SAMPING, TAB_UTAMA } from "./view/menu";
@@ -94,9 +94,7 @@ export default function Dashboard({ awal, emailSetupSiap = false }: { awal: Dash
         if (!senyap) setPesan({ jenis: "error", teks: j.error ?? "Gagal memuat data." });
         return;
       }
-      const transaksiEmailBaru = j.data.transaksi.filter(
-        (tx) => !knownTxIdsRef.current.has(tx.id) && tx.detail?.sumber === "email",
-      );
+      const transaksiEmailBaru = saringTransaksiEmailBaru(j.data.transaksi, knownTxIdsRef.current);
       for (const tx of j.data.transaksi) knownTxIdsRef.current.add(tx.id);
       if (transaksiEmailBaru.length) {
         const tx = transaksiEmailBaru[0];
@@ -306,16 +304,6 @@ export default function Dashboard({ awal, emailSetupSiap = false }: { awal: Dash
 
       <div className="app-main">
         <header className="cn-top">
-          <button
-            className="cn-top-ikon"
-            type="button"
-            onClick={() => navigasiKe("lainnya")}
-            aria-label="Buka menu lainnya"
-          >
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
-              <path d="M4 7h16M4 12h16M4 17h10" />
-            </svg>
-          </button>
           <h1>{tab === "ringkasan" ? "Dashboard" : JUDUL_TAB[tab]}</h1>
         </header>
 
@@ -447,7 +435,7 @@ export default function Dashboard({ awal, emailSetupSiap = false }: { awal: Dash
               ["ringkasan", "Beranda", IkonRingkasan],
               ["riwayat", "Transaksi", IkonTransaksi],
               ["rekap", "Rekap", IkonRekap],
-              ["wawasan", "Wawasan", IkonWawasan],
+              ["wawasan", "Analisis", IkonWawasan],
               ["lainnya", "Lainnya", IkonLainnya],
             ] as [Tab, string, (p: { aktif: boolean }) => ReactElement][]
           ).map(([id, label, Ikon]) => {
