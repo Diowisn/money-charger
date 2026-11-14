@@ -4,9 +4,10 @@ import DashboardView from "./dashboard-view";
 import { muatDashboard } from "./model";
 
 export async function dashboardPage() {
+  const userId = await userIdDariSesi();
+  if (!userId) redirect("/login");
+
   try {
-    const userId = await userIdDariSesi();
-    if (!userId) redirect("/login");
     return <DashboardView awal={await muatDashboard(userId)} emailSetupSiap={Boolean(process.env.GMAIL_SETUP_URL?.trim())} />;
   } catch (e) {
     console.error(e);
