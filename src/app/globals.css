@@ -231,6 +231,7 @@ code {
 .sidebar-promo-ikon svg { width: 18px; height: 18px; }
 .sidebar-promo p { font-size: 0.72rem; line-height: 1.4; color: var(--hero-muted); }
 .sidebar-promo-tombol { min-height: 38px; background: var(--lime); color: var(--hijau); }
+[data-theme="dark"] .sidebar-promo-tombol { color: #10261d; }
 .sidebar-promo-tombol:hover { filter: brightness(1.05); }
 
 .app-main { max-width: 940px; margin: 0 auto; }
@@ -920,6 +921,8 @@ label.cek > span { font-size: 0.72rem; }
 }
 .toast button { padding: 0 2px; border: 0; background: transparent; color: inherit; font-size: 1rem; }
 .toast.galat { background: var(--merah); }
+[data-theme="dark"] .toast:not(.galat) { background: var(--lime); color: #10261d; }
+[data-theme="dark"] .toast.galat { background: var(--merah-2); color: var(--merah); }
 
 /* ---------- Profil ---------- */
 .profil-hero { align-items: center; }
@@ -1479,6 +1482,7 @@ label.cek > span { font-size: 0.72rem; }
 .dh-status { padding: 1px 6px; border: 1px solid transparent; border-radius: 999px; font-size: 0.55rem; font-weight: 750; }
 .dh-status.selesai { border-color: var(--garis); background: var(--dh-aksen-bg); color: var(--dh-aksen); }
 .dh-status.pending { border-color: #ecd9a8; background: #fdf6e3; color: #8a6d1d; }
+[data-theme="dark"] .dh-status.selesai { border-color: var(--dh-aksen-bg); background: var(--dh-aksen-bg); color: var(--dh-aksen); }
 [data-theme="dark"] .dh-status.pending { border-color: #66572c; background: #332d18; color: #e8cf8a; }
 
 .dh-aktivitas { margin: 0; padding: 0; list-style: none; display: grid; gap: 2px; }

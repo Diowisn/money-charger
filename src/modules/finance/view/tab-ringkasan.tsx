@@ -34,7 +34,6 @@ export function Ringkasan({
 }) {
   const r = data.ringkasan;
   const [rentang, setRentang] = useState(6);
-  const bulanIni = data.hariIni.slice(0, 7);
   const [tahun, bulan] = data.hariIni.split("-").map(Number);
   const bulanLalu = mundurBulan(tahun, bulan, 1);
 

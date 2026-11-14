@@ -3,7 +3,7 @@ import { TautanTombol, Tombol } from "@/components/tombol";
 import type { DashboardData } from "@/lib/dashboard";
 import type { LaporanData } from "@/lib/laporan";
 import { addDays } from "@/lib/parse/date";
-import { NAMA_TIPE, labelBulan, mundurBulan, rp, tanggalPendek } from "./format";
+import { NAMA_TIPE, mundurBulan, rp, tanggalPendek } from "./format";
 import type { Kirim } from "./tipe";
 
 interface Preset {
