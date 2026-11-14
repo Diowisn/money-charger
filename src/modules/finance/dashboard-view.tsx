@@ -47,12 +47,17 @@ export default function Dashboard({ awal, emailSetupSiap = false }: { awal: Dash
   const knownTxIdsRef = useRef(new Set(awal.transaksi.map((tx) => tx.id)));
   const sibukRef = useRef(false);
   const urutanRef = useRef(0);
-  const emailToastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     dataRef.current = awal;
     setData(awal);
   }, [awal]);
+
+  useEffect(() => {
+    if (!pesan) return;
+    const timer = setTimeout(() => setPesan(null), 4000);
+    return () => clearTimeout(timer);
+  }, [pesan]);
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
@@ -100,11 +105,6 @@ export default function Dashboard({ awal, emailSetupSiap = false }: { awal: Dash
         const tx = transaksiEmailBaru[0];
         const sumber = transaksiEmailBaru.length > 1 ? `${transaksiEmailBaru.length} transaksi email baru` : `Transaksi email masuk: ${tx.label || tx.subPost || "Transaksi"} Rp${tx.nominal.toLocaleString("id-ID")}`;
         setPesan({ jenis: "ok", teks: sumber });
-        if (emailToastTimerRef.current) clearTimeout(emailToastTimerRef.current);
-        emailToastTimerRef.current = setTimeout(() => {
-          setPesan((terkini) => (terkini?.teks === sumber ? null : terkini));
-          emailToastTimerRef.current = null;
-        }, 7000);
       }
       if (JSON.stringify(j.data) !== JSON.stringify(dataRef.current)) {
         dataRef.current = j.data;
@@ -134,7 +134,6 @@ export default function Dashboard({ awal, emailSetupSiap = false }: { awal: Dash
     window.addEventListener("online", saatOnline);
     return () => {
       window.clearInterval(timer);
-      if (emailToastTimerRef.current) clearTimeout(emailToastTimerRef.current);
       document.removeEventListener("visibilitychange", saatTerlihat);
       window.removeEventListener("focus", saatFokus);
       window.removeEventListener("online", saatOnline);

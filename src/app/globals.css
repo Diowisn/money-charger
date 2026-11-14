@@ -894,7 +894,7 @@ label.cek > span { font-size: 0.72rem; }
 
 .toast {
   position: fixed;
-  top: 16px;
+  top: 50%;
   left: 50%;
   z-index: 110;
   display: flex;
@@ -908,12 +908,12 @@ label.cek > span { font-size: 0.72rem; }
   font-size: 0.74rem;
   font-weight: 600;
   box-shadow: var(--bayang-kuat);
-  transform: translateX(-50%);
+  transform: translate(-50%, -50%);
 }
 .toast button { padding: 0 2px; border: 0; background: transparent; color: inherit; font-size: 1rem; }
-.toast.galat { background: var(--merah); }
-[data-theme="dark"] .toast:not(.galat) { background: var(--lime); color: #10261d; }
-[data-theme="dark"] .toast.galat { background: var(--merah-2); color: var(--merah); }
+.toast.error { background: var(--merah); }
+[data-theme="dark"] .toast:not(.error) { background: var(--lime); color: #10261d; }
+[data-theme="dark"] .toast.error { background: var(--merah-2); color: var(--merah); }
 
 /* ---------- Profil ---------- */
 .profil-hero { align-items: center; }
